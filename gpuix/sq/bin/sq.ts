@@ -12,7 +12,8 @@ Options
   -w, --window          open a native window instead of rendering in the terminal
   -h, --help            show this help
 
-Keys: ⌘↵ run · ⌘E explain · Tab accept completion · ⌘↑/⌘↓ history · ⌃C quit
+Keys: ⌃↵ run · ⌃E explain · Tab accept completion · ⌃L clear · ⌃1–4 tabs · Esc close inspector · ⌃C quit
+      (in --window mode ⌘ works too)
 Runs inside Ghostty or kitty (kitty graphics protocol). Not supported inside tmux.`)
   process.exit(args.length === 0 ? 1 : 0)
 }

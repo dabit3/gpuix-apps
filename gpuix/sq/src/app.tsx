@@ -636,7 +636,17 @@ export function SqApp({ db, initialSql, pollMs = 250 }: { db: SqDb; initialSql?:
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'row', flexGrow: 1, minHeight: 0 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, flexBasis: 0, minWidth: 0 }}>
+            <div
+              onMouseMove={(e: EventPayload) => {
+                const d = drag.current
+                if (!d) return
+                if (!e.pressedButton) { drag.current = null; return }
+                const w = Math.max(48, Math.round(d.w + (e.x ?? 0) - d.x))
+                setWidths((ws) => { const n = ws.slice(); n[d.col] = w; return n })
+              }}
+              onMouseUp={() => { drag.current = null }}
+              style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, flexBasis: 0, minWidth: 0 }}
+            >
               {tab === 'results' && res && (
                 <>
                   <div testId="grid-header" style={{ display: 'flex', flexDirection: 'row', height: 30, flexShrink: 0, alignItems: 'center', borderBottomWidth: 1, borderColor: T.borderStrong, backgroundColor: T.panel, overflow: 'hidden' }}>
@@ -650,13 +660,6 @@ export function SqApp({ db, initialSql, pollMs = 250 }: { db: SqDb; initialSql?:
                         <div
                           testId={`resize-${c}`}
                           onMouseDown={(e: EventPayload) => { drag.current = { col: ci, x: e.x ?? 0, w: widths[ci] ?? 120 } }}
-                          onMouseMove={(e: EventPayload) => {
-                            const d = drag.current
-                            if (!d || !e.pressedButton) return
-                            const w = Math.max(48, Math.round(d.w + (e.x ?? 0) - d.x))
-                            setWidths((ws) => { const n = ws.slice(); n[d.col] = w; return n })
-                          }}
-                          onMouseUp={() => { drag.current = null }}
                           style={{ width: 7, height: 30, cursor: 'col-resize', hover: { backgroundColor: '#71b7ff55' } }}
                         />
                       </div>
