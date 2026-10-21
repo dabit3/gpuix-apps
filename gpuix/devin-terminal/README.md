@@ -44,7 +44,7 @@ Don't pipe anything into `devin-tui`: GPUIX 0.11.0 treats a stdin pipe as the au
 
 | UI | Endpoint |
 |---|---|
-| Sidebar: every page once at launch (cursor pagination), then the newest page every 9 s; sorted by `updated_at`, "Load more…" shows 40 more | `GET /v3/organizations/{org}/sessions?first=100&after=…` |
+| Sidebar: up to 20 pages (2,000 sessions) once at launch (cursor pagination), then the newest page every 9 s; sorted by `updated_at`, "Load more…" shows 40 more | `GET /v3/organizations/{org}/sessions?first=100&after=…` |
 | Open session: status, ACUs, PRs (polled every 3 s) | `GET /v3/organizations/{org}/sessions/{id}` |
 | Transcript (polled every 3 s, cursor pagination) | `GET /v3/organizations/{org}/sessions/{id}/messages` |
 | Composer on the home view | `POST /v3/organizations/{org}/sessions` (`prompt`, `devin_mode`, `repos`, tag `devin-tui`) |
