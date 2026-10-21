@@ -80,7 +80,7 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
   const expLabel = exp.status === 'running' ? `Exporting ${Math.round((exp.done / exp.total) * 100)}%` : exp.status === 'done' ? 'Exported' : exp.status === 'error' ? 'Export failed' : 'Export MP4'
 
   return (
-    <div testId="app-root" style={{ position: 'relative', width: size.width, height: size.height, backgroundColor: ch.bg, overflow: 'hidden' }}>
+    <div testId="app-root" style={{ position: 'relative', width: size.width, height: size.height, backgroundColor: ch.bg, overflow: 'hidden', userSelect: 'none' }}>
       {/* top bar */}
       <div style={{ position: 'absolute', left: 0, top: 0, width: size.width, height: L.top.h, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: L.narrow ? 14 : 22, paddingRight: L.narrow ? 14 : 22 }}>
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
