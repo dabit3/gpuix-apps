@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import './env.ts'
 import { render } from '@gpuix/react'
 import { existsSync } from 'node:fs'
 import { FlameApp, type Order, type View } from './app.tsx'
@@ -71,6 +72,13 @@ try {
 
 const termEnv = /ghostty|kitty/i.test(`${process.env.TERM_PROGRAM ?? ''} ${process.env.TERM ?? ''}`) || process.env.GPUIX_TERMINAL === '1'
 const terminal = mode === 'terminal' || (mode === 'auto' && termEnv && !process.env.GPUIX_BACKGROUND)
+
+// Keep the restored shell clean: GPUIX prints mount logs to stdout.
+const log = console.log
+console.log = (...a: unknown[]) => {
+  if (typeof a[0] === 'string' && a[0].startsWith('[gpuix]')) return
+  log(...a)
+}
 
 render(<FlameApp source={source!} initialView={view} initialOrder={order} initialQuery={search} />, {
   terminal,

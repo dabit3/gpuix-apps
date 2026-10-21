@@ -660,7 +660,7 @@ export function FlameApp({ source, initialView = 'flame', initialOrder = 'heavy'
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.2 }}
-          style={{ position: 'absolute', right: 16, top: 54, display: 'flex', alignItems: 'center', height: 30, paddingLeft: 12, paddingRight: 12, borderRadius: 8, borderWidth: 1, borderColor: toast.good ? '#26cd4d80' : '#ff949280', backgroundColor: '#0d1117f2', pointerEvents: 'none' }}
+          style={{ position: 'absolute', right: 16, bottom: 40, display: 'flex', alignItems: 'center', height: 30, paddingLeft: 12, paddingRight: 12, borderRadius: 8, borderWidth: 1, borderColor: toast.good ? '#26cd4d80' : '#ff949280', backgroundColor: '#0d1117f2', pointerEvents: 'none' }}
         >
           <Txt color={toast.good ? T.green : T.red} testId="toast-text">{toast.text}</Txt>
         </motion.div>
