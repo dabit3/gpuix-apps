@@ -391,7 +391,7 @@ export class Sim {
             this.setState(s, 'toLink')
             break
           }
-          if (this.webs.length < 2 && this.rand() < 0.03) { this.buildWeb(s); break }
+          if (this.webs.length < 2 && this.t > 25 && this.rand() < 0.03) { this.buildWeb(s); break }
         }
         if (s.path.length === 0) {
           if (s.state === 'idle') {

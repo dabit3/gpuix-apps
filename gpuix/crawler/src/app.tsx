@@ -4,6 +4,9 @@ import { Sim, type LinkRect, type Rect } from './sim'
 import { Raster, drawScene } from './raster'
 import { fetchPage, mockSerp, words, type Block, type Page } from './page'
 import { listen, type Command } from './ipc'
+import { writeFileSync } from 'node:fs'
+
+const STATE_FILE = process.env.CRAWLER_STATE
 
 export const C = {
   bg: '#0a0c10',
@@ -177,6 +180,10 @@ export function App(props: Props) {
       drawScene(r, sim, 0, scrollRef.current)
       img.current?.setImagePixels(w, h, r.buf)
       frames++
+      if (STATE_FILE && frames % 6 === 0) {
+        const v = vp.current, sy = scrollRef.current
+        writeFileSync(STATE_FILE, JSON.stringify({ vp: v, scrollY: sy, spiders: sim.spiders.map((sp) => ({ id: sp.id, state: sp.state, x: Math.round(sp.x + v.x), y: Math.round(sp.y - sy + v.y) })) }))
+      }
       if (now - fpsT > 1000) {
         fps.current = (frames * 1000) / (now - fpsT)
         frames = 0

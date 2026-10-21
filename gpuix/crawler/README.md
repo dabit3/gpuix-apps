@@ -78,7 +78,7 @@ The original was a browser script/bookmarklet that drops a spider on any website
 
 ## Performance
 
-The VM used for development has an **Apple Paravirtual GPU** (Metal), which is much slower than a real Mac. In Ghostty at 1417×876 px the animation loop measured **56–59 fps** (`CRAWLER_FPS_LOG=/tmp/fps.log crawler` writes the measured rate each second). GPUIX terminal frames are demand-driven and capped near 60 Hz.
+The VM used for development has an **Apple Paravirtual GPU** (Metal), which is much slower than a real Mac. In Ghostty at 1417×876 px the animation loop measured **56–59 fps** (`CRAWLER_FPS_LOG=/tmp/fps.log crawler` writes the measured rate each second). GPUIX terminal frames are demand-driven and capped near 60 Hz. `CRAWLER_STATE=/tmp/cs.json` dumps spider positions (terminal coordinates) ten times a second; the demo driver used it to aim clicks.
 
 ## GPUIX findings (0.11.0)
 
