@@ -35,6 +35,8 @@ type Listener = () => void
 
 export class Store {
   files: FileItem[] = []
+  /** Every output written this session, including ones whose row was later re-run or canceled. */
+  private written = { done: 0, before: 0, after: 0 }
   rejected: Rejected[] = []
   focus = 0
   settings: Record<Kind, Settings> = structuredClone(DEFAULTS)
@@ -293,6 +295,9 @@ export class Store {
     if (err || !existsSync(out) || statSync(out).size === 0) { rmSync(out, { force: true }); return this.finish(f, ac, 'failed', err ?? 'no output written') }
     f.outputSize = statSync(out).size
     f.ms = performance.now() - t0
+    this.written.done++
+    this.written.before += f.size
+    this.written.after += f.outputSize
     this.finish(f, ac, 'done', null)
     if (t.ext !== 'ico' && (f.src.kind === 'image' || f.src.kind === 'video' || f.src.kind === 'pdf') && t.id !== 'm4a' && t.id !== 'mp3') {
       const kind = f.src.kind === 'pdf' ? 'image' : t.id === 'gif' ? 'image' : f.src.kind
@@ -329,11 +334,9 @@ export class Store {
   }
 
   stats() {
-    const done = this.files.filter((f) => f.state === 'done')
-    const before = done.reduce((a, f) => a + f.size, 0)
-    const after = done.reduce((a, f) => a + (f.outputSize ?? 0), 0)
+    const { done, before, after } = this.written
     return {
-      done: done.length,
+      done,
       running: this.running(),
       queued: this.files.filter((f) => f.state === 'queued').length,
       failed: this.files.filter((f) => f.state === 'failed').length,

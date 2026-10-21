@@ -69,6 +69,11 @@ describe.skipIf(!hasNativeTestRenderer || !haveFixtures)('convt UI (GPU test ren
     expect(existsSync(out)).toBe(true)
     await settle(renderer)
     expect(renderer.getAllText().join(' ')).toContain('dunes.converted.webp')
+    // re-running a finished row writes a second file and the totals keep counting both
+    store.convert([store.files[dunes]!])
+    await until(renderer, () => store.files[dunes]!.state === 'done' && store.stats().done === 2)
+    expect(existsSync(join(dir, 'dunes.converted-2.webp'))).toBe(true)
+    expect(store.stats().done).toBe(2)
     unmount()
   }, 60000)
 
