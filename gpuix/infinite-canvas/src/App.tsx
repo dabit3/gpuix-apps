@@ -149,7 +149,9 @@ export function App({ initialBoard, savePath: initialSave, onStats }: AppProps) 
   // The native file panel takes key focus; hand it back to the canvas so shortcuts keep working.
   const pickPaths = useCallback(async (opts: Parameters<NonNullable<NonNullable<typeof ctx.renderer>['promptForPaths']>>[0]) => {
     const paths = await ctx.renderer?.promptForPaths?.(opts)
+    ctx.renderer?.activateWindow?.()
     focusRoot()
+    for (const ms of [50, 200, 500]) setTimeout(focusRoot, ms)
     return paths
   }, [ctx.renderer, focusRoot])
 
