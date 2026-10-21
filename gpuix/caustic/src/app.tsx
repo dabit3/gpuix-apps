@@ -1,4 +1,3 @@
-import { appendFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { isTerminal, render, useWindowSize } from '@gpuix/react'
@@ -90,7 +89,6 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
     set,
     key(e: KeyLike) {
       const k = keyName(e)
-      if (process.env.CAUSTIC_KEYLOG) appendFileSync(process.env.CAUSTIC_KEYLOG, JSON.stringify({ key: e.key, keyChar: e.keyChar, k }) + '\n')
       const s = settingsRef.current
       switch (k) {
         case '1': case 'l': quality('lite'); return true
