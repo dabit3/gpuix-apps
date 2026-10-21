@@ -1,0 +1,87 @@
+front ghostty
+move 1200 700
+sleep 1800
+type whip
+sleep 350
+key 36
+sleep 2600
+glide 600 400 700
+glide 900 300 600
+glide 760 520 700
+glide 500 420 600
+sleep 400
+glide 250 650 90
+glide 1100 380 90
+sleep 900
+glide 700 300 500
+sleep 300
+glide 1200 700 85
+glide 300 300 85
+sleep 900
+type ]
+sleep 150
+type ]
+sleep 600
+glide 500 250 600
+sleep 500
+glide 1300 600 95
+glide 300 350 95
+sleep 1100
+type [
+sleep 150
+type [
+sleep 600
+glide 650 450 500
+glide 950 300 400
+glide 600 650 90
+glide 1150 250 90
+sleep 1200
+key 2 cmd
+sleep 1600
+type whip -- clanker
+sleep 350
+key 36
+sleep 3500
+click 380 520
+sleep 400
+type a
+sleep 900
+glide 300 350 500
+sleep 300
+glide 120 700 75
+glide 650 300 75
+sleep 2600
+glide 400 450 400
+glide 650 700 75
+glide 150 250 75
+sleep 2800
+type p
+sleep 900
+glide 300 400 400
+glide 100 650 75
+glide 680 350 75
+sleep 2700
+glide 450 300 400
+glide 700 650 75
+glide 120 300 75
+sleep 2800
+move 793 520
+sleep 300
+drag 1000 520 1300
+sleep 900
+glide 500 400 500
+glide 150 700 75
+glide 900 300 75
+sleep 2600
+glide 600 450 500
+glide 950 650 75
+glide 200 280 75
+sleep 2600
+click 300 520
+sleep 300
+key 8 ctrl
+sleep 1500
+click 1100 600
+sleep 300
+key 8 ctrl
+sleep 2200

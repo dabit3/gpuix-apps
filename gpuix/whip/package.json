@@ -1,0 +1,26 @@
+{
+  "name": "whip",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A physics whip for terminal coding agents, painted inside Ghostty with GPUIX",
+  "bin": {
+    "whip": "./bin/whip.tsx",
+    "clanker": "./bin/clanker.ts"
+  },
+  "scripts": {
+    "start": "bun bin/whip.tsx",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.11.0",
+    "@gpuix/react": "0.11.0",
+    "react": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.11",
+    "@types/react": "19.2.2",
+    "typescript": "5.9.3"
+  }
+}
