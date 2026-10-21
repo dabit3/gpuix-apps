@@ -83,6 +83,8 @@ bun run typecheck
 
 - `flexBasis: 'auto'` throws `Batch op setStyle parse error: invalid type: string "auto", expected f64` inside the commit, and in terminal mode the pane just goes black (the error only prints after Ctrl-C). Omit the property instead.
 - Terminal mode reports some printable keys as `key: "space"` with the letter in `keyChar`; `keyName()` normalizes both.
+- The window-level `onKeyDown` from `render()` still fires while an `<input>` has focus, so every input tracks focus with `onFocus`/`onBlur` and shortcuts are ignored while typing. Esc and the rule buttons call `renderer.blur()` (from `useGpuix()`) so plain-key shortcuts work again. `SINKHOLE_KEYLOG=/path` writes raw key events as JSON lines.
+- Ghostty encodes keys by virtual keycode, so synthetic CGEvents must use real keycodes: a unicode string on keycode 0 reaches the app as `key: "a"` (it triggered the allow shortcut in an early demo take).
 - Held `[gpuix]` INFO lines print under the prompt after exit unless `RUST_LOG=error` is in the real process env, so `sinkhole` re-execs itself once with it set and filters `[gpuix]` console lines.
 - The test renderer has no pixel readback, so layout is checked through `findByTestId` and text. Visual checks were done in Ghostty with `screencapture`.
 - A Ghostty split re-lays-out the app on the next frame with no app code; `useWindowSize()` gives the new pane size.

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { render, useWindowSize } from '@gpuix/react'
+import { appendFileSync } from 'node:fs'
+import { render, useGpuix, useWindowSize } from '@gpuix/react'
 import type { Controller, Tab } from './controller'
 import type { QueryEvent, Status } from './dns/stats'
 import { alpha, mix, type Theme } from './theme'
@@ -16,22 +17,33 @@ export function keyName(e: KeyLike): string {
   return k
 }
 
-export interface UiState { sel: number; typing: boolean }
+export interface UiState { sel: number; typing: boolean; seq?: number; field?: 'filter' | 'rule'; blur?: () => void }
+
+/** Keeps the selection on the same query while new ones push the log down. */
+export function syncSel(ui: UiState, list: QueryEvent[]) {
+  if (ui.seq != null) {
+    const i = list.findIndex((e) => e.seq === ui.seq)
+    if (i >= 0) ui.sel = i
+  }
+  ui.sel = Math.max(0, Math.min(ui.sel, list.length - 1))
+}
 
 /** Keyboard map shared by the app and the tests. Returns true when the key did something. */
 export function handleKey(c: Controller, ui: UiState, e: KeyLike, rows: () => QueryEvent[]): boolean {
   const k = keyName(e)
   if (e.modifiers?.cmd || e.modifiers?.ctrl) return false
   if (ui.typing) {
-    if (k === 'escape') { ui.typing = false; return true }
+    if (k === 'escape') { ui.typing = false; ui.field = undefined; ui.blur?.(); return true }
     return false
   }
   const list = rows()
-  const pick = () => list[Math.min(ui.sel, list.length - 1)]
+  syncSel(ui, list)
+  const pick = () => list[ui.sel]
+  const move = (i: number) => { ui.sel = Math.max(0, Math.min(i, list.length - 1)); ui.seq = list[ui.sel]?.seq; return true }
   switch (k) {
-    case 'up': case 'k': ui.sel = Math.max(0, ui.sel - 1); return true
-    case 'down': case 'j': ui.sel = Math.min(Math.max(0, list.length - 1), ui.sel + 1); return true
-    case 'home': ui.sel = 0; return true
+    case 'up': case 'k': return move(ui.sel - 1)
+    case 'down': case 'j': return move(ui.sel + 1)
+    case 'home': return move(0)
     case 'b': { const r = pick(); if (r) c.addRule('deny', r.name); return !!r }
     case 'a': { const r = pick(); if (r) c.addRule('allow', r.name); return !!r }
     case 'space': c.toggleBlocking(); return true
@@ -40,7 +52,7 @@ export function handleKey(c: Controller, ui: UiState, e: KeyLike, rows: () => Qu
     case 'c': c.toggleCache(); return true
     case 't': void c.runBench(1000); return true
     case 'u': void c.updateList(); return true
-    case 'x': c.clearStats(); ui.sel = 0; return true
+    case 'x': c.clearStats(); ui.sel = 0; ui.seq = undefined; return true
     case '1': c.setTab('live'); return true
     case '2': c.setTab('top'); return true
     case '3': c.setTab('rules'); return true
@@ -217,15 +229,15 @@ function LogRow({ c, t, e, selected, onSelect, L, index }: { c: Controller; t: T
   )
 }
 
-function LiveLog({ c, t, L, ui, rows, setSel, setTyping }: { c: Controller; t: Theme; L: Layout; ui: UiState; rows: QueryEvent[]; setSel: (i: number) => void; setTyping: (b: boolean) => void }) {
+function LiveLog({ c, t, L, ui, rows, setSel, setTyping }: { c: Controller; t: Theme; L: Layout; ui: UiState; rows: QueryEvent[]; setSel: (i: number, seq?: number) => void; setTyping: Typing }) {
   const filter = (
-    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', height: 26, width: L.kind === 'tiny' ? 120 : 200, paddingLeft: 10, paddingRight: 6, borderRadius: 6, backgroundColor: t.bg, borderWidth: 1, borderColor: ui.typing ? t.accent : t.line }}>
+    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', height: 26, width: L.kind === 'tiny' ? 120 : 200, paddingLeft: 10, paddingRight: 6, borderRadius: 6, backgroundColor: t.bg, borderWidth: 1, borderColor: ui.typing && ui.field === 'filter' ? t.accent : t.line }}>
       <input
         testId="filter-input"
         value={c.filter}
         placeholder="filter  /"
         onChange={(ev) => c.setFilter(ev.value ?? '')}
-        onFocus={() => setTyping(true)}
+        onFocus={() => setTyping(true, 'filter')}
         onBlur={() => setTyping(false)}
         onSubmit={() => setTyping(false)}
         style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: t.fg, fontFamily: MONO }}
@@ -241,7 +253,7 @@ function LiveLog({ c, t, L, ui, rows, setSel, setTyping }: { c: Controller; t: T
         </div>
       ) : (
         <div testId="log-scroll" style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, overflowY: 'scroll', scrollbarColor: alpha(t.fg, 0.2), scrollbarWidth: 5, paddingTop: 4, paddingBottom: 4 }}>
-          {rows.map((e, i) => <LogRow key={e.seq} c={c} t={t} e={e} index={i} L={L} selected={i === ui.sel} onSelect={() => setSel(i)} />)}
+          {rows.map((e, i) => <LogRow key={e.seq} c={c} t={t} e={e} index={i} L={L} selected={i === ui.sel} onSelect={() => setSel(i, e.seq)} />)}
         </div>
       )}
     </Panel>
@@ -270,16 +282,19 @@ function TopList({ c, t, kind, n, testId }: { c: Controller; t: Theme; kind: 'bl
   )
 }
 
-function Rules({ c, t, L }: { c: Controller; t: Theme; L: Layout }) {
+type Typing = (b: boolean, field?: 'filter' | 'rule') => void
+
+function Rules({ c, t, L, ui, setTyping }: { c: Controller; t: Theme; L: Layout; ui: UiState; setTyping: Typing }) {
   const rules = c.rules()
+  const submit = (kind: 'deny' | 'allow') => { c.submitDraft(kind); ui.blur?.(); setTyping(false) }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, flexGrow: 1, minHeight: 0 }}>
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', flexGrow: 1, minWidth: 0, height: 28, paddingLeft: 10, paddingRight: 6, borderRadius: 6, backgroundColor: t.bg, borderWidth: 1, borderColor: t.line }}>
-          <input testId="rule-input" value={c.draft} placeholder="example.com" onChange={(ev) => c.setDraft(ev.value ?? '')} onSubmit={() => c.submitDraft('deny')} style={{ flexGrow: 1, minWidth: 0, fontSize: 13, color: t.fg, fontFamily: MONO }} />
+          <input testId="rule-input" value={c.draft} placeholder="example.com" onChange={(ev) => c.setDraft(ev.value ?? '')} onFocus={() => setTyping(true, 'rule')} onBlur={() => setTyping(false)} onSubmit={() => submit('deny')} style={{ flexGrow: 1, minWidth: 0, fontSize: 13, color: t.fg, fontFamily: MONO }} />
         </div>
-        <Button t={t} small tone={t.blocked} active testId="rule-deny" label="Block" onClick={() => c.submitDraft('deny')} />
-        <Button t={t} small tone={t.forwarded} active testId="rule-allow" label="Allow" onClick={() => c.submitDraft('allow')} />
+        <Button t={t} small tone={t.blocked} active testId="rule-deny" label="Block" onClick={() => submit('deny')} />
+        <Button t={t} small tone={t.forwarded} active testId="rule-allow" label="Allow" onClick={() => submit('allow')} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'scroll', flexGrow: 1, minHeight: 0 }}>
         {rules.length === 0 ? <Txt c={t.faint} s={13}>No custom rules. Select a query and press b or a.</Txt> : null}
@@ -311,13 +326,13 @@ function Controls({ c, t }: { c: Controller; t: Theme }) {
   )
 }
 
-function Side({ c, t, L }: { c: Controller; t: Theme; L: Layout }) {
-  const tall = L.h > 760
+function Side({ c, t, L, ui, setTyping }: { c: Controller; t: Theme; L: Layout; ui: UiState; setTyping: Typing }) {
+  const tall = L.h > 960
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flexGrow: 2, flexBasis: 0, minWidth: 0, minHeight: 0 }}>
       <Panel t={t} title="Top blocked" grow={0} testId="top-blocked-panel"><TopList c={c} t={t} kind="blocked" n={tall ? 6 : 4} testId="top-blocked" /></Panel>
       <Panel t={t} title="Controls" grow={0}><Controls c={c} t={t} /></Panel>
-      <Panel t={t} title="Allow / deny" grow={1} testId="rules-panel"><Rules c={c} t={t} L={L} /></Panel>
+      <Panel t={t} title="Allow / deny" grow={1} testId="rules-panel"><Rules c={c} t={t} L={L} ui={ui} setTyping={setTyping} /></Panel>
     </div>
   )
 }
@@ -343,12 +358,13 @@ function Footer({ c, t, L }: { c: Controller; t: Theme; L: Layout }) {
   )
 }
 
-export function Dashboard({ c, t, size, ui, setSel, setTyping }: { c: Controller; t: Theme; size: { width: number; height: number }; ui: UiState; setSel: (i: number) => void; setTyping: (b: boolean) => void }) {
+export function Dashboard({ c, t, size, ui, setSel, setTyping }: { c: Controller; t: Theme; size: { width: number; height: number }; ui: UiState; setSel: (i: number, seq?: number) => void; setTyping: Typing }) {
   const L = layout(size.width, size.height)
   const rows = visibleRows(c)
+  syncSel(ui, rows)
   const live = <LiveLog c={c} t={t} L={L} ui={ui} rows={rows} setSel={setSel} setTyping={setTyping} />
   let main: ReactNode
-  if (L.showSide) main = <div style={{ display: 'flex', flexDirection: 'row', gap: 12, flexGrow: 1, minHeight: 0 }}>{live}<Side c={c} t={t} L={L} /></div>
+  if (L.showSide) main = <div style={{ display: 'flex', flexDirection: 'row', gap: 12, flexGrow: 1, minHeight: 0 }}>{live}<Side c={c} t={t} L={L} ui={ui} setTyping={setTyping} /></div>
   else if (c.tab === 'top') main = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flexGrow: 1, minHeight: 0 }}>
       <Panel t={t} title="Top blocked" testId="top-blocked-panel"><TopList c={c} t={t} kind="blocked" n={8} testId="top-blocked" /></Panel>
@@ -358,7 +374,7 @@ export function Dashboard({ c, t, size, ui, setSel, setTyping }: { c: Controller
   else if (c.tab === 'rules') main = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flexGrow: 1, minHeight: 0 }}>
       <Panel t={t} title="Controls" grow={0}><Controls c={c} t={t} /></Panel>
-      <Panel t={t} title="Allow / deny" testId="rules-panel"><Rules c={c} t={t} L={L} /></Panel>
+      <Panel t={t} title="Allow / deny" testId="rules-panel"><Rules c={c} t={t} L={L} ui={ui} setTyping={setTyping} /></Panel>
     </div>
   )
   else main = live
@@ -380,6 +396,8 @@ export function App({ controller: c, theme, size: fixed, tickMs = 1000 }: { cont
   const size = fixed ?? live
   const [, setRev] = useState(0)
   const [ui] = useState<UiState>(() => uiState)
+  const { renderer } = useGpuix()
+  ui.blur = () => renderer?.blur?.()
   useEffect(() => {
     let queued: ReturnType<typeof setTimeout> | null = null
     const off = c.subscribe(() => {
@@ -395,17 +413,21 @@ export function App({ controller: c, theme, size: fixed, tickMs = 1000 }: { cont
       t={theme}
       size={size}
       ui={ui}
-      setSel={(i) => { ui.sel = i; setRev((r) => r + 1) }}
-      setTyping={(b) => { ui.typing = b; setRev((r) => r + 1) }}
+      setSel={(i, seq) => { ui.sel = i; ui.seq = seq; setRev((r) => r + 1) }}
+      setTyping={(b, field) => { ui.typing = b; ui.field = b ? field : undefined; setRev((r) => r + 1) }}
     />
   )
 }
 
 export const uiState: UiState = { sel: 0, typing: false }
+const KEYLOG = process.env.SINKHOLE_KEYLOG
 
 export function keyHandlers(c: Controller, ui: UiState = uiState) {
   return {
-    onKeyDown: (e: KeyLike) => { if (handleKey(c, ui, e, () => visibleRows(c))) c.ping() },
+    onKeyDown: (e: KeyLike) => {
+      if (KEYLOG) appendFileSync(KEYLOG, JSON.stringify({ key: e.key, keyChar: e.keyChar, modifiers: e.modifiers, typing: ui.typing }) + '\n')
+      if (handleKey(c, ui, e, () => visibleRows(c))) c.ping()
+    },
   }
 }
 

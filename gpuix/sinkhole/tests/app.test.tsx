@@ -31,6 +31,17 @@ describe('layout and keys', () => {
     expect(keyName({ key: 'space', keyChar: ' ' })).toBe('space')
     expect(keyName({ key: 'Down' })).toBe('down')
   })
+  test('keys typed into a field do not trigger shortcuts; Esc leaves the field', () => {
+    const c = new Controller({ port: 0, upstreams: [], matcher: new Matcher(HashedBlocklist.fromDomains(AD_DOMAINS)) })
+    let blurred = 0
+    const ui = { sel: 0, typing: true, field: 'rule' as const, blur: () => { blurred++ } }
+    expect(handleKey(c, ui, { key: 'a', keyChar: 'a' }, () => [])).toBe(false)
+    expect(handleKey(c, ui, { key: 'p', keyChar: 'p' }, () => [])).toBe(false)
+    expect(c.dns.pausedFor).toBe(0)
+    expect(handleKey(c, ui, { key: 'escape' }, () => [])).toBe(true)
+    expect(ui.typing).toBe(false)
+    expect(blurred).toBe(1)
+  })
 })
 
 describeNative('dashboard in the GPU test renderer', () => {
@@ -68,7 +79,8 @@ describeNative('dashboard in the GPU test renderer', () => {
     expect(c.dns.stats.recent[0]!.status).toBe('blocked')
 
     // Keyboard: select the blocked doubleclick row and allow it with "a" (as terminal mode reports it).
-    uiState.sel = visibleRows(c).findIndex((e) => e.name === 'doubleclick.net')
+    const dc = visibleRows(c).find((e) => e.name === 'doubleclick.net')!
+    uiState.seq = dc.seq
     expect(handleKey(c, uiState, { key: 'space', keyChar: 'a' }, () => visibleRows(c))).toBe(true)
     expect(c.dns.matcher.allow.has('doubleclick.net')).toBe(true)
     draw()

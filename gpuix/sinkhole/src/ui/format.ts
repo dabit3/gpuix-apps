@@ -22,5 +22,5 @@ export function layout(w: number, h: number): Layout {
   const cards = kind === 'wide' ? 5 : kind === 'narrow' ? 3 : 2
   const spark = Math.max(40, Math.min(110, Math.round(h * 0.12)))
   const logW = kind === 'wide' ? w * 0.6 : w
-  return { kind, w, h, pad, cards, spark, showSide: kind === 'wide', logName: Math.max(14, Math.floor((logW - 330) / 8.6)) }
+  return { kind, w, h, pad, cards, spark, showSide: kind === 'wide', logName: Math.max(12, Math.floor((logW - (kind === 'wide' ? 430 : 450)) / 8)) }
 }
