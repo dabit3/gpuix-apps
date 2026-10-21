@@ -222,6 +222,7 @@ export class Renderer {
       }
     }
     if (this.bloom) this.applyBloom()
+    this.vignette()
     if (tint && tint[3] > 0) {
       const [tr, tg, tb, ta] = tint
       for (let i = 0; i < W * H; i++) {
@@ -231,6 +232,27 @@ export class Renderer {
       }
     }
     this.stats.ms = performance.now() - t0
+  }
+
+  private vr = new Float32Array(0)
+  private vc = new Float32Array(0)
+  // Darkens the top and bottom bands so the HUD text stays readable over bright ceiling lights.
+  private vignette() {
+    const { W, H, u32 } = this
+    if (this.vr.length !== H || this.vc.length !== W) {
+      this.vr = new Float32Array(H); this.vc = new Float32Array(W)
+      for (let y = 0; y < H; y++) { const t = y / H, a = Math.min(1, t / 0.16), b = Math.min(1, (1 - t) / 0.14); this.vr[y] = (0.42 + 0.58 * a * a * (3 - 2 * a)) * (0.55 + 0.45 * b * b * (3 - 2 * b)) }
+      for (let x = 0; x < W; x++) { const t = Math.min(x, W - 1 - x) / W, a = Math.min(1, t / 0.12); this.vc[x] = 0.78 + 0.22 * a }
+    }
+    for (let y = 0; y < H; y++) {
+      const fy = this.vr[y]!
+      for (let x = 0, i = y * W; x < W; x++, i++) {
+        const f = fy * this.vc[x]!
+        if (f > 0.995) continue
+        const p = u32[i]!
+        u32[i] = 0xff000000 | ((((p >> 16) & 255) * f) << 16) | ((((p >> 8) & 255) * f) << 8) | ((p & 255) * f)
+      }
+    }
   }
 
   // Bright-pass at quarter resolution, two box blurs, bilinear add back.
