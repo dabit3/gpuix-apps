@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import path from 'node:path'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -54,7 +55,7 @@ type ResponseState =
 /** Window-level key handler, set by the mounted App; app entry wires it to render({ onKeyDown }). */
 export const windowKeys: { current: ((e: KeyEvent) => void) | null } = { current: null }
 
-const FONT_DIR = path.join(import.meta.dir, '..', 'fonts')
+const FONT_DIR = fileURLToPath(new URL('../fonts', import.meta.url))
 
 export function App({ paths, sender = sendRequest, initial, copy = copyText }: AppProps) {
   const { renderer } = useGpuix()
@@ -155,7 +156,7 @@ export function App({ paths, sender = sendRequest, initial, copy = copyText }: A
       })
       .catch((e: Error & { code?: string }) => {
         const ms = performance.now() - started
-        const message = e.code ? `${e.code}: ${e.message}` : e.message
+        const message = controller.signal.aborted ? 'Cancelled' : e.code ? `${e.code}: ${e.message}` : e.message
         setResponse({ kind: 'error', message, ms, wire })
         record({ status: null, ms, size: 0, error: message })
       })

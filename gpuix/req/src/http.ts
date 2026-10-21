@@ -47,16 +47,30 @@ export const sendRequest: Sender = async (request, signal) => {
   const port = Number(url.port || (secure ? 443 : 80))
 
   const t0 = performance.now()
-  const address = net.isIP(host) ? host : (await dns.lookup(host)).address
+  const addresses = net.isIP(host) ? [host] : (await dns.lookup(host, { all: true })).map((a) => a.address)
   const tDns = performance.now()
   abortCheck(signal)
 
-  const socket = net.connect({ host: address, port })
-  const sockets: net.Socket[] = [socket]
+  const sockets: net.Socket[] = []
   const onAbort = () => sockets.forEach((s) => s.destroy(new Error('Request cancelled')))
   signal?.addEventListener('abort', onAbort, { once: true })
+  let socket: net.Socket | null = null
+  let address = addresses[0]!
   try {
-    await once(socket, 'connect')
+    // Try every resolved address in order (e.g. ::1 then 127.0.0.1 for localhost).
+    for (let i = 0; i < addresses.length && !socket; i++) {
+      address = addresses[i]!
+      const s = net.connect({ host: address, port })
+      sockets.push(s)
+      try {
+        await once(s, 'connect')
+        socket = s
+      } catch (e) {
+        s.destroy()
+        if (signal?.aborted || i === addresses.length - 1) throw e
+      }
+    }
+    if (!socket) throw new Error(`Could not connect to ${host}`)
     const tConnect = performance.now()
     let stream: net.Socket = socket
     if (secure) {
