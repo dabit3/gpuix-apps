@@ -31,7 +31,7 @@ Env flags: `GPUIX_WINDOW=1` (same as `--window`), `GPUIX_BACKGROUND=1` (don't st
 
 ## GPUIX features used
 
-`render(..., { terminal: true })`, `isTerminal()`, `<markdown>`, `<code>`, `<diff>`, `<textarea>`, `<input>`, `<svg>` (Lucide icons imported as text), `<motion.div>` native animations, headless `Select` primitives, `<virtual-list>` for the session list, focus APIs (`focusElement`, `blur`, `getFocusedElementId`, `tabIndex`, `autoFocus`), window `onKeyDown`, `debugFrameOverlay`, the native test renderer (`createTestRoot`, `simulateKeystrokes`, screenshot capture) and the automation client (`connectTest`, `getByTestId(...).click()/fill()`).
+`render(..., { terminal: true })`, `isTerminal()`, `<markdown>`, `<code>`, `<diff>`, `<textarea>`, `<input>`, `<svg>` (Lucide icons imported as text), `<motion.div>` native animations, headless `Select` primitives, `<virtual-list>` for the session list and transcript (`followTail`), focus APIs (`focusElement`, `blur`, `getFocusedElementId`, `tabIndex`, `autoFocus`), window `onKeyDown`, `debugFrameOverlay`, the native test renderer (`createTestRoot`, `simulateKeystrokes`, screenshot capture) and the automation client (`connectTest`, `getByTestId(...).click()/fill()`).
 
 ## Test
 
