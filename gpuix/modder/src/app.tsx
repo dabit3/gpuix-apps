@@ -435,7 +435,7 @@ export function ModderApp({ targets, theme: t, workspace, yes = false, live = tr
       </div>
     )
   } else {
-    const previewW = two ? mainW - 300 : mainW - 30
+    const previewW = two ? mainW - 336 : mainW - 34
     body = (
       <div style={{ display: 'flex', flexDirection: two ? 'row' : 'column', gap: 12, flexGrow: 1, minHeight: 0 }}>
         <Card t={t} title="grovekeep · in-workbench" grow testId="play-card" right={<text style={{ color: t.faint, fontSize: 11 }}>P autopilot · Q weapon · E spawn</text>}>
