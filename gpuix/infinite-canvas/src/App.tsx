@@ -146,6 +146,13 @@ export function App({ initialBoard, savePath: initialSave, onStats }: AppProps) 
     if (rootRef.current) ctx.renderer?.focusElement?.(rootRef.current.id)
   }, [ctx.renderer])
 
+  // The native file panel takes key focus; hand it back to the canvas so shortcuts keep working.
+  const pickPaths = useCallback(async (opts: Parameters<NonNullable<NonNullable<typeof ctx.renderer>['promptForPaths']>>[0]) => {
+    const paths = await ctx.renderer?.promptForPaths?.(opts)
+    focusRoot()
+    return paths
+  }, [ctx.renderer, focusRoot])
+
   // ── camera ──
   const flyTo = useCallback((target: Camera, ms = 650) => {
     if (anim.current) clearInterval(anim.current)
@@ -310,7 +317,7 @@ export function App({ initialBoard, savePath: initialSave, onStats }: AppProps) 
   const save = useCallback(async () => {
     let path = savePath
     if (!path) {
-      const dirs = await ctx.renderer?.promptForPaths?.({ directories: true, files: false, prompt: 'Save Here' })
+      const dirs = await pickPaths({ directories: true, files: false, prompt: 'Save Here' })
       if (!dirs?.[0]) return
       path = join(dirs[0], 'Untitled board.json')
     }
@@ -320,7 +327,7 @@ export function App({ initialBoard, savePath: initialSave, onStats }: AppProps) 
   }, [savePath, ctx.renderer, flash])
 
   const open = useCallback(async () => {
-    const paths = await ctx.renderer?.promptForPaths?.({ files: true, multiple: true, prompt: 'Open' })
+    const paths = await pickPaths({ files: true, multiple: true, prompt: 'Open' })
     if (!paths?.length) return
     const json = paths.find((p) => p.endsWith('.json'))
     if (json) loadBoard(json)
@@ -328,7 +335,7 @@ export function App({ initialBoard, savePath: initialSave, onStats }: AppProps) 
   }, [ctx.renderer, loadBoard, addImages])
 
   const pickImage = useCallback(async () => {
-    const paths = await ctx.renderer?.promptForPaths?.({ files: true, multiple: true, prompt: 'Insert' })
+    const paths = await pickPaths({ files: true, multiple: true, prompt: 'Insert' })
     if (paths?.length) addImages(paths)
   }, [ctx.renderer, addImages])
 
