@@ -108,7 +108,7 @@ The GPU test drives the real app through `@gpuix/react/automation`: clicks ▶, 
 ## Performance (Apple Paravirtual Metal, this macOS VM)
 
 - Export: 840 frames at 1080×1080 in about 17–41 s (20–49 ms per frame including PNG writes and ffmpeg), depending on what else the VM is doing.
-- Live: see the PR for the terminal-mode numbers measured on this VM. This is a paravirtual GPU; a real Mac is faster.
+- Live in Ghostty (full 1440×900 window): about 30–35 distinct frames per second reach the screen while playing, counted from a 60 fps screen recording. The clock is frame-exact regardless (a dropped paint skips ahead, it never slows the timeline). This is a paravirtual GPU; a real Mac is faster.
 
 ## GPUIX findings (0.11.0)
 
@@ -119,4 +119,6 @@ The GPU test drives the real app through `@gpuix/react/automation`: clicks ▶, 
 - The left mouse button is `0` (`pressedButton != null` is the drag test). A single element with `onMouseDown` + `onMouseMove` + `onMouseUp` keeps receiving moves while you drag outside it, which makes the scrubber easy.
 - Positioned overlays need `pointerEvents: 'none'`; every `<text>` needs an explicit `color`; `<div>` needs `display: 'flex'`.
 - Ghostty sets `RUST_LOG`, and GPUIX prints held native logs after exit; `cli.ts` re-execs itself with `RUST_LOG=error`.
+- Doing a React render per pointer event let a fast drag queue renders faster than terminal frames could go out, so the picture froze until the drag ended. Pointer moves now only record the latest x and the 60 Hz tick applies it, with one paint in flight at a time.
+- Text is selectable by default; `userSelect: 'none'` on the root keeps drags on the timeline from selecting the chrome.
 - Don't pipe into stdin: a stdin pipe switches GPUIX to its automation protocol, so the in-app export runs `morph --export` as a child with `stdin: 'ignore'`.
