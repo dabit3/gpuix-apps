@@ -42,6 +42,7 @@ export class Whip {
   tipSpeed = 0
   extension = 0
   private lastCrackAt = -Infinity
+  private quietUntil = -Infinity
   private clock = 0
 
   constructor(x: number, y: number, opts: Partial<WhipOptions> = {}) {
@@ -75,7 +76,20 @@ export class Whip {
   }
 
   setLength(length: number) {
-    this.opts.length = Math.max(80, Math.min(900, length))
+    const next = Math.max(80, Math.min(900, length))
+    if (next === this.opts.length) return
+    // Rescale about the handle (and the previous positions too) so a length change adds no velocity.
+    const k = next / this.opts.length
+    const ox = this.x[0]
+    const oy = this.y[0]
+    for (let i = 1; i < this.x.length; i++) {
+      this.x[i] = ox + (this.x[i] - ox) * k
+      this.y[i] = oy + (this.y[i] - oy) * k
+      this.px[i] = ox + (this.px[i] - ox) * k
+      this.py[i] = oy + (this.py[i] - oy) * k
+    }
+    this.opts.length = next
+    this.quietUntil = this.clock * 1000 + 250
   }
 
   pointTo(x: number, y: number) {
@@ -162,7 +176,8 @@ export class Whip {
     if (
       this.tipSpeed > this.opts.crackSpeed &&
       this.extension > this.opts.crackExtension &&
-      now - this.lastCrackAt >= this.opts.debounceMs
+      now - this.lastCrackAt >= this.opts.debounceMs &&
+      now >= this.quietUntil
     ) {
       this.lastCrackAt = now
       return { x: this.x[t], y: this.y[t], speed: this.tipSpeed, at: now }

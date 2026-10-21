@@ -73,6 +73,15 @@ describe('verlet whip', () => {
     for (let i = 1; i < cracks.length; i++) expect(cracks[i] - cracks[i - 1]).toBeGreaterThanOrEqual(0.4 - 1e-6)
   })
 
+  test('changing length while at rest never cracks', () => {
+    const w = new Whip(300, 100)
+    for (let i = 0; i < 600; i++) w.step()
+    for (const len of [380, 340, 420, 460, 500, 420]) {
+      w.setLength(len)
+      for (let i = 0; i < 240; i++) expect(w.step()).toBeNull()
+    }
+  })
+
   test('setLength rescales the rope', () => {
     const w = new Whip(300, 100)
     w.setLength(200)
