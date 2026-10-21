@@ -24,7 +24,7 @@ Demo (Ghostty, GitHub Dark High Contrast, real mouse and keyboard): [media/demo.
 - **Source panel**: the selected frame's file opens in a `<code>` panel, syntax-highlighted, scrolled to the line.
 - **Minimap**: an overview of the whole profile drawn into an `<img>` with `setImagePixels`. Drag it to pan.
 - **Watches the file.** When the profiler rewrites it, flame reloads in place, keeps your selection, and shows a toast like `Reloaded · 1.15 s → 194 ms (−83%)`.
-- **Reflows with the pane.** Under 1000 px the source panel goes; under 820 px the table goes too, and the flamegraph keeps the whole width. Ghostty splits and divider drags resize it live.
+- **Reflows with the pane.** Under 1000 px the sidebar (top functions and source) goes and the flamegraph takes the whole width; under 820 px the toolbar drops the layout toggle (`t` still works). Ghostty splits and divider drags resize it live.
 
 ## Run it
 
