@@ -54,6 +54,9 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
   const fonts = useRef(false)
   if (!fonts.current) { registerGeist(renderer); fonts.current = true }
   c.onChange = () => paint()
+  // Pointer moves only record the latest x; the 60 Hz tick applies it, so a burst of motion events never queues renders.
+  const moveX = useRef<{ x: number; scrub: boolean } | null>(null)
+  const frameAtXRef = useRef((x: number) => x)
 
   useLayoutEffect(() => {
     if (!autoTick) return
@@ -62,10 +65,14 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
     const tick = () => {
       if (!alive) return
       const now = performance.now()
-      const was = c.shown
+      const was = c.shown, wasHover = c.hoverFrame
+      const m = moveX.current
+      moveX.current = null
+      if (m?.scrub) c.seek(frameAtXRef.current(m.x))
+      else if (m) c.hoverFrame = Math.min(LAST_FRAME, Math.max(0, frameAtXRef.current(m.x)))
       c.advance(Math.min(100, now - prev))
       prev = now
-      if (c.shown !== was || c.exp.status === 'running') paint()
+      if (c.shown !== was || c.hoverFrame !== wasHover || c.exp.status === 'running') paint()
       timer = setTimeout(tick, Math.max(1, 16.667 - (performance.now() - now)))
     }
     timer = setTimeout(tick, 16)
@@ -80,6 +87,7 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
   const { tl } = L
   const fx = (frame: number) => tl.trackX + (frame / LAST_FRAME) * tl.trackW
   const frameAtX = (x: number) => Math.round(((x - tl.trackX) / tl.trackW) * LAST_FRAME)
+  frameAtXRef.current = frameAtX
   const scrubTo = (x: number) => { c.seek(frameAtX(x)); paint() }
   const onWheel = (e: { deltaY?: number; deltaX?: number }) => {
     const d = (e.deltaY ?? 0) || (e.deltaX ?? 0)
@@ -154,11 +162,13 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
         testId="timeline"
         onMouseDown={(e) => { c.scrubbing = true; c.playing = false; scrubTo(e.x ?? 0) }}
         onMouseMove={(e) => {
-          if (c.scrubbing && e.pressedButton != null) scrubTo(e.x ?? 0)
+          const scrub = c.scrubbing && e.pressedButton != null
+          if (autoTick) moveX.current = { x: e.x ?? 0, scrub }
+          else if (scrub) scrubTo(e.x ?? 0)
           else { const h = Math.min(LAST_FRAME, Math.max(0, frameAtX(e.x ?? 0))); if (h !== c.hoverFrame) { c.hoverFrame = h; paint() } }
         }}
         onMouseUp={() => { c.scrubbing = false; paint() }}
-        onMouseLeave={() => { c.hoverFrame = null; paint() }}
+        onMouseLeave={() => { if (!c.scrubbing) moveX.current = null; c.hoverFrame = null; paint() }}
         onScroll={onWheel}
         style={{ position: 'absolute', left: tl.trackX - 8, top: tl.trackY - (tl.labels ? 40 : 24), width: tl.trackW + 16, height: tl.labels ? 64 : 46, cursor: 'pointer' }}
       />
