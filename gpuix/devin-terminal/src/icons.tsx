@@ -21,6 +21,26 @@ import iconSliders from '../assets/icons/sliders-horizontal.svg' with { type: 't
 import iconArrowLeft from '../assets/icons/arrow-left.svg' with { type: 'text' }
 import iconArrowRight from '../assets/icons/arrow-right.svg' with { type: 'text' }
 import iconRetry from '../assets/icons/rotate-ccw.svg' with { type: 'text' }
+import icon_plus from '../assets/icons/plus.svg' with { type: 'text' }
+import icon_clock from '../assets/icons/clock-3.svg' with { type: 'text' }
+import icon_shield from '../assets/icons/shield-check.svg' with { type: 'text' }
+import icon_pr from '../assets/icons/git-pull-request.svg' with { type: 'text' }
+import icon_shapes from '../assets/icons/shapes.svg' with { type: 'text' }
+import icon_bell from '../assets/icons/bell.svg' with { type: 'text' }
+import icon_help from '../assets/icons/circle-help.svg' with { type: 'text' }
+import icon_mic from '../assets/icons/mic.svg' with { type: 'text' }
+import icon_wave from '../assets/icons/audio-lines.svg' with { type: 'text' }
+import icon_slash from '../assets/icons/square-slash.svg' with { type: 'text' }
+import icon_settings2 from '../assets/icons/settings-2.svg' with { type: 'text' }
+import icon_sun from '../assets/icons/sun.svg' with { type: 'text' }
+import icon_moon from '../assets/icons/moon.svg' with { type: 'text' }
+import icon_listChecks from '../assets/icons/list-checks.svg' with { type: 'text' }
+import icon_listFilter from '../assets/icons/list-filter.svg' with { type: 'text' }
+import icon_panelLeft from '../assets/icons/panel-left.svg' with { type: 'text' }
+import icon_merge from '../assets/icons/git-merge.svg' with { type: 'text' }
+import icon_link from '../assets/icons/link.svg' with { type: 'text' }
+import icon_monitor from '../assets/icons/monitor.svg' with { type: 'text' }
+import icon_devin from '../assets/icons/devin-mark.svg' with { type: 'text' }
 
 const ICONS = {
   compose: iconCompose,
@@ -46,6 +66,26 @@ const ICONS = {
   arrowLeft: iconArrowLeft,
   arrowRight: iconArrowRight,
   retry: iconRetry,
+  plus: icon_plus,
+  clock: icon_clock,
+  shield: icon_shield,
+  pr: icon_pr,
+  shapes: icon_shapes,
+  bell: icon_bell,
+  help: icon_help,
+  mic: icon_mic,
+  wave: icon_wave,
+  slash: icon_slash,
+  settings2: icon_settings2,
+  sun: icon_sun,
+  moon: icon_moon,
+  listChecks: icon_listChecks,
+  listFilter: icon_listFilter,
+  panelLeft: icon_panelLeft,
+  merge: icon_merge,
+  link: icon_link,
+  monitor: icon_monitor,
+  devin: icon_devin,
 }
 
 export type IconName = keyof typeof ICONS

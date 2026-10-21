@@ -13,7 +13,7 @@ export type Check = { name: string; state: 'pass' | 'pending' | 'fail'; detail: 
 
 export type TranscriptEvent =
   | { kind: 'user'; id: string; text: string; at: string }
-  | { kind: 'devin'; id: string; md: string; streaming?: boolean }
+  | { kind: 'devin'; id: string; md: string; streaming?: boolean; fresh?: boolean }
   | { kind: 'plan'; id: string; items: PlanItem[] }
   | { kind: 'work'; id: string; seconds: number; steps: Step[]; open: boolean; active?: boolean }
   | {
@@ -41,6 +41,16 @@ export type Session = {
   acus: number
   mode: AgentMode
   events: TranscriptEvent[]
+  /** Present for sessions loaded from the Devin API. */
+  live?: {
+    url: string
+    statusDetail: string | null
+    prs: { url: string; state: string | null }[]
+    parentId: string | null
+    childIds: string[]
+    updatedAt: number
+    loaded: boolean
+  }
 }
 
 export const STATUS_COLOR: Record<Status, string> = {

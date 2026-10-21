@@ -1,6 +1,6 @@
 import type { AgentMode, RunAction, Session, Step, TranscriptEvent } from './data'
 
-export type PanelTab = 'shell' | 'editor' | 'browser' | 'planner'
+export type PanelTab = string
 
 export type State = {
   sessions: Session[]
@@ -23,6 +23,11 @@ export type Action =
   | { type: 'toggle-work'; sessionId: string; workId: string }
   | { type: 'tick'; seconds: number }
   | { type: 'run'; sessionId: string; action: RunAction }
+  | { type: 'load'; sessions: Session[] }
+  | { type: 'upsert'; session: Session }
+  | { type: 'events'; id: string; events: TranscriptEvent[] }
+  | { type: 'rekey'; from: string; session: Session }
+  | { type: 'patch'; id: string; patch: Partial<Session> }
 
 function mapEvents(s: Session, fn: (e: TranscriptEvent) => TranscriptEvent): Session {
   return { ...s, events: s.events.map(fn) }
@@ -70,6 +75,29 @@ function applyRun(s: Session, a: RunAction): Session {
   }
 }
 
+/** Merges a fresh API snapshot into what we already have, keeping the loaded transcript and optimistic title/repo. */
+export function mergeLive(existing: Session | undefined, incoming: Session): Session {
+  if (!existing) return incoming
+  return {
+    ...incoming,
+    title: incoming.title === 'Untitled session' ? existing.title : incoming.title,
+    repo: incoming.repo === 'No repository' ? existing.repo : incoming.repo,
+    events: existing.events,
+    live: incoming.live && { ...incoming.live, loaded: existing.live?.loaded ?? false },
+  }
+}
+
+function setEvents(s: Session, incoming: TranscriptEvent[]): Session {
+  if (incoming.length === 0 && s.events.length > 0) return s
+  const known = new Set(s.events.map((e) => e.id))
+  const wasLoaded = s.live?.loaded ?? false
+  const events = incoming.map((e) => (wasLoaded && e.kind === 'devin' && !known.has(e.id) ? { ...e, fresh: true } : e))
+  const pending = s.events.filter(
+    (e) => e.kind === 'user' && e.id.startsWith('local-') && !incoming.some((x) => x.kind === 'user' && x.text === e.text),
+  )
+  return { ...s, events: [...events, ...pending], live: s.live && { ...s.live, loaded: true } }
+}
+
 export function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'select':
@@ -114,6 +142,32 @@ export function reducer(state: State, action: Action): State {
         ...state,
         sessions: state.sessions.map((s) => (s.id === action.sessionId ? applyRun(s, action.action) : s)),
       }
+    case 'load': {
+      const byId = new Map(state.sessions.map((s) => [s.id, s]))
+      const ids = new Set(action.sessions.map((s) => s.id))
+      const pending = state.sessions.filter((s) => s.id.startsWith('pending-'))
+      const kept = state.sessions.filter((s) => s.id === state.selectedId && !ids.has(s.id) && !s.id.startsWith('pending-'))
+      return { ...state, sessions: [...pending, ...action.sessions.map((s) => mergeLive(byId.get(s.id), s)), ...kept] }
+    }
+    case 'upsert': {
+      const exists = state.sessions.some((s) => s.id === action.session.id)
+      return {
+        ...state,
+        sessions: exists
+          ? state.sessions.map((s) => (s.id === action.session.id ? mergeLive(s, action.session) : s))
+          : [action.session, ...state.sessions],
+      }
+    }
+    case 'events':
+      return { ...state, sessions: state.sessions.map((s) => (s.id === action.id ? setEvents(s, action.events) : s)) }
+    case 'rekey':
+      return {
+        ...state,
+        selectedId: state.selectedId === action.from ? action.session.id : state.selectedId,
+        sessions: state.sessions.map((s) => (s.id === action.from ? { ...mergeLive(s, action.session), id: action.session.id } : s)),
+      }
+    case 'patch':
+      return { ...state, sessions: state.sessions.map((s) => (s.id === action.id ? { ...s, ...action.patch } : s)) }
   }
 }
 
