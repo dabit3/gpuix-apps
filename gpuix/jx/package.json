@@ -1,0 +1,24 @@
+{
+  "name": "gpuix-jx",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "jx": "./jx.tsx"
+  },
+  "scripts": {
+    "dev": "GPUIX_TERMINAL=1 bun --hot jx.tsx data/github-events.json.gz",
+    "start": "bun jx.tsx data/github-events.json.gz",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.11.0",
+    "@gpuix/react": "0.11.0",
+    "react": "19"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}
