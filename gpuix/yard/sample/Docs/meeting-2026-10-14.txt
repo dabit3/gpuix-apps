@@ -1,0 +1,7 @@
+Weekly sync, 14 Oct 2026
+Attendees: Ana, Bo, Chidi, Dana
+
+- Terminal rendering demo went well; Ghostty splits look great.
+- Bo to profile image decode on large photos.
+- Dana: move sample data into the repo so demos are reproducible.
+- Next sync: 21 Oct.
