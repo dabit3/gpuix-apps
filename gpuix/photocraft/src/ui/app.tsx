@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useWindowSize, type EventPayload, type ImgInstance } from '@gpuix/react'
 import { ADJUST_LABELS, curveLut, type Adjust, type AdjustKind } from '../core/adjust'
 import { BLEND_LABELS, BLEND_MODES } from '../core/blend'
@@ -6,7 +6,7 @@ import type { Editor, Tool } from '../core/editor'
 import { FILTER_LABELS, type FilterKind } from '../core/filters'
 import type { Layer } from '../core/doc'
 import { ICONS } from './icons'
-import { handleKey, normKey, type KeyActions } from './keys'
+import { handleKey, normKey, type KeyActions, type KeyLike } from './keys'
 import { computeLayout } from './layout'
 import { hex, rgb, SWATCHES, T } from './theme'
 import { Viewport, type Preview } from './viewport'
@@ -417,6 +417,13 @@ const HistRow = ({ label, active, faded, onClick, hidden }: { label: string; act
     </div>
   )
 
+/** Keys are window-level (render({ onKeyDown })) so they keep working after clicks move GPUI focus off the root. */
+const keyBus: { down: ((e: KeyLike) => void) | null; up: ((e: KeyLike) => void) | null } = { down: null, up: null }
+export const keyHandlers = {
+  onKeyDown: (e: KeyLike) => keyBus.down?.(e),
+  onKeyUp: (e: KeyLike) => keyBus.up?.(e),
+}
+
 export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
   const live = useWindowSize()
   const size = fixed ?? live
@@ -658,24 +665,27 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
   const fg = hex(ed.fg)
   const status = notice && ed.lastAction === '' ? notice : ed.lastAction
 
+  useEffect(() => {
+    keyBus.down = (e) => {
+      if (normKey(e) === 'space') {
+        spaceDown.current = true
+        return
+      }
+      if (handleKey(ed, e, act)) {
+        updateRing(ring.current)
+        present()
+      }
+    }
+    keyBus.up = (e) => {
+      if (normKey(e) === 'space') spaceDown.current = false
+    }
+  })
+
   return (
     <div
       testId="app-root"
       tabIndex={-1}
       autoFocus
-      onKeyDown={(e) => {
-        if (normKey(e) === 'space') {
-          spaceDown.current = true
-          return
-        }
-        if (handleKey(ed, e, act)) {
-          updateRing(ring.current)
-          present()
-        }
-      }}
-      onKeyUp={(e) => {
-        if (normKey(e) === 'space') spaceDown.current = false
-      }}
       style={{ width: layout.w, height: layout.h, backgroundColor: T.bg, position: 'relative', overflow: 'hidden' }}
     >
       {/* Options bar */}

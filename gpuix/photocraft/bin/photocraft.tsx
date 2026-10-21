@@ -69,7 +69,7 @@ if (!process.env.PHOTOCRAFT_CHILD) {
 const { Editor } = await import('../src/core/editor')
 const { fitImage, readImageFile, writeImageFile } = await import('../src/core/io')
 const { render } = await import('@gpuix/react')
-const { App } = await import('../src/ui/app')
+const { App, keyHandlers } = await import('../src/ui/app')
 
 const max = Number(values.max ?? 1600)
 let ed: InstanceType<typeof Editor>
@@ -111,4 +111,4 @@ const actions = {
 }
 
 const label = input ? basename(input) : 'Untitled'
-render(<App ed={ed} actions={actions} fileLabel={`${label} · ${ed.doc.width}×${ed.doc.height}`} />, terminal ? { terminal: true } : { title: 'PhotoCraft', width: 1440, height: 900 })
+render(<App ed={ed} actions={actions} fileLabel={`${label} · ${ed.doc.width}×${ed.doc.height}`} />, terminal ? { terminal: true, ...keyHandlers } : { title: 'PhotoCraft', width: 1440, height: 900, ...keyHandlers })
