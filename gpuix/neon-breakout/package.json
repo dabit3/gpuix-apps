@@ -1,0 +1,25 @@
+{
+  "name": "neon-breakout",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot src/app.tsx",
+    "start": "bun src/app.tsx",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "build": "bun build --compile --minify src/main.ts --outfile dist/neon-breakout",
+    "package": "bun run build && cargo packager --release --config packager.json"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0"
+  },
+  "peerDependencies": {
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.11.0",
+    "@gpuix/react": "0.11.0",
+    "react": "19"
+  }
+}

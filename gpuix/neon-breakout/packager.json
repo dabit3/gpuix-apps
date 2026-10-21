@@ -1,0 +1,12 @@
+{
+  "name": "neon-breakout",
+  "productName": "Neon Breakout",
+  "version": "0.1.0",
+  "identifier": "dev.dabit3.neon-breakout",
+  "binariesDir": "dist",
+  "outDir": "bundle",
+  "binaries": [{ "path": "neon-breakout", "main": true }],
+  "icons": ["assets/AppIcon.icns"],
+  "formats": ["app"],
+  "category": "ArcadeGame"
+}
