@@ -117,8 +117,17 @@ const server = Bun.serve({
     const size = Number((await res.clone().arrayBuffer()).byteLength)
     const time = new Date().toTimeString().slice(0, 8)
     const m = (methodColor[req.method] ?? c.grey)(pad(req.method, 6))
+    // Fit one line per request to the pane width, so a narrow Ghostty split stays readable.
+    const cols = process.stdout.columns || 100
+    const compact = cols < 72
+    const pathW = Math.max(12, cols - (compact ? 22 : 46))
+    const full = url.pathname + url.search
+    const shown = full.length > pathW ? full.slice(0, pathW - 1) + '…' : full
+    const status = statusColor(res.status)(String(res.status))
     console.log(
-      `${c.grey(time)}  ${m} ${pad(url.pathname + url.search, 38)} ${statusColor(res.status)(String(res.status))}  ${c.dim(pad(`${ms.toFixed(1)} ms`, 9))} ${c.dim(`${(size / 1024).toFixed(1)} KB`)}`,
+      compact
+        ? `${m} ${pad(shown, pathW)} ${status} ${c.dim(`${ms.toFixed(0)}ms`)}`
+        : `${c.grey(time)}  ${m} ${pad(shown, pathW)} ${status}  ${c.dim(pad(`${ms.toFixed(1)} ms`, 9))} ${c.dim(`${(size / 1024).toFixed(1)} KB`)}`,
     )
     return res
   },

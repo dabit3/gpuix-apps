@@ -4,6 +4,18 @@ import { App, windowKeys } from './src/App'
 import { METHODS, type Method } from './src/http'
 import { dataPaths, defaultDataDir, kv, type RequestDraft } from './src/store'
 
+// GPUIX holds stdout/stderr until exit and then replays them into the shell. A RUST_LOG=info in the
+// environment would dump renderer logs over the restored prompt, and the native logger reads the real
+// process environment at startup, so re-exec once with RUST_LOG=error (REQ_DEBUG=1 keeps the logs).
+if (process.env.RUST_LOG && process.env.RUST_LOG !== 'error' && !process.env.REQ_DEBUG) {
+  process.on('SIGINT', () => {})
+  const child = Bun.spawnSync([process.execPath, ...process.argv.slice(1)], {
+    env: { ...process.env, RUST_LOG: 'error' },
+    stdio: ['inherit', 'inherit', 'inherit'],
+  })
+  process.exit(child.exitCode ?? 0)
+}
+
 const HELP = `req: a Postman-style HTTP client that runs inside your terminal
 
 Usage
@@ -120,6 +132,13 @@ function safePretty(s: string) {
   } catch {
     return s
   }
+}
+
+// Keep the restored shell clean: GPUIX holds stdout until exit, then replays its own startup logs.
+const log = console.log
+console.log = (...a: unknown[]) => {
+  if (typeof a[0] === 'string' && a[0].startsWith('[gpuix]')) return
+  log(...a)
 }
 
 render(
