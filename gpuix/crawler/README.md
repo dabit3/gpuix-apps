@@ -68,7 +68,7 @@ Behaviours (`sim.ts`): drop on silk → wander along text lines → notice link 
 The original was a browser script/bookmarklet that drops a spider on any website. Here it is a terminal app:
 
 - **Page:** a mock search-results page (the "indexing" joke) or a real URL fetched and rendered as GPUIX elements (title, headings, paragraphs, list items, quotes, links). It is a reading view, not a browser: no CSS, images or JS from the site.
-- **Bookmarklet / Shadow DOM / "works on 5 sites":** cut. There is no host page to inject into. The equivalent is `crawler <url>` on any page; tested with example.com and Wikipedia.
+- **Bookmarklet / Shadow DOM / "works on 5 sites":** cut. There is no host page to inject into. The equivalent is `crawler <url>` on any page. Parsing was checked against example.com, Wikipedia, Hacker News and MDN; the Wikipedia article was also run live in Ghostty. Fetched pages are capped at ~900 words / 80 blocks: every word is a GPUIX `<text>` node and the full Wikipedia article (thousands of nodes) dropped the loop to ~13 fps on the paravirtual GPU; with the cap it runs at 55–57 fps. Pages with `<main>`/`<article>` are read from there only; navigation, infoboxes and Wikipedia language lists are skipped. Pages that render their content with JavaScript show little or nothing.
 - **Surface map:** built from GPUIX `getElementBounds` on words instead of `Range.getClientRects`, cached and rebuilt on resize, split and navigation.
 - **Silk:** spiders arrive by dropping on a silk thread with a pendulum swing; mid-walk drops between elements were simplified away.
 - **Chaos mode** navigates the same terminal app to the link instead of opening a browser tab.

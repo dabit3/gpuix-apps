@@ -142,6 +142,13 @@ describe('page model', () => {
     expect(words(para.segs).map((w) => w.href ?? '-')).toEqual(['-', 'https://example.com/docs', 'https://example.com/docs', '-'])
     expect(p.blocks.length).toBe(2) // single-word paragraph dropped
   })
+  it('reads only <main> when present and caps the word budget', () => {
+    const body = Array.from({ length: 50 }, (_, i) => `<p>word ${i} lorem ipsum dolor sit amet</p>`).join('')
+    const p = parseHtml(`<nav><p>skip this menu</p></nav><p>outside main text</p><main>${body}</main>`, 'https://x.dev/', 80, 40)
+    expect(JSON.stringify(p.blocks)).not.toContain('outside')
+    expect(JSON.stringify(p.blocks)).not.toContain('skip')
+    expect(p.blocks.length).toBe(6)
+  })
   it('mock results page has links on real domains', () => {
     const p = mockSerp()
     expect(p.blocks.length).toBeGreaterThanOrEqual(10)

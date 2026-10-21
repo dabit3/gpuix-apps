@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGpuixRequired, useWindowSize, type ImgInstance } from '@gpuix/react'
 import { Sim, type LinkRect, type Rect } from './sim'
 import { Raster, drawScene } from './raster'
@@ -243,7 +243,7 @@ export function App(props: Props) {
       <Header page={page} loading={loading} sim={sim} modes={modes} narrow={narrow} fps={fps.current} />
       <div ref={vpRef as never} style={{ display: 'flex', flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
         <div ref={wrapRef as never} style={{ position: 'absolute', left: 0, top: -scrollY, width: '100%', display: 'flex', flexDirection: 'column', paddingLeft: padX, paddingRight: padX, paddingTop: 22, paddingBottom: 120, pointerEvents: 'none' }}>
-          <PageView page={page} indexed={sim.indexed} wordRefs={wordRefs.current} narrow={narrow} />
+          <PageView page={page} indexed={sim.indexed} nIndexed={sim.indexed.size} wordRefs={wordRefs.current} narrow={narrow} />
         </div>
         <img ref={img} objectFit="fill" style={{ position: 'absolute', left: 0, top: 0, width: vp.current.w, height: vp.current.h, pointerEvents: 'none' }} />
         {toasts.map((t) => (
@@ -344,7 +344,7 @@ function Words({ bi, segs, size, color, weight, wordRefs, indexed, linkColor = C
   )
 }
 
-function PageView({ page, indexed, wordRefs, narrow }: { page: Page; indexed: Set<string>; wordRefs: Map<string, { id: number }>; narrow: boolean }) {
+const PageView = memo(function PageView({ page, indexed, wordRefs, narrow }: { page: Page; indexed: Set<string>; wordRefs: Map<string, { id: number }>; narrow: boolean; nIndexed: number }) {
   const serp = page.blocks.some((b) => b.kind === 'result')
   return (
     <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 760, gap: serp ? 24 : 0 }}>
@@ -364,7 +364,7 @@ function PageView({ page, indexed, wordRefs, narrow }: { page: Page; indexed: Se
       {page.blocks.map((b, bi) => <BlockView key={bi} b={b} bi={bi} indexed={indexed} wordRefs={wordRefs} narrow={narrow} />)}
     </div>
   )
-}
+})
 
 function BlockView({ b, bi, indexed, wordRefs, narrow }: { b: Block; bi: number; indexed: Set<string>; wordRefs: Map<string, { id: number }>; narrow: boolean }) {
   if (b.kind === 'result') {

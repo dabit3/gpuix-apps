@@ -49,7 +49,7 @@ export function mockSerp(query = 'how do spiders walk'): Page {
 }
 
 const BLOCK_TAGS: Record<string, Block['kind']> = {
-  h1: 'h1', h2: 'h2', h3: 'h3', h4: 'h3', p: 'p', li: 'li', blockquote: 'quote', dt: 'p', dd: 'p', figcaption: 'p', pre: 'p',
+  h1: 'h1', h2: 'h2', h3: 'h3', h4: 'h3', p: 'p', li: 'li', blockquote: 'quote', dt: 'p', dd: 'p', figcaption: 'p', pre: 'p', td: 'p',
 }
 
 const clean = (s: string) =>
@@ -57,15 +57,18 @@ const clean = (s: string) =>
     .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
 
 /** Turn HTML into a flat list of text blocks with inline links (Bun's HTMLRewriter, streaming). */
-export function parseHtml(html: string, baseUrl: string, maxBlocks = 80): Page {
+export function parseHtml(html: string, baseUrl: string, maxBlocks = 80, maxWords = 900): Page {
   let title = ''
+  let total = 0
   const blocks: Block[] = []
   let cur: { kind: Block['kind']; segs: Seg[] } | null = null
   let href: string | undefined
   let skip = 0
   let inTitle = false
+  const scoped = /<(main|article)[\s>]/i.test(html)
+  let inMain = 0
   const push = (text: string) => {
-    if (!cur || skip) return
+    if (!cur || skip || (scoped && !inMain)) return
     const t = clean(text)
     if (!t) return
     const last = cur.segs[cur.segs.length - 1]
@@ -81,15 +84,24 @@ export function parseHtml(html: string, baseUrl: string, maxBlocks = 80): Page {
       segs[0]!.text = segs[0]!.text.trimStart()
       segs[segs.length - 1]!.text = segs[segs.length - 1]!.text.trimEnd()
       const words = segs.reduce((n, s) => n + s.text.split(' ').length, 0)
-      if (blocks.length < maxBlocks && (words > 1 || cur.kind !== 'p')) blocks.push({ kind: cur.kind as 'p', segs })
+      if (blocks.length < maxBlocks && total < maxWords && (words > 1 || cur.kind !== 'p')) {
+        blocks.push({ kind: cur.kind as 'p', segs })
+        total += words
+      }
     }
     cur = null
   }
   const rw = new HTMLRewriter()
-    .on('script, style, noscript, svg, nav, footer, form, button, select, template', {
+    .on('script, style, noscript, svg, nav, footer, form, button, select, template, [role=navigation], .interlanguage-link, .vector-menu, .mw-editsection, .navbox, .infobox, .sidebar, .reflist, .hatnote', {
       element(e) {
         skip++
         e.onEndTag(() => { skip-- })
+      },
+    })
+    .on('main, article', {
+      element(e) {
+        inMain++
+        e.onEndTag(() => { inMain-- })
       },
     })
     .on('title', {
@@ -100,7 +112,7 @@ export function parseHtml(html: string, baseUrl: string, maxBlocks = 80): Page {
     })
     .on(Object.keys(BLOCK_TAGS).join(', '), {
       element(e) {
-        if (skip) return
+        if (skip || (scoped && !inMain)) return
         close()
         cur = { kind: BLOCK_TAGS[e.tagName.toLowerCase()]!, segs: [] }
         e.onEndTag(() => close())
