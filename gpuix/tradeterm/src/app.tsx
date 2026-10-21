@@ -233,6 +233,8 @@ export function App(props: AppProps) {
   const wide = size.w >= 1000
   const showPanel = panel ?? wide
   const compact = size.w < 760
+  // Below this the header and toolbar wrap onto a second row instead of clipping controls.
+  const roomy = size.w >= 1250
   const chartH = Math.max(120, colBox.h - TIME_H)
   const oscHeights = own.map(({ def }) => st.paneSizes[def.id] ?? Math.round(Math.min(130, Math.max(70, chartH * 0.17))))
   let oscTotal = oscHeights.reduce((a, b) => a + b + DIVIDER, 0)
@@ -461,7 +463,7 @@ export function App(props: AppProps) {
       style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: T.bg, userSelect: 'none' }}
     >
       {/* Header */}
-      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', height: 44, paddingLeft: 16, paddingRight: 12, gap: 14, flexShrink: 0, borderBottomWidth: 1, borderColor: T.border }}>
+      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minHeight: 44, paddingTop: 6, paddingBottom: 6, paddingLeft: 16, paddingRight: 12, columnGap: 14, rowGap: 6, flexShrink: 0, borderBottomWidth: 1, borderColor: T.border }}>
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: 10, flexShrink: 0 }}>
           <text testId="symbol" style={{ color: T.fg, fontSize: 17, fontWeight: 'bold' }}>
             {sym}
@@ -489,16 +491,16 @@ export function App(props: AppProps) {
       </div>
 
       {/* Toolbar */}
-      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', height: 36, paddingLeft: 12, paddingRight: 12, gap: 10, flexShrink: 0, borderBottomWidth: 1, borderColor: T.border, overflow: 'hidden' }}>
+      <div testId="toolbar" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minHeight: 36, paddingTop: 4, paddingBottom: 4, paddingLeft: 12, paddingRight: 12, columnGap: 10, rowGap: 4, flexShrink: 0, borderBottomWidth: 1, borderColor: T.border }}>
         <Group>
-          {CHART_TYPES.filter((c) => !compact || c.id !== 'area').map((c) => (
-            <Pill key={c.id} testId={`chart-${c.id}`} label={compact && c.id === 'heikin' ? 'HA' : c.label} active={st.chart === c.id} onClick={() => update((s) => ({ ...s, chart: c.id }))} />
+          {CHART_TYPES.map((c) => (
+            <Pill key={c.id} testId={`chart-${c.id}`} label={!roomy && c.id === 'heikin' ? 'HA' : c.label} active={st.chart === c.id} onClick={() => update((s) => ({ ...s, chart: c.id }))} />
           ))}
           <Pill testId="log" label="Log" active={st.log} onClick={() => update((s) => ({ ...s, log: !s.log }))} />
         </Group>
         <Group>
           {IND_ORDER.map((id) => findIndicator(id))
-            .filter((d) => d && (!compact || ['ema', 'bb', 'rsi', 'macd'].includes(d.id)))
+            .filter((d) => d && (roomy || ['ema', 'sma', 'bb', 'rsi', 'macd', 'stoch'].includes(d.id)))
             .map((d) => (
               <Pill key={d!.id} testId={`ind-${d!.id}`} label={d!.label} active={st.indicators.includes(d!.id)} onClick={() => toggleIndicator(d!.id)} />
             ))}
@@ -509,7 +511,7 @@ export function App(props: AppProps) {
           ))}
         </Group>
         <div style={{ flexGrow: 1 }} />
-        {!compact ? <Pill testId="sweep" label="Sweep" active={sweepOpen} onClick={() => setSweepOpen((o) => !o)} /> : null}
+        <Pill testId="sweep" label="Sweep" active={sweepOpen} onClick={() => setSweepOpen((o) => !o)} />
         <Pill testId="panel" label="Backtest" active={showPanel} onClick={() => setPanel(!showPanel)} />
       </div>
 
