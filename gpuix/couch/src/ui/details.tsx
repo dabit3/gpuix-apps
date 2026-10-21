@@ -56,7 +56,7 @@ export function Details({ view, width, height }: { view: View; width: number; he
   return (
     <div style={{ position: 'relative', width, height, overflow: 'hidden' }}>
       {backdrop ? <img src={backdrop} objectFit="cover" style={{ position: 'absolute', left: 0, top: 0, width, height }} /> : null}
-      <div style={{ position: 'absolute', left: 0, top: 0, width, height, backgroundColor: alpha(theme.bg, 0.35), pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', left: 0, top: 0, width, height, backgroundColor: alpha(theme.bg, 0.72), pointerEvents: 'none' }} />
       <Scrims theme={theme} side={0.85} />
       <div style={{ position: 'absolute', left: pad, right: pad, top: 64, bottom: 20, display: 'flex', flexDirection: 'row', gap: 34 }}>
         {pw ? (

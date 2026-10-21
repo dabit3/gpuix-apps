@@ -52,6 +52,12 @@ export function TopBar({ view, width }: { view: View; width: number }) {
   )
 }
 
+/** Shrinks the poster title so its longest word never breaks mid-word. */
+export function posterTitleSize(title: string, w: number): number {
+  const longest = Math.max(...title.toUpperCase().split(/\s+/).map((x) => x.length))
+  return Math.max(9, Math.min(Math.round(w / 9.5), Math.floor((w - 22) / (longest * 0.72))))
+}
+
 export function Tile(props: { item: Item; shape: 'poster' | 'landscape'; w: number; h: number; focused: boolean; progress?: number; watched?: boolean; caption?: string; sub?: string; onHover?: () => void; onClick?: () => void }) {
   const { theme, ctl } = useApp()
   const { item, shape, w, h, focused } = props
@@ -73,7 +79,7 @@ export function Tile(props: { item: Item; shape: 'poster' | 'landscape'; w: numb
         {shape === 'poster' ? <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: Math.round(h * 0.4), pointerEvents: 'none', background: { type: 'linear-gradient', angle: 0, stops: [{ color: alpha('#000000', 0.78), position: 0 }, { color: alpha('#000000', 0), position: 1 }] } }} /> : null}
         {shape === 'poster' ? (
           <div style={{ position: 'absolute', left: 9, right: 9, bottom: 8, pointerEvents: 'none' }}>
-            <T color="#ffffff" size={Math.max(12, Math.round(w / 9.5))} weight={700} lines={2}>{artItem.title.toUpperCase()}</T>
+            <T color="#ffffff" size={posterTitleSize(artItem.title, w)} weight={700} lines={2}>{artItem.title.toUpperCase()}</T>
           </div>
         ) : null}
         {props.watched ? (
