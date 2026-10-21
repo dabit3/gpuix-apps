@@ -39,10 +39,21 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
   const live = useWindowSize()
   const size = fixed ?? live
   const [, bump] = useState(0)
+  // One update in flight at a time: back-to-back 60 Hz bumps can keep a heavy render from ever committing.
+  const committed = useRef(true), dirty = useRef(false)
+  const paint = () => {
+    if (!committed.current) { dirty.current = true; return }
+    committed.current = false
+    bump((n) => n + 1)
+  }
+  useLayoutEffect(() => {
+    committed.current = true
+    if (dirty.current) { dirty.current = false; paint() }
+  })
   const renderer = useGpuixRequired()
   const fonts = useRef(false)
   if (!fonts.current) { registerGeist(renderer); fonts.current = true }
-  c.onChange = () => bump((n) => n + 1)
+  c.onChange = () => paint()
 
   useLayoutEffect(() => {
     if (!autoTick) return
@@ -54,7 +65,7 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
       const was = c.shown
       c.advance(Math.min(100, now - prev))
       prev = now
-      if (c.shown !== was || c.exp.status === 'running') bump((n) => n + 1)
+      if (c.shown !== was || c.exp.status === 'running') paint()
       timer = setTimeout(tick, Math.max(1, 16.667 - (performance.now() - now)))
     }
     timer = setTimeout(tick, 16)
@@ -69,12 +80,12 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
   const { tl } = L
   const fx = (frame: number) => tl.trackX + (frame / LAST_FRAME) * tl.trackW
   const frameAtX = (x: number) => Math.round(((x - tl.trackX) / tl.trackW) * LAST_FRAME)
-  const scrubTo = (x: number) => { c.seek(frameAtX(x)); bump((n) => n + 1) }
+  const scrubTo = (x: number) => { c.seek(frameAtX(x)); paint() }
   const onWheel = (e: { deltaY?: number; deltaX?: number }) => {
     const d = (e.deltaY ?? 0) || (e.deltaX ?? 0)
     if (!d) return
     c.step(d > 0 ? 1 : -1)
-    bump((n) => n + 1)
+    paint()
   }
   const exp = c.exp
   const expLabel = exp.status === 'running' ? `Exporting ${Math.round((exp.done / exp.total) * 100)}%` : exp.status === 'done' ? 'Exported' : exp.status === 'error' ? 'Export failed' : 'Export MP4'
@@ -89,8 +100,8 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
           {L.narrow ? null : <Txt c={ch.dim} size={13}>one shape that never cuts</Txt>}
         </div>
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Chip testId="chip-theme" ch={ch} k="T" label={c.palette === 'dark' ? (L.narrow ? 'Dark' : 'Terminal') : (L.narrow ? 'Light' : '#EDEBE8')} onClick={() => { c.togglePalette(); bump((n) => n + 1) }} />
-          <Chip testId="chip-aspect" ch={ch} k="V" label={c.aspect === 'square' ? '1:1' : '4:5'} onClick={() => { c.toggleAspect(); bump((n) => n + 1) }} />
+          <Chip testId="chip-theme" ch={ch} k="T" label={c.palette === 'dark' ? (L.narrow ? 'Dark' : 'Terminal') : (L.narrow ? 'Light' : '#EDEBE8')} onClick={() => { c.togglePalette(); paint() }} />
+          <Chip testId="chip-aspect" ch={ch} k="V" label={c.aspect === 'square' ? '1:1' : '4:5'} onClick={() => { c.toggleAspect(); paint() }} />
           <div testId="export-button" onClick={() => c.onExport?.()} style={{ position: 'relative', display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 7, height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 8, backgroundColor: exp.status === 'running' ? ch.panel : ch.fg, overflow: 'hidden', cursor: 'pointer' }}>
             {exp.status === 'running' ? <div style={{ position: 'absolute', left: 0, top: 0, width: `${(exp.done / exp.total) * 100}%`, height: 28, backgroundColor: withAlpha(ch.accent, 0.35), pointerEvents: 'none' }} /> : null}
             <svg source={icon('export', exp.status === 'running' ? ch.fg : ch.bg)} style={{ width: 15, height: 15, color: exp.status === 'running' ? ch.fg : ch.bg }} />
@@ -100,14 +111,14 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
       </div>
 
       {/* artboard */}
-      <div testId="artboard" onClick={() => { c.toggle(); bump((n) => n + 1) }} onScroll={onWheel} style={{ position: 'absolute', left: L.art.x, top: L.art.y, width: L.art.w, height: L.art.h, borderRadius: 14, borderWidth: 1, borderColor: ch.line, overflow: 'hidden', cursor: 'pointer' }}>
+      <div testId="artboard" onClick={() => { c.toggle(); paint() }} onScroll={onWheel} style={{ position: 'absolute', left: L.art.x, top: L.art.y, width: L.art.w, height: L.art.h, borderRadius: 14, borderWidth: 1, borderColor: ch.line, overflow: 'hidden', cursor: 'pointer' }}>
         <Stage scene={scene} pal={pal} width={L.art.w} height={L.art.h} />
       </div>
 
       {/* timeline */}
       <div style={{ position: 'absolute', left: tl.x, top: tl.y, width: tl.w, height: tl.h, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', left: 0, top: tl.trackY - tl.y - 18, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <div testId="play-button" onClick={() => { c.toggle(); bump((n) => n + 1) }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 18, backgroundColor: ch.fg, cursor: 'pointer', pointerEvents: 'auto' }}>
+          <div testId="play-button" onClick={() => { c.toggle(); paint() }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 18, backgroundColor: ch.fg, cursor: 'pointer', pointerEvents: 'auto' }}>
             <svg source={icon(c.playing ? 'pause' : 'play', ch.bg, !c.playing)} style={{ width: 16, height: 16, color: ch.bg }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -144,10 +155,10 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
         onMouseDown={(e) => { c.scrubbing = true; c.playing = false; scrubTo(e.x ?? 0) }}
         onMouseMove={(e) => {
           if (c.scrubbing && e.pressedButton != null) scrubTo(e.x ?? 0)
-          else { const h = Math.min(LAST_FRAME, Math.max(0, frameAtX(e.x ?? 0))); if (h !== c.hoverFrame) { c.hoverFrame = h; bump((n) => n + 1) } }
+          else { const h = Math.min(LAST_FRAME, Math.max(0, frameAtX(e.x ?? 0))); if (h !== c.hoverFrame) { c.hoverFrame = h; paint() } }
         }}
-        onMouseUp={() => { c.scrubbing = false; bump((n) => n + 1) }}
-        onMouseLeave={() => { c.hoverFrame = null; bump((n) => n + 1) }}
+        onMouseUp={() => { c.scrubbing = false; paint() }}
+        onMouseLeave={() => { c.hoverFrame = null; paint() }}
         onScroll={onWheel}
         style={{ position: 'absolute', left: tl.trackX - 8, top: tl.trackY - (tl.labels ? 40 : 24), width: tl.trackW + 16, height: tl.labels ? 64 : 46, cursor: 'pointer' }}
       />
