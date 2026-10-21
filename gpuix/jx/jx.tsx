@@ -52,7 +52,6 @@ for (const f of files) {
 
 // Keep the shell clean after quit: the renderer's mount logs and the native INFO line are
 // held while the app runs and would print over the restored prompt.
-process.env.RUST_LOG ??= 'error'
 const log = console.log
 console.log = (...a: unknown[]) => { if (!(typeof a[0] === 'string' && a[0].startsWith('[gpuix]'))) log(...a) }
 

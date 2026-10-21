@@ -52,8 +52,13 @@ function defaultExpanded(root: Json): Set<string> {
     }
     const obj: Record<string, Json> = cur
     const keys = Object.keys(obj)
-    const next = keys.find((k) => Array.isArray(obj[k]) && (obj[k] as Json[]).length > 1) ?? keys.find((k) => isContainer(obj[k]) && Object.keys(obj[k] as object).length > 0 && keys.length <= 4)
-    if (next === undefined) break
+    let next: string | undefined
+    let best = 0
+    for (const k of keys) {
+      const n = isContainer(obj[k]) ? countNodes(obj[k]!) : 0
+      if (n > best) { best = n; next = k }
+    }
+    if (next === undefined || (keys.length > 4 && !Array.isArray(obj[next]))) break
     for (const k of keys) if (isContainer(obj[k]) && keys.length <= 4 && k !== next && sizeOfSmall(obj[k])) s.add(pathKey([...path, k]))
     path = [...path, next]
     cur = obj[next]!

@@ -1,0 +1,5 @@
+#!/bin/sh
+# The native addon logs an INFO line on startup that terminal mode replays over the restored
+# prompt on quit. Its filter comes from RUST_LOG, so pin it before bun starts (JX_LOG overrides).
+export RUST_LOG="${JX_LOG:-error}"
+exec bun "$(dirname "$(readlink -f "$0")")/../jx.tsx" "$@"

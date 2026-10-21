@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "bin": {
-    "jx": "./jx.tsx"
+    "jx": "./bin/jx"
   },
   "scripts": {
     "dev": "GPUIX_TERMINAL=1 bun --hot jx.tsx data/github-events.json.gz",
