@@ -1,0 +1,23 @@
+{
+  "name": "gpuix-infinite-canvas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot app.tsx",
+    "start": "bun app.tsx",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "bench": "bun bench.tsx",
+    "export": "bun export.tsx"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.11.0",
+    "@gpuix/react": "0.11.0",
+    "react": "19"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}
