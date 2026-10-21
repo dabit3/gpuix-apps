@@ -259,6 +259,8 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
     if (mode.kind !== 'browse') {
       if (key === 'escape') return close()
       if (key === 'enter') return submit()
+      // Ghostty binds cmd-a to select_all, so offer the readline way to clear a prompt.
+      if (m.ctrl && key === 'u') return setDraft('')
       if (mode.kind === 'trash') {
         if (ch === 'y') return submit()
         if (ch === 'n') return close()

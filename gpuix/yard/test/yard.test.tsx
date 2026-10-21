@@ -142,7 +142,7 @@ describeNative('yard in the GPU test renderer', () => {
     expect(existsSync(join(root, 'hikes.csv'))).toBe(true)
     await press('r')
     expect(r().findByTestId('prompt')).toBeDefined()
-    await press('cmd-a', r().findByTestId('prompt')!.id)
+    await press('ctrl-u', r().findByTestId('prompt')!.id)
     await type('walks.csv')
     await press('enter', r().findByTestId('prompt')!.id)
     expect(existsSync(join(root, 'walks.csv'))).toBe(true)

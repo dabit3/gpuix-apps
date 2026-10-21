@@ -18,7 +18,7 @@ yard --help
 - **Mouse**: click a row to select, click it again (or double-click) to open, click a parent-column row to jump, clickable **breadcrumbs**, scroll wheel / trackpad moves through the list, hover highlight.
 - **Rich previews**: images through `<img>` (with real pixel dimensions read from the file header), syntax-highlighted code through `<code>`, GitHub-flavoured Markdown through `<markdown>`, pretty-printed JSON with a shape summary, and recursive **directory sizes** with per-child bars.
 - **Fuzzy jump** (`/` or `f`): fuzzy search across every file under the start folder, with matched characters highlighted; `enter` jumps there.
-- **Multi-select and file ops**: `space` marks, `a` marks all, `y` copy, `x` cut, `p` paste, `r` rename, `n` new folder, `d` trash (with a confirm sheet; uses Finder's Trash on macOS). Name collisions become `name copy.ext`, `name copy 2.ext`.
+- **Multi-select and file ops**: `space` marks, `a` marks all, `y` copy, `x` cut, `p` paste, `r` rename (`ctrl-u` clears the prompt), `n` new folder, `d` trash (with a confirm sheet; uses Finder's Trash on macOS). Name collisions become `name copy.ext`, `name copy 2.ext`.
 - **Two-pane file manager across splits**: the copy/cut clipboard lives in `~/.cache/yard/clipboard.json`, so you can `y` in one Ghostty split and `p` in a `yard` running in another split. Every pane watches its folders (`fs.watch`), so a paste, `mv` or `git checkout` in another pane shows up instantly.
 - **Hidden files**: `.` or the pill at the top right.
 - Colours come straight from Ghostty's **GitHub Dark High Contrast** theme so the app blends into the terminal.
@@ -64,4 +64,5 @@ Measured on this macOS VM (Apple **Paravirtual** Metal GPU, slower than real App
 - **`ctrl-c` with a focused element**: the key also reaches `onKeyDown` as `key: 'c'` with `ctrl`, so the app quits itself on it to be safe.
 - **`SyntaxTheme` typing**: assigning an object literal to `GpuixTheme.syntax` fails to typecheck (`constructor` collides with `Object.prototype.constructor`); needs an explicit `constructor` colour or a cast.
 - **No `focusElement` on `useGpuix().renderer` types**, although the runtime has it; needs a cast to restore focus after closing a prompt.
+- Ghostty keeps `cmd-a` for its own select-all, so it never reaches a focused GPUIX `<input>`; yard clears prompts with `ctrl-u` instead.
 - Not tried: tmux (unsupported per README). VS Code/Zed/Codex terminals don't implement the Kitty Graphics protocol's shared-memory path GPUIX uses, so the demo stays in Ghostty.
