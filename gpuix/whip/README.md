@@ -39,6 +39,8 @@ bun test            # physics, raster, safety gate, socket link, CLI, GPU test-r
 bun run typecheck
 ```
 
+`tools/drive.swift` is the small CGEvent driver (move, glide, drag, keys, typing) used to record `media/demo.mp4` with real input. `tools/demo.drive` is the script for that take.
+
 ## How it works
 
 - `src/physics.ts`: fixed-step (120 Hz) verlet rope, 40 segments, 420 px, 10 constraint iterations, gravity 900 px/s², damping 0.99, a light bending constraint and a follow-the-leader clamp so fast flicks don't stretch it. A crack fires when the tip passes ~8.3 rope-lengths per second (3,500 px/s at 420 px) while the rope is ≥ 86 % extended, debounced at 400 ms. The whip shortens itself to fit when a split halves the pane.
@@ -74,4 +76,5 @@ Cut: Windows and Linux support, cracking over arbitrary windows (a browser, anot
 - Keys: plain letters arrive with the character in `keyChar`; handling both `keyChar` and `key` covers terminal and window mode. `EventModifiers` is `{ shift, ctrl, alt, cmd }`.
 - Every `<text>` needs a `color`, and `<div>` needs `display:'flex'`.
 - The GPU test renderer (`createTestRoot`) renders the app with no window; `getPaintedText()` is enough to assert the intro, pills and empty-state copy. Pass `loop={false}` so the sim timer doesn't keep the test alive.
+- Verlet integration stores velocity implicitly as `pos - prev`. Anything that moves the rope from outside the sim (a length change, a split resize, the first pointer sample after launch) has to move `prev` too (`Whip.setLength` and `Whip.teleport`). Otherwise the jump reads as a 20,000+ px/s flick and fires a crack. The testing agent caught both cases.
 - Running a PTY (`Bun.spawn({ terminal })`) in one split and the GPUIX app in the other, talking over a Unix socket, needs no special handling: the leash never touches GPUIX and the app never reads stdin.
