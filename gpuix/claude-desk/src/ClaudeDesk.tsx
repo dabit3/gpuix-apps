@@ -397,9 +397,16 @@ export function ClaudeDesk({ storePath, streamer, titler }: Props) {
     focusComposer()
   }, [focusComposer])
 
+  // The same keystroke reaches both the root div and the window-level handler;
+  // handle each shortcut once.
+  const lastKey = useRef({ combo: '', at: 0 })
   const onKeyDown = useCallback(
     (event: KeyEvent) => {
       const cmd = event.modifiers?.cmd
+      const combo = `${cmd ? 'cmd+' : ''}${event.key}`
+      const now = performance.now()
+      if (lastKey.current.combo === combo && now - lastKey.current.at < 40) return
+      lastKey.current = { combo, at: now }
       if (cmd && event.key === 'f') {
         event.preventDefault?.()
         openFind()
