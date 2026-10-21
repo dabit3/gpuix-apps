@@ -26,11 +26,11 @@ export const ICON = {
 
 export const KIND_COLOR: Record<Kind, string> = {
   dir: T.blue,
-  image: T.cyan,
-  code: T.yellow,
-  markdown: T.fg,
-  json: T.orange,
+  image: T.muted,
+  code: T.muted,
+  markdown: T.muted,
+  json: T.muted,
   text: T.muted,
-  archive: T.red,
+  archive: T.muted,
   other: T.dim,
 }

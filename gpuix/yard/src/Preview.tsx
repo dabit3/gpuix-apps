@@ -70,8 +70,8 @@ export function Icon({ entry, size = 16, color }: { entry: Pick<Entry, 'kind'>; 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0 }}>
-      <text style={{ color: T.dim, fontSize: 11, fontWeight: 600 }}>{label.toUpperCase()}</text>
-      <text style={{ color: T.fg, fontSize: 13, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{value}</text>
+      <text style={{ color: T.faint, fontSize: 11 }}>{label}</text>
+      <text style={{ color: T.muted, fontSize: 12, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{value}</text>
     </div>
   )
 }
@@ -84,20 +84,17 @@ export function Preview({ entry, width, height, showHidden, version }: { entry: 
       </div>
     )
   return (
-    <div testId="preview" style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, flexBasis: 0, minWidth: 0, height: '100%', overflowY: 'scroll', padding: 20, gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-        <div style={{ display: 'flex', width: 40, height: 40, borderRadius: 10, backgroundColor: T.raised, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon entry={entry} size={20} />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flexGrow: 1 }}>
-          <text testId="preview-title" style={{ color: T.fg, fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{entry.name}</text>
-          <text style={{ color: T.muted, fontSize: 12 }}>
+    <div testId="preview" style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, flexBasis: 0, minWidth: 0, height: '100%', overflowY: 'scroll', paddingTop: 10, paddingLeft: 20, paddingRight: 24, paddingBottom: 20, gap: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0, flexGrow: 1 }}>
+          <text testId="preview-title" style={{ color: T.fg, fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{entry.name}</text>
+          <text style={{ color: T.dim, fontSize: 12 }}>
             {entry.isDir ? `Folder · ${entry.children ?? 0} item${entry.children === 1 ? '' : 's'}` : `${KIND_LABEL[entry.kind]} · ${formatSize(entry.size)}`}
           </text>
         </div>
       </div>
-      <Body key={`${entry.path}:${version}`} entry={entry} width={width - 40} height={height} showHidden={showHidden} version={version} />
-      <div style={{ display: 'flex', gap: 28, paddingTop: 14, borderTopWidth: 1, borderColor: T.line, flexWrap: 'wrap', rowGap: 12 }}>
+      <Body key={`${entry.path}:${version}`} entry={entry} width={width - 48} height={height} showHidden={showHidden} version={version} />
+      <div style={{ display: 'flex', gap: 32, paddingTop: 2, flexWrap: 'wrap', rowGap: 12 }}>
         <Meta label="Modified" value={formatDate(entry.mtime)} />
         <Meta label="Permissions" value={formatMode(entry.mode, entry.isDir)} />
         {!entry.isDir && <Meta label="Size" value={entry.size.toLocaleString('en-US') + ' bytes'} />}
@@ -116,15 +113,13 @@ function Body({ entry, width, height, showHidden, version }: { entry: Entry; wid
   if (entry.kind === 'markdown') return <markdown testId="preview-markdown" source={clipped} theme={codeTheme} style={{ minWidth: 0 }} />
   if (entry.kind === 'json') return <JsonPreview text={head} />
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, borderRadius: 10, borderWidth: 1, borderColor: T.line, backgroundColor: T.panel }}>
-      <code testId="preview-code" code={clipped} language={LANG[extOf(entry.name)]} showLineNumbers theme={codeTheme} style={{ padding: 12, minWidth: 0 }} />
-    </div>
+    <code testId="preview-code" code={clipped} language={LANG[extOf(entry.name)]} showLineNumbers theme={codeTheme} style={{ minWidth: 0 }} />
   )
 }
 
 function Empty({ text }: { text: string }) {
   return (
-    <div style={{ display: 'flex', padding: 24, borderRadius: 10, backgroundColor: T.panel, justifyContent: 'center' }}>
+    <div style={{ display: 'flex', paddingTop: 24, paddingBottom: 24, justifyContent: 'center' }}>
       <text style={{ color: T.dim, fontSize: 13 }}>{text}</text>
     </div>
   )
@@ -139,8 +134,8 @@ function ImagePreview({ entry, width, height }: { entry: Entry; width: number; h
   const h = Math.round(w / ratio)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <img testId="preview-image" src={entry.path} objectFit="cover" style={{ width: w, height: h, borderRadius: 10 }} />
-      {dims && <text testId="image-dims" style={{ color: T.muted, fontSize: 12 }}>{`${dims.width} × ${dims.height} px · ${extOf(entry.name).toUpperCase()}`}</text>}
+      <img testId="preview-image" src={entry.path} objectFit="cover" style={{ width: w, height: h, borderRadius: 8 }} />
+      {dims && <text testId="image-dims" style={{ color: T.dim, fontSize: 12 }}>{`${dims.width} × ${dims.height} px · ${extOf(entry.name).toUpperCase()}`}</text>}
     </div>
   )
 }
@@ -155,10 +150,8 @@ function JsonPreview({ text }: { text: string }) {
   } catch {}
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
-      <text testId="json-summary" style={{ color: T.orange, fontSize: 12, fontWeight: 600 }}>{summary}</text>
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, borderRadius: 10, borderWidth: 1, borderColor: T.line, backgroundColor: T.panel }}>
-        <code testId="preview-code" code={pretty.split('\n').slice(0, 400).join('\n')} language="json" showLineNumbers theme={codeTheme} style={{ padding: 12, minWidth: 0 }} />
-      </div>
+      <text testId="json-summary" style={{ color: T.dim, fontSize: 12 }}>{summary}</text>
+      <code testId="preview-code" code={pretty.split('\n').slice(0, 400).join('\n')} language="json" showLineNumbers theme={codeTheme} style={{ minWidth: 0 }} />
     </div>
   )
 }
@@ -182,27 +175,20 @@ function DirPreview({ entry, showHidden, version }: { entry: Entry; showHidden: 
   if (!children.length) return <Empty text="Empty folder" />
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', gap: 10 }}>
-        {[
-          ['Total size', total ? formatSize(total.bytes) + (total.truncated ? '+' : '') : '…'],
-          ['Files', total ? total.files.toLocaleString('en-US') : '…'],
-          ['Folders', total ? total.dirs.toLocaleString('en-US') : '…'],
-        ].map(([label, value]) => (
-          <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 12, borderRadius: 10, backgroundColor: T.panel, borderWidth: 1, borderColor: T.line, flexGrow: 1, flexBasis: 0, minWidth: 0 }}>
-            <text style={{ color: T.dim, fontSize: 11, fontWeight: 600 }}>{label!.toUpperCase()}</text>
-            <text testId={label === 'Total size' ? 'dir-total' : undefined} style={{ color: T.fg, fontSize: 18, fontWeight: 600 }}>{value}</text>
-          </div>
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <text style={{ color: T.faint, fontSize: 11 }}>Total size</text>
+        <text testId="dir-total" style={{ color: T.fg, fontSize: 26, fontWeight: 600 }}>{total ? formatSize(total.bytes) + (total.truncated ? '+' : '') : '…'}</text>
+        <text style={{ color: T.dim, fontSize: 12 }}>{total ? `${total.files.toLocaleString('en-US')} files · ${total.dirs.toLocaleString('en-US')} folders` : ' '}</text>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingTop: 4 }}>
         {sized.slice(0, 14).map(({ c, bytes }) => (
           <div key={c.path} style={{ display: 'flex', alignItems: 'center', gap: 10, height: 28, minWidth: 0 }}>
-            <Icon entry={c} size={14} />
-            <text style={{ color: T.fg, fontSize: 13, width: 170, flexShrink: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{c.name}</text>
-            <div style={{ display: 'flex', flexGrow: 1, height: 6, borderRadius: 3, backgroundColor: T.raised, minWidth: 40 }}>
-              <div style={{ width: `${Math.max(2, (bytes / max) * 100)}%`, height: 6, borderRadius: 3, backgroundColor: c.isDir ? T.blue : KIND_COLOR[c.kind] }} />
+            <Icon entry={c} size={13} />
+            <text style={{ color: T.muted, fontSize: 13, width: 160, flexShrink: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{c.name}</text>
+            <div style={{ display: 'flex', flexGrow: 1, height: 3, borderRadius: 2, backgroundColor: T.line, minWidth: 40 }}>
+              <div style={{ width: `${Math.max(2, (bytes / max) * 100)}%`, height: 3, borderRadius: 2, backgroundColor: c.isDir ? T.blue : T.dim }} />
             </div>
-            <text style={{ color: T.muted, fontSize: 12, width: 64, flexShrink: 0 }}>{sizes[c.path] !== undefined || !c.isDir ? formatSize(bytes) : '…'}</text>
+            <text style={{ color: T.faint, fontSize: 12, width: 64, flexShrink: 0 }}>{sizes[c.path] !== undefined || !c.isDir ? formatSize(bytes) : '…'}</text>
           </div>
         ))}
         {sized.length > 14 && <text style={{ color: T.dim, fontSize: 12, paddingTop: 4 }}>{`+ ${sized.length - 14} more`}</text>}

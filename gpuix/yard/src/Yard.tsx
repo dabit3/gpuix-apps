@@ -349,20 +349,19 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
       style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: T.bg, paddingTop: chromeTop, userSelect: 'none' }}
     >
       {/* Breadcrumbs */}
-      <div style={{ display: 'flex', alignItems: 'center', height: TOP, paddingLeft: 14, paddingRight: 14, gap: 4, borderBottomWidth: 1, borderColor: T.line, flexShrink: 0 }}>
-        <text style={{ color: T.blue, fontSize: 13, fontWeight: 700, marginRight: 10 }}>yard</text>
+      <div style={{ display: 'flex', alignItems: 'center', height: TOP, paddingLeft: 12, paddingRight: 16, gap: 4, flexShrink: 0 }}>
         <div testId="breadcrumbs" style={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1, minWidth: 0 }}>
           {crumbs.map((c, i) => {
             const last = i === crumbs.length - 1
             return (
               <div key={c.path + i} style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flexShrink: last ? 1 : 0 }}>
-                {i > 0 && <svg source={ICON.chevron} style={{ width: 11, height: 11, color: T.faint, flexShrink: 0 }} />}
+                {i > 0 && <text style={{ color: T.faint, fontSize: 13 }}>/</text>}
                 <div
                   testId={`crumb-${i}`}
                   onClick={() => c.path && goto(c.path, crumbs[i + 1]?.path ? basename(crumbs[i + 1]!.path) : undefined)}
                   style={{ display: 'flex', paddingLeft: 6, paddingRight: 6, height: 26, alignItems: 'center', borderRadius: 6, cursor: c.path ? 'pointer' : 'default', hover: c.path ? { backgroundColor: T.raised } : undefined, minWidth: 0 }}
                 >
-                  <text style={{ color: last ? T.fg : T.muted, fontSize: 13, fontWeight: last ? 600 : 400, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{c.label}</text>
+                  <text style={{ color: last ? T.fg : T.dim, fontSize: 13, fontWeight: last ? 500 : 400, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{c.label}</text>
                 </div>
               </div>
             )
@@ -371,10 +370,10 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
         <div
           testId="toggle-hidden"
           onClick={() => setHidden((h) => !h)}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, height: 26, paddingLeft: 9, paddingRight: 10, borderRadius: 13, borderWidth: 1, borderColor: hidden ? T.blue : T.lineStrong, backgroundColor: hidden ? T.blueSoft : T.bg, cursor: 'pointer', flexShrink: 0 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, height: 26, paddingLeft: 8, paddingRight: 8, borderRadius: 6, cursor: 'pointer', flexShrink: 0, hover: { backgroundColor: T.raised } }}
         >
           <svg source={ICON.eye} style={{ width: 13, height: 13, color: hidden ? T.blue : T.dim }} />
-          <text style={{ color: hidden ? T.blue : T.muted, fontSize: 12 }}>{hidden ? 'Hidden shown' : 'Hidden'}</text>
+          <text style={{ color: hidden ? T.blue : T.dim, fontSize: 12 }}>{hidden ? 'Hidden files' : 'Hidden'}</text>
         </div>
       </div>
 
@@ -413,15 +412,15 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
           onWheel={onWheel}
         />
         {showPreview && (
-          <div style={{ display: 'flex', flexGrow: 5, flexBasis: 0, minWidth: 0, borderLeftWidth: 1, borderColor: T.line }}>
+          <div style={{ display: 'flex', flexGrow: 5, flexBasis: 0, minWidth: 0 }}>
             <Preview entry={current} width={(width * 5) / (showParent ? 10 : 8)} height={listH} showHidden={hidden} version={version} />
           </div>
         )}
       </div>
 
       {/* Status bar */}
-      <div testId="status" style={{ display: 'flex', alignItems: 'center', height: BOTTOM, paddingLeft: 14, paddingRight: 14, gap: 14, borderTopWidth: 1, borderColor: T.line, flexShrink: 0 }}>
-        <text testId="position" style={{ color: T.dim, fontSize: 12 }}>{entries.length ? `${idx + 1}/${entries.length}` : '0/0'}</text>
+      <div testId="status" style={{ display: 'flex', alignItems: 'center', height: BOTTOM, paddingLeft: 20, paddingRight: 20, gap: 16, flexShrink: 0 }}>
+        <text testId="position" style={{ color: T.faint, fontSize: 12 }}>{entries.length ? `${idx + 1}/${entries.length}` : '0/0'}</text>
         {marks.size > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <svg source={ICON.check} style={{ width: 12, height: 12, color: T.green }} />
@@ -498,7 +497,7 @@ function Column(props: {
     <div
       testId={`col-${props.testId}`}
       onScroll={(e: { deltaY?: number; precise?: boolean }) => props.onWheel(e.deltaY ?? 0, e.precise)}
-      style={{ display: 'flex', flexDirection: 'column', flexGrow: props.flex, flexBasis: 0, minWidth: 0, paddingTop: 6, paddingLeft: 6, paddingRight: 6, borderLeftWidth: props.testId === 'parent' ? 0 : 1, borderColor: T.line, backgroundColor: active ? T.bg : T.bg }}
+      style={{ display: 'flex', flexDirection: 'column', flexGrow: props.flex, flexBasis: 0, minWidth: 0, paddingTop: 4, paddingLeft: 8, paddingRight: 8, backgroundColor: T.bg }}
     >
       {entries.length === 0 && (
         <div style={{ display: 'flex', padding: 14 }}>
@@ -511,7 +510,7 @@ function Column(props: {
         const marked = marks.has(e.path)
         const cut = props.clipPaths?.includes(e.path)
         const solid = sel && active
-        const fg = solid ? T.bg : marked ? T.green : sel ? T.fg : e.hidden || cut ? T.dim : T.fg
+        const fg = marked ? T.green : solid || sel ? T.fg : e.hidden || cut ? T.faint : active ? T.fg : T.muted
         return (
           <div
             key={e.path}
@@ -523,23 +522,23 @@ function Column(props: {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 9,
+              gap: 10,
               height: ROW,
               flexShrink: 0,
               paddingLeft: 10,
               paddingRight: 10,
-              borderRadius: 7,
+              borderRadius: 6,
               cursor: 'pointer',
-              backgroundColor: solid ? (marked ? T.green : T.blue) : sel ? T.raised : hover === e.path ? '#11151b' : T.bg,
+              backgroundColor: solid ? (marked ? T.greenSoft : T.blueSoft) : sel ? T.raised : hover === e.path ? '#0f1319' : T.bg,
             }}
           >
-            <Icon entry={e} size={16} color={solid ? T.bg : undefined} />
-            <text style={{ color: fg, fontSize: 14, fontWeight: solid ? 600 : 400, flexGrow: 1, flexBasis: 0, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{e.name}</text>
-            {marked && <svg source={ICON.check} style={{ width: 13, height: 13, color: solid ? T.bg : T.green, flexShrink: 0 }} />}
+            <Icon entry={e} size={15} color={solid && !e.isDir ? T.fg : undefined} />
+            <text style={{ color: fg, fontSize: 13.5, fontWeight: solid ? 500 : 400, flexGrow: 1, flexBasis: 0, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{e.name}</text>
+            {marked && <svg source={ICON.check} style={{ width: 13, height: 13, color: T.green, flexShrink: 0 }} />}
             {active && (
-              <text style={{ color: solid ? T.bg : T.dim, fontSize: 12, flexShrink: 0 }}>{e.isDir ? (e.children !== undefined ? String(e.children) : '') : formatSize(e.size)}</text>
+              <text style={{ color: solid ? T.muted : T.faint, fontSize: 12, flexShrink: 0 }}>{e.isDir ? (e.children !== undefined ? String(e.children) : '') : formatSize(e.size)}</text>
             )}
-            {!active && e.isDir && <svg source={ICON.chevron} style={{ width: 10, height: 10, color: sel ? T.muted : T.faint, flexShrink: 0 }} />}
+            {!active && e.isDir && <svg source={ICON.chevron} style={{ width: 10, height: 10, color: T.faint, flexShrink: 0 }} />}
           </div>
         )
       })}
@@ -550,28 +549,25 @@ function Column(props: {
 function Key({ k, label }: { k: string; label: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-      <div style={{ display: 'flex', minWidth: 18, height: 18, paddingLeft: 5, paddingRight: 5, borderRadius: 4, backgroundColor: T.raised, borderWidth: 1, borderColor: T.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
-        <text style={{ color: T.fg, fontSize: 11, fontWeight: 600 }}>{k}</text>
-      </div>
-      <text style={{ color: T.dim, fontSize: 12 }}>{label}</text>
+      <text style={{ color: T.muted, fontSize: 12, fontWeight: 600 }}>{k}</text>
+      <text style={{ color: T.faint, fontSize: 12 }}>{label}</text>
     </div>
   )
 }
 
 function Hints({ width }: { width: number }) {
   const all: [string, string][] = [
-    ['␣', 'select'],
+    ['space', 'select'],
     ['y', 'copy'],
-    ['x', 'cut'],
     ['p', 'paste'],
     ['r', 'rename'],
     ['d', 'trash'],
     ['/', 'jump'],
     ['.', 'hidden'],
   ]
-  const n = width >= 1300 ? 8 : width >= 1050 ? 6 : width >= 800 ? 4 : 0
+  const n = width >= 1200 ? 7 : width >= 980 ? 5 : width >= 760 ? 3 : 0
   return (
-    <div style={{ display: 'flex', gap: 14, flexShrink: 0 }}>
+    <div style={{ display: 'flex', gap: 18, flexShrink: 0 }}>
       {all.slice(0, n).map(([k, l]) => (
         <Key key={k} k={k} label={l} />
       ))}
@@ -602,7 +598,7 @@ function Overlay(props: {
     >
       <div
         onClick={() => {}}
-        style={{ display: 'flex', flexDirection: 'column', width: cardW, borderRadius: 12, borderWidth: 1, borderColor: T.lineStrong, backgroundColor: T.panel, boxShadow: { offsetX: 0, offsetY: 18, blurRadius: 48, spreadRadius: 0, color: '#000000aa' } }}
+        style={{ display: 'flex', flexDirection: 'column', width: cardW, borderRadius: 12, borderWidth: 1, borderColor: T.line, backgroundColor: T.panel, boxShadow: { offsetX: 0, offsetY: 18, blurRadius: 48, spreadRadius: 0, color: '#000000aa' } }}
       >
         {mode.kind === 'trash' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 18 }}>

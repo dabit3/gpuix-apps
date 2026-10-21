@@ -90,7 +90,7 @@ describeNative('yard in the GPU test renderer', () => {
     expect(text()).toContain('~|')
     expect(text()).toContain('sample')
     await settle(200)
-    expect(text()).toContain('TOTAL SIZE')
+    expect(text()).toContain('Total size')
     await press('j j j')
     expect(text()).toContain('4/5')
     await press('l')
