@@ -43,6 +43,17 @@ d('dashboard (GPU test renderer)', () => {
     expect(text).toContain('$0.532')
   })
 
+  it('hovering a request bar shows what that turn carried', () => {
+    const { renderer } = mount()
+    const bar = renderer.findByTestId('req-40') as { id: number }
+    const b = renderer.getElementBounds(bar.id)!
+    renderer.nativeSimulateMouseMove(b.x + b.width / 2, b.y + b.height - 10)
+    renderer.flush()
+    const text = renderer.getAllText().join(' ')
+    expect(text).toContain('turn 41')
+    expect(text).toMatch(/in [\d.]+k = [\d.]+k read \+ [\d.]+k write/)
+  })
+
   it('hides the sidebar and shows a switcher when narrow', () => {
     const { renderer } = mount(760, 800)
     const text = renderer.getAllText().join(' ')

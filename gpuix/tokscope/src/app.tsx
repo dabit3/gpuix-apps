@@ -479,13 +479,13 @@ function Overview(p: { scope: Session[]; t: ReturnType<typeof totals>; hoverReq:
               <div
                 key={r.id + i}
                 testId={`req-${i}`}
-                onMouseEnter={() => p.setHoverReq(i)}
+                onMouseMove={() => p.hoverReq !== i && p.setHoverReq(i)}
                 style={{ ...col, flexGrow: 1, flexBasis: 0, minWidth: 2, maxWidth: 34, height: p.chartH + 8, justifyContent: 'flex-end', gap: 0 }}
               >
-                {r.cacheBreak ? <div style={{ height: 4, borderRadius: 2, backgroundColor: C.red, marginBottom: 3, flexShrink: 0 }} /> : null}
-                <div style={{ ...col, height: Math.max(2, h), borderRadius: 2, overflow: 'hidden', flexShrink: 0 }}>
+                {r.cacheBreak ? <div style={{ height: 4, borderRadius: 2, backgroundColor: C.red, marginBottom: 3, flexShrink: 0, pointerEvents: 'none' }} /> : null}
+                <div style={{ ...col, height: Math.max(2, h), borderRadius: 2, overflow: 'hidden', flexShrink: 0, pointerEvents: 'none' }}>
                   {order.map((s) => (
-                    <div key={s} style={{ flexGrow: Math.max(0, r.seg[s]), flexBasis: 0, backgroundColor: dim ? mix(segColor(s), C.panel, 0.6) : segColor(s) }} />
+                    <div key={s} style={{ flexGrow: Math.max(0, r.seg[s]), flexBasis: 0, pointerEvents: 'none', backgroundColor: dim ? mix(segColor(s), C.panel, 0.6) : segColor(s) }} />
                   ))}
                 </div>
               </div>
