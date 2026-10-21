@@ -18,9 +18,9 @@ function EpisodeRow({ ep, idx, focused, width }: { ep: Item; idx: number; focuse
       onClick={() => ctl.play(ep.id)}
       style={{ display: 'flex', flexDirection: 'row', gap: 16, padding: 8, borderRadius: 10, cursor: 'pointer', backgroundColor: focused ? alpha(theme.fg, 0.08) : 'transparent', borderWidth: 2, borderColor: focused ? theme.focus : 'transparent' }}
     >
-      <div style={{ position: 'relative', width: tw, height: Math.round(tw * 9 / 16), borderRadius: 7, overflow: 'hidden', backgroundColor: theme.panel, flexShrink: 0 }}>
-        {thumb ? <img src={thumb} objectFit="cover" style={{ width: tw, height: Math.round(tw * 9 / 16) }} /> : null}
-        {prog ? <div style={{ position: 'absolute', left: 6, right: 6, bottom: 6 }}><ProgressBar value={prog} theme={theme} height={3} /></div> : null}
+      <div style={{ position: 'relative', width: tw, height: Math.round(tw * 9 / 16), borderRadius: 7, overflow: 'hidden', backgroundColor: theme.panel, flexShrink: 0, pointerEvents: 'none' }}>
+        {thumb ? <img src={thumb} objectFit="cover" style={{ width: tw, height: Math.round(tw * 9 / 16), pointerEvents: 'none' }} /> : null}
+        {prog ? <div style={{ position: 'absolute', left: 6, right: 6, bottom: 6, pointerEvents: 'none' }}><ProgressBar value={prog} theme={theme} height={3} /></div> : null}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexGrow: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'row', gap: 10, alignItems: 'center' }}>

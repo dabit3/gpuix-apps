@@ -21,7 +21,7 @@ export function Profiles({ view, width, height }: { view: View; width: number; h
               style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, cursor: 'pointer' }}
             >
               <div style={{
-                width: size, height: size, borderRadius: Math.round(size * 0.22), display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: size, height: size, borderRadius: Math.round(size * 0.22), display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
                 background: { type: 'linear-gradient', angle: 160, stops: [{ color: mix(color, theme.fg, 0.15), position: 0 }, { color: mix(color, theme.bg, 0.45), position: 1 }] },
                 borderWidth: 4, borderColor: focused ? theme.fg : 'transparent',
                 opacity: focused ? 1 : 0.72,

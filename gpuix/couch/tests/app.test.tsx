@@ -52,6 +52,20 @@ describeNative('couch in the GPU test renderer', () => {
 
     c.setTab('movies'); draw(); await Bun.sleep(5); draw()
     const wide = c.view.gridCols
+
+    const second = c.gridIds()[1]!
+    const it2 = c.lib.items[second]!
+    const cap = it2.year ? `${it2.title} · ${it2.year}` : it2.title
+    const capId = renderer.findByType('text').find((e) => e.text === cap)?.id
+    expect(capId).toBeDefined()
+    const b = renderer.getElementBounds(capId!)!
+    const p = sizes(W, H)
+    renderer.nativeSimulateClick(b.x + p.posterW / 2, b.y - 8 - p.posterH / 2)
+    draw()
+    expect(c.view.screen).toBe('details')
+    expect(c.view.detailsId).toBe(second)
+    c.dispatch('back'); draw()
+    expect(c.view.screen).toBe('browse')
     W = 640; draw(); await Bun.sleep(5); draw()
     expect(c.view.gridCols).toBeLessThan(wide)
     expect(text()).toContain('Spring')

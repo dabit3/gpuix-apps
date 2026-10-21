@@ -67,12 +67,12 @@ export function Tile(props: { item: Item; shape: 'poster' | 'landscape'; w: numb
   return (
     <div onMouseEnter={props.onHover} onClick={props.onClick} style={{ display: 'flex', flexDirection: 'column', width: w, gap: 8, cursor: 'pointer', flexShrink: 0 }}>
       <div style={{
-        position: 'relative', width: w, height: h, borderRadius: r, backgroundColor: theme.panel, overflow: 'hidden',
+        position: 'relative', width: w, height: h, borderRadius: r, backgroundColor: theme.panel, overflow: 'hidden', pointerEvents: 'none',
         borderWidth: 3, borderColor: focused ? theme.focus : 'transparent',
         boxShadow: focused ? { offsetX: 0, offsetY: 8, blurRadius: 24, spreadRadius: 0, color: alpha(theme.focus, 0.28) } : undefined,
       }}>
-        {src ? <img src={src} objectFit="cover" style={{ position: 'absolute', left: 0, top: 0, width: w - 6, height: h - 6, borderRadius: r - 3 }} /> : (
-          <div style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
+        {src ? <img src={src} objectFit="cover" style={{ position: 'absolute', left: 0, top: 0, width: w - 6, height: h - 6, borderRadius: r - 3, pointerEvents: 'none' }} /> : (
+          <div style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, pointerEvents: 'none' }}>
             <T color={theme.faint} size={13} weight={600}>{artItem.title}</T>
           </div>
         )}
