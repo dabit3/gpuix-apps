@@ -66,12 +66,13 @@ The frame time is pinned near 16.7 ms by the 60 Hz redraw loop; the draw-time co
 ## GPUIX findings (0.11.0, macOS arm64)
 
 1. **`bun build --compile` binaries can't find the native addon when the app imports `@gpuix/react`.** The ESM loader in `@gpuix/native/index.js` uses `createRequire(import.meta.url)`, which Bun's bundler can't follow, so the `.node` file isn't embedded and the binary dies with `Cannot find native binding` / `Cannot find module '@gpuix/native-darwin-arm64'`. Repro: `bun build --compile src/app.tsx --outfile x && ./x`. Workaround in `src/main.ts`: import the addon with `with { type: 'file' }` so Bun embeds it, set `NAPI_RS_NATIVE_LIBRARY_PATH` to it, then dynamically import the app.
-2. **Return never reaches the native window.** With real key events (CGEvent keycode 36 or `cliclick kp:return`), neither `render({ onKeyDown })` nor a focused `<input>`'s `onSubmit` fires, while Space, Esc, Tab and letters arrive normally. In the test renderer `simulateKeystrokes('enter')` does fire `onSubmit`, so the test suite can't catch it. Workaround: the game-over screen has a Save button, and the title screen advertises Space.
+2. **Return was unreliable with synthesized key events.** Return posted with `cliclick kp:return` or a raw CGEvent (keycode 36) reached neither `render({ onKeyDown })` nor a focused `<input>`'s `onSubmit`, while Space, Esc, Tab and letters from the same tools arrived fine. Return sent by Devin's computer tool did submit the `<input>`. In the test renderer, `simulateKeystrokes('enter')` fires `onSubmit`. Workaround: the game-over screen also has a Save button, and the title screen advertises Space.
 3. **README's cargo-packager config fails with `--config`.** `cargo packager --release --config packager.json` (cargo-packager 0.11.8) errors with `I/O Error (.../packager.json): Not a directory`. Adding `"name": "neon-breakout"` fixes it.
-4. **Mouse handlers on the playfield container were unreliable with real clicks** once bricks, balls and banners were drawn inside it (the native click did not launch the ball). Fix: a transparent, absolutely positioned top layer (`pointer-pad`) owns `onMouseDown`/`onMouseMove`.
-5. Only two-stop linear gradients are supported (radial gradients are not), so glows are built from layered `boxShadow`s and translucent bars instead.
-6. The test renderer has no alpha channel, so `scripts/icon.tsx` paints a matching mask and merges it with ffmpeg to get transparent icon corners.
-7. Every launch logs a burst of `WARN gpui_macos::text_system skipping duplicate font` lines on this VM. Harmless.
+4. **`<input value>` doesn't reject edits like a React controlled input.** If `onChange` cleans the text (here: A-Z/0-9, max 3) and the cleaned value equals the previous prop, GPUIX keeps showing the raw edit (`QA1!z`). Workaround in `GameOver`: echo the raw value for one render, then set the cleaned value so the prop changes and replaces the native text.
+5. **Mouse handlers on the playfield container were unreliable with real clicks** once bricks, balls and banners were drawn inside it (the native click did not launch the ball). Fix: a transparent, absolutely positioned top layer (`pointer-pad`) owns `onMouseDown`/`onMouseMove`.
+6. Only two-stop linear gradients are supported (radial gradients are not), so glows are built from layered `boxShadow`s and translucent bars instead.
+7. The test renderer has no alpha channel, so `scripts/icon.tsx` paints a matching mask and merges it with ffmpeg to get transparent icon corners.
+8. Every launch logs a burst of `WARN gpui_macos::text_system skipping duplicate font` lines on this VM. Harmless.
 
 ## Layout
 

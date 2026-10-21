@@ -97,6 +97,8 @@ function Paused({ c }: { c: Controller }) {
 function GameOver({ c }: { c: Controller }) {
   const g = c.game
   const save = (value: string) => c.submitInitials(value)
+  // Re-rendering the same value doesn't reject a native edit, so echo the raw text once, then the cleaned text.
+  if (c.draft !== cleanInitials(c.draft)) queueMicrotask(() => { c.draft = cleanInitials(c.draft) })
   return (
     <Backdrop alpha="d8">
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -115,7 +117,7 @@ function GameOver({ c }: { c: Controller }) {
                 value={c.draft}
                 placeholder="AAA"
                 theme={{ caret: COLORS.teal }}
-                onChange={(e) => { c.draft = cleanInitials(e.value ?? '') }}
+                onChange={(e) => { c.draft = e.value ?? '' }}
                 onSubmit={(e) => save(e.value ?? c.draft)}
                 style={{ flexGrow: 1, minWidth: 0, height: 52, fontSize: 28, fontWeight: 800, color: INK.text }}
               />

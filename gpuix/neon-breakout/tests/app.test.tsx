@@ -89,18 +89,22 @@ describeNative('Neon Breakout in the GPU test renderer', () => {
     expect(c.mode).toBe('gameover')
     expect(text()).toContain('New high score!')
 
-    await app.getByTestId('initials-input').fill('nb7')
+    // The native editor shows the cleaned initials, not the raw edit.
+    await app.getByTestId('initials-input').fill('qa1!z')
     draw()
+    await Promise.resolve()
+    draw()
+    expect(c.draft).toBe('QA1')
     await app.getByTestId('save-score').click()
     draw()
-    expect(text()).toContain('Saved NB7 at #1')
+    expect(text()).toContain('Saved QA1 at #1')
     expect(text()).toContain('99,999')
 
     // Persisted: a fresh controller reads the table back from disk.
     const file = process.env.NEON_BREAKOUT_SCORES!
     expect(existsSync(file)).toBe(true)
-    expect(JSON.parse(readFileSync(file, 'utf8'))[0]).toMatchObject({ initials: 'NB7', score: 99_999 })
-    expect(new Controller({ muted: true }).scores[0]!.initials).toBe('NB7')
+    expect(JSON.parse(readFileSync(file, 'utf8'))[0]).toMatchObject({ initials: 'QA1', score: 99_999 })
+    expect(new Controller({ muted: true }).scores[0]!.initials).toBe('QA1')
 
     await app.close()
   }, 60_000)
