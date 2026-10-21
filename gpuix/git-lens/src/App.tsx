@@ -504,7 +504,7 @@ export function App({ initialRepo, onOpened }: { initialRepo?: string; onOpened?
       </div>
       <div style={{ display: 'flex', flexGrow: 1, minHeight: 0, overflowY: 'scroll', flexDirection: 'column', paddingBottom: 16 }}>
         <SectionLabel>Workspace</SectionLabel>
-        {sidebarItem('History', mode === 'history', () => setMode('history'), { testId: 'nav-history', badge: stats ? stats.commits.toLocaleString('en-US') : undefined })}
+        {sidebarItem('History', mode === 'history', () => setMode('history'), { testId: 'nav-history', badge: commits.length ? commits.length.toLocaleString('en-US') : undefined })}
         {sidebarItem('Working Changes', mode === 'changes', () => setMode('changes'), { testId: 'nav-changes', badge: statusEntries.length ? String(statusEntries.length) : undefined })}
         {sidebarItem(readme?.path ?? 'README', mode === 'readme', () => setMode('readme'), { testId: 'nav-readme' })}
         <SectionLabel>Branches</SectionLabel>
