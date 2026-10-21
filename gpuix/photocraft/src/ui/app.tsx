@@ -84,28 +84,30 @@ function Slider({ label, value, min, max, step = 1, format, onChange, testId, wi
   const t = (value - min) / (max - min || 1)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5, width, flexGrow: width ? 0 : 1 }}>
-      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
         <Label size={11} color={T.faint}>{label}</Label>
         <Label size={11} color={T.fg} weight={600}>{format ? format(value) : String(value)}</Label>
       </div>
-      <div
-        testId={testId}
-        onLayout={(e) => (box.current = { x: e.x ?? 0, w: Math.max(1, e.width ?? 1) })}
-        onMouseDown={(e) => {
-          drag.current = true
-          set(e.x)
-        }}
-        onMouseMove={(e) => {
-          if (drag.current && e.pressedButton != null) set(e.x)
-        }}
-        onMouseUp={() => (drag.current = false)}
-        style={{ height: 14, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-      >
+      <div style={{ position: 'relative', height: 14, display: 'flex', alignItems: 'center' }}>
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', width: '100%', height: 12 }}>
           <div style={{ flexGrow: Math.max(0.0001, t), flexBasis: 0, height: 4, borderTopLeftRadius: 2, borderBottomLeftRadius: 2, backgroundColor: T.accent }} />
           <div style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: T.fg, flexShrink: 0 }} />
           <div style={{ flexGrow: Math.max(0.0001, 1 - t), flexBasis: 0, height: 4, borderTopRightRadius: 2, borderBottomRightRadius: 2, backgroundColor: T.line }} />
         </div>
+        {/* Childless hit layer on top: in GPUIX 0.11 a div whose children paint over it stops getting mouse events. */}
+        <div
+          testId={testId}
+          onLayout={(e) => (box.current = { x: e.x ?? 0, w: Math.max(1, e.width ?? 1) })}
+          onMouseDown={(e) => {
+            drag.current = true
+            set(e.x)
+          }}
+          onMouseMove={(e) => {
+            if (drag.current && e.pressedButton != null) set(e.x)
+          }}
+          onMouseUp={() => (drag.current = false)}
+          style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, cursor: 'pointer' }}
+        />
       </div>
     </div>
   )
@@ -701,8 +703,8 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
         <Label color={T.fg} size={12} weight={600}>{toolLabel}</Label>
         {brushTool ? (
           <div style={{ display: 'flex', flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-            <Slider testId="size-slider" width={layout.compactTop ? 86 : 110} label="Size" value={ed.brush.size} min={1} max={300} format={(v) => `${v} px`} onChange={(v) => ((ed.brush.size = v), ed.emit())} />
-            <Slider width={layout.compactTop ? 70 : 96} label="Hardness" value={Math.round(ed.brush.hardness * 100)} min={0} max={100} format={(v) => `${v}%`} onChange={(v) => ((ed.brush.hardness = v / 100), ed.emit())} />
+            <Slider testId="size-slider" width={layout.compactTop ? 92 : 110} label="Size" value={ed.brush.size} min={1} max={300} format={(v) => `${v} px`} onChange={(v) => ((ed.brush.size = v), ed.emit())} />
+            <Slider width={layout.compactTop ? 104 : 104} label="Hardness" value={Math.round(ed.brush.hardness * 100)} min={0} max={100} format={(v) => `${v}%`} onChange={(v) => ((ed.brush.hardness = v / 100), ed.emit())} />
             {layout.compactTop ? null : <Slider width={96} label="Opacity" value={Math.round(ed.brush.opacity * 100)} min={1} max={100} format={(v) => `${v}%`} onChange={(v) => ((ed.brush.opacity = v / 100), ed.emit())} />}
             {layout.compactTop ? null : <Slider width={96} label="Flow" value={Math.round(ed.brush.flow * 100)} min={1} max={100} format={(v) => `${v}%`} onChange={(v) => ((ed.brush.flow = v / 100), ed.emit())} />}
           </div>

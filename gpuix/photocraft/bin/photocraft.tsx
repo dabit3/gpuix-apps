@@ -66,6 +66,12 @@ if (!process.env.PHOTOCRAFT_CHILD) {
   process.exit(await child.exited)
 }
 
+const log = console.log
+console.log = (...args: unknown[]) => {
+  if (typeof args[0] === 'string' && args[0].startsWith('[gpuix]')) return
+  log(...args)
+}
+
 const { Editor } = await import('../src/core/editor')
 const { fitImage, readImageFile, writeImageFile } = await import('../src/core/io')
 const { render } = await import('@gpuix/react')

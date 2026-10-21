@@ -486,8 +486,11 @@ export class Editor {
     this.insertLayer(copy, this.active + 1, 'Duplicate Layer')
   }
 
+  /** With an active selection the adjustment gets it as its layer mask, so it only affects that area. */
   addAdjustment(kind: AdjustKind) {
-    this.insertLayer(adjustLayer(ADJUST_LABELS[kind], defaultAdjust(kind)), this.active + 1, `New ${ADJUST_LABELS[kind]}`)
+    const L = adjustLayer(ADJUST_LABELS[kind], defaultAdjust(kind))
+    if (this.selection) L.mask = this.selection.slice()
+    this.insertLayer(L, this.active + 1, `New ${ADJUST_LABELS[kind]}`)
   }
 
   deleteLayer() {

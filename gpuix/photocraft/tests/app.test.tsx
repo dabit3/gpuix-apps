@@ -57,6 +57,20 @@ describeNative('PhotoCraft in the GPU test renderer', () => {
     expect(ed.layer!.blend).toBe('soft-light')
     expect(text()).toContain('Soft Light · 100%')
 
+    // Drag the opacity slider from the right end to 40 %.
+    const sb = await app.getByTestId('opacity-slider').bounds()
+    const sy = sb.y + sb.height / 2
+    renderer.nativeSimulateMouseDown(sb.x + sb.width - 2, sy, 0)
+    renderer.flush()
+    for (let i = 1; i <= 6; i++) {
+      renderer.nativeSimulateMouseMove(sb.x + sb.width - 2 - (i / 6) * (sb.width * 0.6 - 2), sy, 0)
+      renderer.flush()
+    }
+    renderer.nativeSimulateMouseUp(sb.x + sb.width * 0.4, sy, 0)
+    renderer.flush()
+    expect(Math.round(ed.layer!.opacity * 100)).toBe(40)
+    expect(ed.history.entries.at(-1)!.label).toBe('Opacity')
+
     await click('filter-gaussian')
     expect(ed.history.entries.at(-1)!.label).toBe('Gaussian Blur')
 
