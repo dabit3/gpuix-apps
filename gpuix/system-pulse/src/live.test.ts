@@ -83,7 +83,13 @@ live('System Pulse live app (real window, real processes)', () => {
       await painted(app.getByTestId('confirm-quit'))
       await app.getByTestId('confirm-quit').click()
       await until(() => !alive(victim))
-      expect(await app.getByTestId('stress-label').textContent()).toBe(`Stop stress · ${n - 1} workers`)
+      const want = `Stop stress · ${n - 1} workers`
+      let shown = ''
+      for (let i = 0; i < 50 && shown !== want; i++) {
+        shown = await app.getByTestId('stress-label').textContent()
+        if (shown !== want) await new Promise((r) => setTimeout(r, 100))
+      }
+      expect(shown).toBe(want)
 
       fs.mkdirSync(OUT, { recursive: true })
       await app.screenshot({ path: path.join(OUT, 'live.png') })

@@ -58,6 +58,20 @@ describeNative('System Pulse window (GPU test renderer)', () => {
     ;[ws, xcode, finder] = order('WindowServer', 'Xcode', 'Finder')
     expect(xcode).toBeLessThan(ws!)
 
+    // Keyboard: Tab leaves the search field, and Enter on a focused header sorts.
+    const r = root.renderer as unknown as { getFocusedElementId(): number | null }
+    await app.getByTestId('search').click()
+    const searchFocus = r.getFocusedElementId()
+    await app.getByTestId('search').press('tab')
+    root.renderer.flush()
+    expect(r.getFocusedElementId()).not.toBe(searchFocus)
+    expect(r.getFocusedElementId()).not.toBeNull()
+    const before = order('WindowServer', 'Xcode', 'Finder').join()
+    await app.getByTestId('sort-name').press('enter')
+    root.renderer.flush()
+    expect(order('WindowServer', 'Xcode', 'Finder').join()).not.toBe(before)
+    await app.getByTestId('sort-cpu').click()
+
     // Search filters the table.
     await app.getByTestId('search').fill('safari')
     expect(await app.getByTestId('process-count').textContent()).toBe('1 of 6')

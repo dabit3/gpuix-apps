@@ -40,6 +40,7 @@ const hex = ([r, g, b]: RGB, a = 1) =>
 
 const FONT = '.SystemUIFont'
 const CORE_H = 118
+const FOCUS_RING = { outlineWidth: 2, outlineColor: '#0A84FFCC', outlineOffset: 1 }
 const WINDOW_MS = 60_000
 /** Charts trail real time by one slow sample so the right edge never extrapolates. */
 const CHART_DELAY_MS = 1_100
@@ -156,7 +157,9 @@ function Pill({
         borderWidth: 1,
         borderColor: border,
         cursor: onClick ? 'pointer' : undefined,
-      hover: { backgroundColor: hover } }}
+        hover: { backgroundColor: hover },
+        focusVisible: FOCUS_RING,
+      }}
     >
       {children}
     </div>
@@ -252,7 +255,7 @@ function LiveChart({
     const flip = hoverX > box.w - 170
     tooltip = (
       <>
-        <div style={{ position: 'absolute', left: hoverX, top: 0, width: 1, height, backgroundColor: '#FFFFFF66' }} />
+        <div style={{ position: 'absolute', left: hoverX, top: 0, width: 1, height, backgroundColor: '#FFFFFF66', pointerEvents: 'none' }} />
         <div
           testId={`${testId}-tooltip`}
           style={{
@@ -268,6 +271,9 @@ function LiveChart({
             backgroundColor: '#1C1C1EF0',
             borderWidth: 1,
             borderColor: '#FFFFFF1F',
+            // Positioned boxes block hover behind them; without this the tooltip
+            // under the pointer fires onMouseLeave on the chart and hides itself.
+            pointerEvents: 'none',
           }}
         >
           <T size={11} color={C.muted}>{ago === 0 ? 'now' : `${ago}s ago`}</T>
@@ -337,6 +343,10 @@ function HeaderCell({
     <div
       testId={`sort-${col.key}`}
       onClick={() => onSort(col.key)}
+      tabIndex={0}
+      onKeyDown={(e: EventPayload) => {
+        if (e.key === 'enter' || e.key === 'space') onSort(col.key)
+      }}
       style={{
         display: 'flex',
         width: col.width,
@@ -351,7 +361,9 @@ function HeaderCell({
         paddingRight: 6,
         borderRadius: 6,
         cursor: 'pointer',
-      hover: { backgroundColor: C.hover } }}
+        hover: { backgroundColor: C.hover },
+        focusVisible: FOCUS_RING,
+      }}
     >
       <T size={11} weight={600} color={active ? C.text : C.muted}>{col.label}</T>
       {active && <T size={9} color={hex(BLUE)}>{desc ? '▼' : '▲'}</T>}
