@@ -179,7 +179,8 @@ export class World {
       if (along <= 0 || along >= bd) continue
       const perp = Math.abs(ex * dy - ey * dx)
       const zz = aimZ + p.pitch * along * 0
-      if (perp < st.radius + 0.06 && zz > st.z0 - 0.35 && zz < st.z1 + 0.35) { best = e; bd = along }
+      // Slight cone widening with distance: terminal mouse-drag aim is coarser than pointer lock.
+      if (perp < st.radius + 0.06 + along * 0.025 && zz > st.z0 - 0.35 && zz < st.z1 + 0.35) { best = e; bd = along }
     }
     if (best) this.damage(best, w.damage)
     this.fx.push({ kind: 'spark', x: p.x + dx * (bd - 0.1), y: p.y + dy * (bd - 0.1), z: best ? (STATS[best.kind].z0 + STATS[best.kind].z1) / 2 : p.z, t: 0 })
@@ -233,7 +234,7 @@ export class World {
       if (e.state === 'chase' || e.state === 'attack') {
         if (this.time - e.lastSeen > 6 || this.state !== 'play') { e.state = 'patrol'; this.pickPatrol(e) }
         else {
-          const range = e.kind === 'spider' ? 0.85 : 7.5
+          const range = e.kind === 'spider' ? 0.85 : 6.5
           e.state = sees && d < range ? 'attack' : 'chase'
         }
       }

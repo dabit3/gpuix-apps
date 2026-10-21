@@ -45,6 +45,16 @@ case "--kd", "--ku":
   if args.count > 3 && !args[3].isEmpty { let u = Array(args[3].utf16); e.keyboardSetUnicodeString(stringLength: u.count, unicodeString: u) }
   e.post(tap: .cghidEventTap)
   usleep(40_000) // exiting right after a post can drop the event
+case "--stdin":
+  // Persistent mode for closed-loop drivers: "kd <code> [char]" / "ku <code>" per line, no per-event process spawn.
+  while let line = readLine() {
+    let f = line.split(separator: " ").map(String.init)
+    guard f.count >= 2, let code = Int(f[1]) else { continue }
+    let e = CGEvent(keyboardEventSource: src, virtualKey: CGKeyCode(code), keyDown: f[0] == "kd")!
+    if f.count > 2 { let u = Array(f[2].utf16); e.keyboardSetUnicodeString(stringLength: u.count, unicodeString: u) }
+    e.post(tap: .cghidEventTap)
+  }
+  usleep(60_000)
 case "--scroll":
   let n = Int(num(3, 1))
   for _ in 0..<n {

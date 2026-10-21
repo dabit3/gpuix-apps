@@ -1,24 +1,25 @@
 // Demo/test driver: plays a running `krieg` with REAL OS keyboard events (via tools/input.swift), steering
 // from the live snapshot the game publishes for `krieg map`. Nothing is injected into the game process.
-//   bun tools/pilot.ts [--secs 30] [--goal kills|key|exit] [--kills n]
+//   bun tools/pilot.ts [--secs 30] [--goal kills|key|exit] [--kills n] [--calm: stop once no enemy is chasing]
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { EMPTY, MW, MH, generateLevel, lineOfSight } from '../src/gen/level'
 import { LIVE, type Live } from '../src/live'
 
 const arg = (k: string, d: string) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1]! : d }
-const SECS = Number(arg('--secs', '30')), GOAL = arg('--goal', 'exit'), KILLS = Number(arg('--kills', '99'))
+const CALM = process.argv.includes('--calm'), SECS = Number(arg('--secs', '30')), GOAL = arg('--goal', 'exit'), KILLS = Number(arg('--kills', '99'))
 const INPUT = `${homedir()}/bin/input`
 const CODE: Record<string, number> = { w: 13, s: 1, a: 0, d: 2, f: 3, left: 123, right: 124 }
 
-const run = (...a: string[]) => Bun.spawnSync([INPUT, ...a])
+const driver = Bun.spawn([INPUT, '--stdin'], { stdin: 'pipe' })
+const send = (line: string) => { driver.stdin.write(line + '\n'); driver.stdin.flush() }
 const held = new Set<string>()
 function want(keys: Set<string>) {
-  for (const k of [...held]) if (!keys.has(k)) { run('--ku', String(CODE[k])); held.delete(k) }
-  for (const k of keys) if (!held.has(k)) { run('--kd', String(CODE[k]), k.length === 1 ? k : ''); held.add(k) }
+  for (const k of [...held]) if (!keys.has(k)) { send(`ku ${CODE[k]}`); held.delete(k) }
+  for (const k of keys) if (!held.has(k)) { send(`kd ${CODE[k]}${k.length === 1 ? ' ' + k : ''}`); held.add(k) }
 }
-const release = () => want(new Set())
-process.on('SIGINT', () => { release(); process.exit(0) })
+async function release() { want(new Set()); driver.stdin.end(); await driver.exited }
+process.on('SIGINT', async () => { await release(); process.exit(0) })
 
 function front() {
   const asn = Bun.spawnSync(['lsappinfo', 'front']).stdout.toString().trim()
@@ -49,11 +50,12 @@ function path(sx: number, sy: number, goal: (i: number) => boolean, key: boolean
 const t0 = Date.now()
 let lastFront = 0, stuck = 0, lastPos = [0, 0]
 while (Date.now() - t0 < SECS * 1000) {
-  if (Date.now() - lastFront > 2000) { if (!front()) { release(); console.error('ghostty not frontmost, stopping'); process.exit(1) } lastFront = Date.now() }
+  if (Date.now() - lastFront > 2000) { if (!front()) { await release(); console.error('ghostty not frontmost, stopping'); process.exit(1) } lastFront = Date.now() }
   live = read() ?? live
   if (live.state !== 'play') break
   if (GOAL === 'key' && live.key) break
   if (live.kills >= KILLS) break
+  if (CALM && Date.now() - t0 > 2000 && live.e.every(([, , , st]) => st !== 'chase' && st !== 'attack')) break
   live.d.forEach((o, i) => { level.doors[i]!.open = o })
   const [px, py, pa] = live.p
   const keys = new Set<string>()
@@ -64,7 +66,7 @@ while (Date.now() - t0 < SECS * 1000) {
     const f = foes[0]!
     aim = Math.atan2(f.y - py, f.x - px)
     const err = wrap(aim - pa)
-    if (Math.abs(err) < 0.09) keys.add('f')
+    if (Math.abs(err) < Math.min(0.09, Math.atan(0.3 / f.d) + 0.02)) keys.add('f')
     if (f.d > 3.2 && Math.abs(err) < 0.4) keys.add('w')
     if (f.d < 1.6) keys.add('s')
   } else {
@@ -72,7 +74,9 @@ while (Date.now() - t0 < SECS * 1000) {
     let goal: (i: number) => boolean
     const near = (x: number, y: number) => (i: number) => i === Math.floor(y) * MW + Math.floor(x)
     const key = level.pickups.find((k) => k.kind === 'key')!
-    if (GOAL === 'kills' && alive.length) goal = (i) => alive.some(([x, y]) => near(x, y)(i))
+    const meds = level.pickups.filter((k, i) => k.kind === 'health' && !live!.k[i] && Math.hypot(k.x - px, k.y - py) < 14)
+    if (live.hp < 60 && meds.length) goal = (i) => meds.some((k) => near(k.x, k.y)(i))
+    else if (GOAL === 'kills' && alive.length) goal = (i) => alive.some(([x, y]) => near(x, y)(i))
     else if (!live.key) goal = near(key.x, key.y)
     else goal = near(level.exit.x, level.exit.y)
     const p = path(px, py, goal, live.key)
@@ -89,5 +93,5 @@ while (Date.now() - t0 < SECS * 1000) {
   want(keys)
   await Bun.sleep(30)
 }
-release()
+await release()
 console.log(JSON.stringify({ state: live.state, kills: live.kills, hp: live.hp, key: live.key }))
