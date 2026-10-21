@@ -3,12 +3,15 @@
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "bin": { "testdeck": "./cli.tsx" },
+  "bin": {
+    "testdeck": "./cli.tsx"
+  },
   "scripts": {
     "dev": "GPUIX_TERMINAL=1 bun --hot cli.tsx sample",
     "start": "bun cli.tsx sample",
     "test": "bun test ./test",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "perf": "bun scripts/perf.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.3",

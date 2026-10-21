@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env -S RUST_LOG=error bun
 import { existsSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -46,7 +46,14 @@ if (!existsSync(dir) || !statSync(dir).isDirectory()) {
 }
 
 const background = process.env.GPUIX_BACKGROUND === '1'
-const terminal = !windowed && !background && process.stdout.isTTY === true && process.stdin.isTTY === true && process.env.GPUIX_TERMINAL !== '0'
+const tty = process.stdout.isTTY === true && process.stdin.isTTY === true
+const env = process.env
+// GPUIX 0.11 paints over the kitty graphics protocol, which only kitty and Ghostty implement.
+const kittyGraphics = env.GPUIX_TERMINAL === '1' || env.TERM === 'xterm-ghostty' || env.TERM === 'xterm-kitty' || env.TERM_PROGRAM === 'ghostty' || !!env.KITTY_WINDOW_ID
+const terminal = !windowed && !background && tty && env.GPUIX_TERMINAL !== '0' && kittyGraphics
+if (!windowed && !background && tty && !kittyGraphics) {
+  process.stderr.write(`testdeck: ${env.TERM_PROGRAM ?? env.TERM ?? 'this terminal'} has no kitty graphics support, opening a window instead (force with GPUIX_TERMINAL=1)\n`)
+}
 
 // GPUIX holds stdout until exit in terminal mode; keep its startup chatter out of the restored shell.
 process.env.RUST_LOG ??= 'error'

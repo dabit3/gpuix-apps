@@ -48,6 +48,9 @@ test('watch mode goes red on a broken function, shows the diff, and goes green o
   await app.getByTestId('search').fill('BREW25')
   await app.getByTestId('test-BREW25 takes 25% off big orders').waitFor()
   await waitForText('detail-name', 'takes 10% off')
+  expect(await app.getByTestId('test-takes 10% off').count()).toBe(0)
+  await app.getByTestId('search').press('escape')
+  await app.getByTestId('test-takes 10% off').waitFor()
 
   writeFileSync(pricing, good)
   await waitForText('count-fail', '0')

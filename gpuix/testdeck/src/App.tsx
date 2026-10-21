@@ -56,6 +56,7 @@ function useMonoFont() {
 }
 
 export function App({ dir, watch = true, namePattern, initialFilter = 'all' }: AppProps) {
+  const renderer = useGpuixRequired()
   useMonoFont()
   const project = useMemo(() => {
     try {
@@ -277,6 +278,12 @@ export function App({ dir, watch = true, namePattern, initialFilter = 'all' }: A
         onChange={(e) => setQuery(e.value ?? '')}
         onFocus={() => (typing.current = true)}
         onBlur={() => (typing.current = false)}
+        onKeyDown={(e) => {
+          if (e.key !== 'escape') return
+          setQuery('')
+          renderer.blur?.()
+          typing.current = false
+        }}
         theme={nativeTheme}
         style={{ width: compact ? 150 : 230, height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 7, backgroundColor: P.bg, borderWidth: 1, borderColor: P.border, color: P.text, fontSize: 12.5 }}
       />
