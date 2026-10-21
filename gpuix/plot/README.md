@@ -4,7 +4,7 @@ Live GPU charts in your terminal. `plot -- <command>` runs a command and charts 
 
 ![plot dashboard in three Ghostty splits](media/screenshot.png)
 
-[Demo video](media/demo.mp4) (74 s, recorded in Ghostty with real input)
+[Demo video](media/demo.mp4) (71 s, real-time Ghostty recording with real input)
 
 *Three `plot`s in Ghostty splits (theme GitHub Dark High Contrast): ping latency, CPU from `iostat`, and a CSV that a script is appending to.*
 
