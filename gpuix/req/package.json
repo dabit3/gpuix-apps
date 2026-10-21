@@ -1,0 +1,28 @@
+{
+  "name": "req",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A Postman-style HTTP client that runs inside your terminal (GPUIX + kitty graphics).",
+  "bin": {
+    "req": "./cli.tsx"
+  },
+  "scripts": {
+    "dev": "GPUIX_TERMINAL=1 bun --hot cli.tsx",
+    "start": "bun cli.tsx",
+    "server": "bun server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.11.0",
+    "@gpuix/react": "0.11.0",
+    "react": "19"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
