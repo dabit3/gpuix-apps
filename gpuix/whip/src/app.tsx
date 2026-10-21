@@ -78,6 +78,7 @@ export function App(props: AppProps) {
 
   const sim = useRef<{
     whip: Whip
+    pointerSeen: boolean
     canvas: WhipCanvas
     flashes: Flash[]
     shake: number
@@ -100,6 +101,7 @@ export function App(props: AppProps) {
       picker: new MessagePicker(),
       limiter: new RateLimiter(2000),
       popupId: 1,
+      pointerSeen: false,
       dirty: true,
     }
   }
@@ -111,6 +113,18 @@ export function App(props: AppProps) {
     },
     [props.persist],
   )
+
+  // The first pointer sample (and re-entry after the pointer was elsewhere) moves the rope there
+  // instead of yanking it across the pane, which would read as a crack.
+  const aim = useCallback((x: number, y: number) => {
+    const st = sim.current!
+    if (st.pointerSeen) st.whip.pointTo(x, y)
+    else {
+      st.pointerSeen = true
+      st.whip.teleport(x, y)
+      st.dirty = true
+    }
+  }, [])
 
   const popup = useCallback((x: number, y: number, text: string, color: string) => {
     const st = sim.current!
@@ -166,7 +180,7 @@ export function App(props: AppProps) {
     const len = effectiveLength(settings.length, W, H)
     st.whip.setLength(len)
     st.whip.opts.crackSpeed = 8.3 * len
-    if (st.whip.targetX > W - 20 || st.whip.targetY > H - 20) st.whip.pointTo(Math.min(st.whip.targetX, W * 0.45), Math.min(st.whip.targetY, H * 0.3))
+    if (st.whip.targetX > W - 20 || st.whip.targetY > H - 20) st.whip.teleport(Math.min(st.whip.targetX, W * 0.45), Math.min(st.whip.targetY, H * 0.3))
     st.dirty = true
   }, [settings.length, W, H])
 
@@ -284,10 +298,10 @@ export function App(props: AppProps) {
       autoFocus
       onKeyDown={onKey}
       onMouseMove={(e) => {
-        if (e.x != null && e.y != null) sim.current!.whip.pointTo(e.x, e.y)
+        if (e.x != null && e.y != null) aim(e.x, e.y)
       }}
       onMouseDown={(e) => {
-        if (e.x != null && e.y != null) sim.current!.whip.pointTo(e.x, e.y)
+        if (e.x != null && e.y != null) aim(e.x, e.y)
         refocus()
       }}
       style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: T.bg, position: 'relative', overflow: 'hidden' }}

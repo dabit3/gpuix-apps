@@ -92,6 +92,21 @@ export class Whip {
     this.quietUntil = this.clock * 1000 + 250
   }
 
+  /** Move the whole rope so the handle sits at (x, y) without adding velocity or cracking. */
+  teleport(x: number, y: number) {
+    const dx = x - this.handleX
+    const dy = y - this.handleY
+    for (let i = 0; i < this.x.length; i++) {
+      this.x[i] += dx
+      this.y[i] += dy
+      this.px[i] += dx
+      this.py[i] += dy
+    }
+    this.handleX = this.targetX = x
+    this.handleY = this.targetY = y
+    this.quietUntil = this.clock * 1000 + 250
+  }
+
   pointTo(x: number, y: number) {
     this.targetX = x
     this.targetY = y

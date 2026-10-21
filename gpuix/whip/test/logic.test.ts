@@ -73,6 +73,14 @@ describe('verlet whip', () => {
     for (let i = 1; i < cracks.length; i++) expect(cracks[i] - cracks[i - 1]).toBeGreaterThanOrEqual(0.4 - 1e-6)
   })
 
+  test('teleporting the handle across the pane never cracks', () => {
+    const w = new Whip(800, 375)
+    for (let i = 0; i < 600; i++) w.step()
+    w.teleport(1100, 600)
+    for (let i = 0; i < 240; i++) expect(w.step()).toBeNull()
+    expect(Math.hypot(w.x[0] - 1100, w.y[0] - 600)).toBeLessThan(1)
+  })
+
   test('changing length while at rest never cracks', () => {
     const w = new Whip(300, 100)
     for (let i = 0; i < 600; i++) w.step()
