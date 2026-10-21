@@ -60,7 +60,7 @@ The prompt was a native Plex client for an LG webOS TV (C/Rust, custom OpenGL UI
 ## GPUIX findings (0.11.0, terminal mode)
 
 - `setImagePixels` is fast enough for 960×540 BGRA video at 24 fps through Ghostty's kitty graphics path on a paravirtual GPU; update the `<img>` through a ref, never through React state.
-- Every `<text>` needs a `color` and every `<div>` needs `display: 'flex'`; overlays (scrims, OSD) need `pointerEvents: 'none'` or they swallow the parent's hover/click.
+- Every `<text>` needs a `color` and every `<div>` needs `display: 'flex'`; overlays (scrims, OSD) need `pointerEvents: 'none'` or they swallow the parent's hover/click. The same goes for content inside a click target: a poster's filled box and its `<img>` ate the tile's `onClick` (only the caption text was clickable) until they got `pointerEvents: 'none'`. The test renderer's `nativeSimulateClick` reproduces it, so `tests/app.test.tsx` clicks a poster centre.
 - Terminal key events arrive as `{ key: 'h', keyChar: 'h' }` from Ghostty here, but other paths send printable keys as `key: 'space'` with the real character in `keyChar`; map both.
 - A root `<div tabIndex={-1} autoFocus onKeyDown>` is needed for arrows/Esc to arrive. Ghostty owns Cmd shortcuts, so everything has a plain-key alternative.
 - GPUIX's native INFO/WARN logs are held and printed under the prompt after Ctrl-C; `couch` re-execs itself with `RUST_LOG=error` before GPUIX loads (`COUCH_LOG=info` to see them).
