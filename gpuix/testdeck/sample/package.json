@@ -1,0 +1,6 @@
+{
+  "name": "acme-checkout",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "bun test" }
+}
