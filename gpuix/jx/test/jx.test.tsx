@@ -142,6 +142,10 @@ describe('jx app', () => {
     expect(ui.byId('path')).toBe(jqPath(hits[0]!))
     ui.key('n')
     expect(ui.byId('path')).toBe(jqPath(hits[1]!))
+    ui.key('escape')
+    expect(ui.r.findByTestId('search')).toBeUndefined()
+    ui.key('n')
+    expect(ui.byId('path')).toBe(jqPath(hits[1]!))
   })
 
   it('shows a side-by-side diff', () => {

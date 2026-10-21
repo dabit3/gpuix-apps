@@ -208,6 +208,15 @@ export function App({ docs: initialDocs, watch = false, initialFilter = '', init
     if (idx >= 0) { setCursor(idx); reveal(idx, r.length, true) }
   }, [expanded, view, reveal])
 
+  // Live, Enter in the search field reaches the root onKeyDown; in the test renderer it is the
+  // input's onSubmit. Route both here and drop the duplicate.
+  const lastSubmit = useRef(0)
+  const submitSearch = (dir: 1 | -1) => {
+    const now = performance.now()
+    if (now - lastSubmit.current < 80) return
+    lastSubmit.current = now
+    stepMatch(dir)
+  }
   const stepMatch = useCallback((dir: 1 | -1) => {
     if (!matches.length) return
     const i = (matchIdx + dir + matches.length) % matches.length
@@ -296,7 +305,7 @@ export function App({ docs: initialDocs, watch = false, initialFilter = '', init
     const inInput = focused != null && rootRef.current != null && focused !== rootRef.current.id
     if (inInput) {
       if (key === 'escape' || key === 'enter' || (key === 'down' && focused === filterRef.current?.id)) {
-        if (focused === searchRef.current?.id && key === 'enter') { stepMatch(shift ? -1 : 1); return }
+        if (focused === searchRef.current?.id && key === 'enter') { submitSearch(shift ? -1 : 1); return }
         if (focused === searchRef.current?.id && key === 'escape') { setSearchActive(false); setSearch('') }
         focusRoot()
       }
@@ -342,7 +351,7 @@ export function App({ docs: initialDocs, watch = false, initialFilter = '', init
 
   // --- render ---------------------------------------------------------------------------
   const leftPad = term ? 14 : 84
-  const activeMatch = matchIdx >= 0 ? pathKey(matches[matchIdx]!) : null
+  const activeMatch = matchIdx >= 0 && matches[matchIdx] ? pathKey(matches[matchIdx]!) : null
   const treeW = W - (schemaVisible ? SCHEMA_W : 0)
 
   return (
@@ -467,7 +476,7 @@ export function App({ docs: initialDocs, watch = false, initialFilter = '', init
             value={search}
             placeholder="search keys and values"
             onChange={(e) => setSearch(e.value ?? '')}
-            onSubmit={() => stepMatch(1)}
+            onSubmit={() => submitSearch(1)}
             theme={{ caret: T.yellow }}
             style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, color: T.fg, fontFamily: MONO, fontSize: FS, backgroundColor: 'transparent' }}
           />
