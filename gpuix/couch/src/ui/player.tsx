@@ -86,9 +86,9 @@ export function Player({ view, width, height }: { view: View; width: number; hei
             onMouseUp={() => { drag.current = false; ctl.commitScrub(); setHover(null) }}
             style={{ position: 'absolute', left: pad, width: barW, bottom: 44, height: 26, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
           >
-            <div style={{ position: 'relative', width: barW, height: 6, borderRadius: 3, backgroundColor: alpha('#ffffff', 0.25) }}>
-              <div style={{ position: 'absolute', left: 0, top: 0, height: 6, width: Math.round(posFrac * barW), borderRadius: 3, backgroundColor: alpha('#ffffff', 0.55) }} />
-              <div style={{ position: 'absolute', left: 0, top: 0, height: 6, width: Math.round(frac * barW), borderRadius: 3, backgroundColor: theme.focus }} />
+            <div style={{ position: 'relative', width: barW, height: 6, borderRadius: 3, backgroundColor: alpha('#ffffff', 0.25), pointerEvents: 'none' }}>
+              <div style={{ position: 'absolute', left: 0, top: 0, height: 6, width: Math.round(posFrac * barW), borderRadius: 3, backgroundColor: alpha('#ffffff', 0.55), pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', left: 0, top: 0, height: 6, width: Math.round(frac * barW), borderRadius: 3, backgroundColor: theme.focus, pointerEvents: 'none' }} />
               <div style={{ position: 'absolute', left: Math.round(frac * barW) - 8, top: -5, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ffffff', pointerEvents: 'none' }} />
             </div>
           </div>

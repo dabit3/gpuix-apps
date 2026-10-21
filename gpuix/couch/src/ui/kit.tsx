@@ -45,8 +45,8 @@ export function Pill({ children, color, bg, border }: { children: ReactNode; col
 
 export function ProgressBar({ value, theme, height = 4, track }: { value: number; theme: Theme; height?: number; track?: string }) {
   return (
-    <div style={{ height, borderRadius: height / 2, backgroundColor: track ?? alpha(theme.fg, 0.22), overflow: 'hidden', width: '100%' }}>
-      <div style={{ height, width: `${Math.max(0, Math.min(100, value * 100)).toFixed(2)}%`, backgroundColor: theme.focus, borderRadius: height / 2 }} />
+    <div style={{ height, borderRadius: height / 2, backgroundColor: track ?? alpha(theme.fg, 0.22), overflow: 'hidden', width: '100%', pointerEvents: 'none' }}>
+      <div style={{ height, width: `${Math.max(0, Math.min(100, value * 100)).toFixed(2)}%`, backgroundColor: theme.focus, borderRadius: height / 2, pointerEvents: 'none' }} />
     </div>
   )
 }

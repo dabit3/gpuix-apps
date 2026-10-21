@@ -35,6 +35,8 @@ export interface View {
   tab: Tab
   navFocus: boolean
   row: number
+  /** True while the focused shelf came from mouse hover, so the shelves don't scroll under the pointer. */
+  hoverRow?: boolean
   cols: Record<string, number>
   grid: Record<Tab, number>
   gridCols: number
@@ -90,6 +92,7 @@ export class Controller {
 
   private set(patch: Partial<View>) {
     this.view = { ...this.view, ...patch }
+    if ('row' in patch && !('hoverRow' in patch)) this.view.hoverRow = false
     for (const l of this.listeners) l()
     const s = this.status()
     for (const l of this.onStatus) l(s)
@@ -132,7 +135,7 @@ export class Controller {
     const r = this.rows[row]
     if (!v.pointer || !r || v.screen !== 'browse') return
     if (v.row === row && this.colOf(r) === col && !v.navFocus) return
-    this.set({ row, navFocus: false, cols: { ...v.cols, [r.key]: col } })
+    this.set({ row, hoverRow: true, navFocus: false, cols: { ...v.cols, [r.key]: col } })
   }
 
   hoverGrid(idx: number) {

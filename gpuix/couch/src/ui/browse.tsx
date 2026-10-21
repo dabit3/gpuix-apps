@@ -141,9 +141,18 @@ export function Home({ view, width, height }: { view: View; width: number; heigh
   const focused = ctl.focusedId()
   const rows = ctl.rows
   const rowH = (shape: 'poster' | 'landscape') => 32 + (shape === 'poster' ? sz.posterH : sz.landH) + (shape === 'poster' ? 28 : 46) + 14
-  let offset = 0
-  for (let i = 0; i < view.row && i < rows.length; i++) offset += rowH(rows[i]!.shape)
   const areaH = height - heroH
+  const anchor = useRef(view.row)
+  let top = anchor.current
+  if (!view.hoverRow || view.row < top) top = view.row
+  else {
+    let h = 0
+    for (let i = top; i <= view.row && i < rows.length; i++) h += rowH(rows[i]!.shape)
+    if (h > areaH) top = view.row
+  }
+  anchor.current = top
+  let offset = 0
+  for (let i = 0; i < top && i < rows.length; i++) offset += rowH(rows[i]!.shape)
   return (
     <div style={{ position: 'relative', width, height, overflow: 'hidden' }}>
       <Hero item={ctl.item(focused)} width={width} height={heroH + 40} />
@@ -160,7 +169,7 @@ export function Home({ view, width, height }: { view: View; width: number; heigh
       >
         <motion.div initial={false} animate={{ top: -offset }} transition={{ duration: 0.22, ease: 'easeOut' }} style={{ position: 'absolute', left: 0, width, display: 'flex', flexDirection: 'column' }}>
           {rows.map((row, ri) => {
-            const near = ri >= view.row - 1 && ri <= view.row + Math.ceil(areaH / rowH('landscape')) + 1
+            const near = ri >= top - 1 && ri <= top + Math.ceil(areaH / rowH('landscape')) + 1
             const w = row.shape === 'poster' ? sz.posterW : sz.landW
             const h = row.shape === 'poster' ? sz.posterH : sz.landH
             const step = w + sz.gap
@@ -173,7 +182,7 @@ export function Home({ view, width, height }: { view: View; width: number; heigh
             starts.current.set(row.key, start)
             const active = ri === view.row && !view.navFocus
             return (
-              <div key={row.key} style={{ display: 'flex', flexDirection: 'column', height: rowH(row.shape), opacity: ri < view.row ? 0 : 1 }}>
+              <div key={row.key} style={{ display: 'flex', flexDirection: 'column', height: rowH(row.shape), opacity: ri < top ? 0 : 1 }}>
                 <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: sz.pad, height: 32 }}>
                   <T color={active ? theme.fg : theme.dim} size={17} weight={650}>{row.title}</T>
                   {active ? <T color={theme.faint} size={13}>{`${col + 1} / ${row.ids.length}`}</T> : null}

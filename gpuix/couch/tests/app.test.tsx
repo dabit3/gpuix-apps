@@ -47,6 +47,12 @@ describeNative('couch in the GPU test renderer', () => {
 
     c.dispatch('ok'); draw()
     expect(c.view.screen).toBe('player')
+    const barY = H - 44 - 13, barX = (f: number) => 48 + (W - 96) * f
+    renderer.nativeSimulateMouseMove(barX(0.25), barY); draw()
+    renderer.nativeSimulateMouseDown(barX(0.25), barY); draw()
+    renderer.nativeSimulateMouseMove(barX(0.75), barY, 0); draw()
+    renderer.nativeSimulateMouseUp(barX(0.75), barY); draw()
+    expect(Math.abs(c.view.player!.pos - 450)).toBeLessThan(20)
     c.dispatch('back'); draw()
     c.dispatch('back'); draw()
 
