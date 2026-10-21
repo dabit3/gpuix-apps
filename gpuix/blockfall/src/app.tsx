@@ -76,6 +76,7 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
     return () => { alive = false; clearTimeout(timer) }
   }, [c, autoTick])
 
+  paneSize = size
   const L = computeLayout(size.width, size.height)
   const { ox, oy } = shakeOffset(c.game, L.c)
   const shaken = { ...L, bx: L.bx + ox, by: L.by + oy }
@@ -100,11 +101,12 @@ export function keyHandlers(c: Controller) {
 
 // Demo capture only: the recorder's key driver reads the piece and where a good player would put it.
 const telemetry = process.env.BLOCKFALL_TELEMETRY
+let paneSize = { width: 0, height: 0 }
 function writeTelemetry(c: Controller) {
   const g = c.game
   const a = g.active
-  const plan = c.mode === 'playing' && a ? (c.pilot.current() && c.pilot.current()!.type === a.type ? c.pilot.current() : null) : null
-  writeFileSync(telemetry!, JSON.stringify({ mode: c.mode, phase: g.phase, pieces: g.pieces, holdUsed: g.holdUsed, active: a, plan, score: g.score, lines: g.lines, frame: c.frame }) + '\n')
+  const plan = c.hint()
+  writeFileSync(telemetry!, JSON.stringify({ mode: c.mode, phase: g.phase, pieces: g.pieces, holdUsed: g.holdUsed, active: a, plan, score: g.score, lines: g.lines, frame: c.frame, w: paneSize.width, h: paneSize.height }) + '\n')
 }
 
 export function start(c: Controller, theme: Theme, opts: { terminal: boolean }) {

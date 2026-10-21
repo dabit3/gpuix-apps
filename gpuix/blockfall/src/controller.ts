@@ -1,4 +1,4 @@
-import { Pilot } from './sim/ai'
+import { Pilot, plan, type Plan } from './sim/ai'
 import { DT, Game, type Tuning } from './sim/game'
 import { addScore, cleanInitials, loadScores, qualifies, scoresPath, type ScoreEntry } from './scores'
 
@@ -27,6 +27,8 @@ export class Controller {
   frame = 0
   overDelay = 0
   private acc = 0
+  private hintKey = ''
+  private hintPlan: Plan | null = null
 
   constructor(opts: ControllerOptions = {}) {
     this.seed = opts.seed ?? (Date.now() & 0xffff)
@@ -99,6 +101,15 @@ export class Controller {
       this.overDelay += DT
       if (this.overDelay > 1.1) this.beginGameOver()
     }
+  }
+
+  /** Where a strong player would put the current piece (used by the demo recorder's key driver). */
+  hint(): Plan | null {
+    const g = this.game, a = g.active
+    if (this.mode !== 'playing' || !a || g.phase !== 'play') return null
+    const k = `${g.pieces}:${a.type}:${g.holdUsed}`
+    if (k !== this.hintKey) { this.hintKey = k; this.hintPlan = plan(g) }
+    return this.hintPlan
   }
 
   keyDown(e: KeyLike): boolean {

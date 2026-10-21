@@ -45,8 +45,15 @@ if (terminal && !process.stdin.isTTY) {
 }
 const num = (v: string | undefined) => (v == null ? undefined : Number(v))
 
-// Keep the shell clean after Ctrl-C: GPUIX holds stdout until exit and then prints its own startup lines.
-process.env.RUST_LOG ??= 'error'
+// Keep the shell clean after Ctrl-C: GPUIX's env_logger prints INFO/WARN lines once the terminal is restored. It reads
+// RUST_LOG from the real process environment (Ghostty's shells export RUST_LOG=info, and setting process.env at runtime
+// doesn't reach the native logger), so re-exec once with it pinned. BLOCKFALL_LOG=<filter> opts back into logs.
+if (!process.env.BLOCKFALL_CHILD) {
+  const env = { ...process.env, BLOCKFALL_CHILD: '1', RUST_LOG: process.env.BLOCKFALL_LOG ?? 'error' }
+  const child = Bun.spawn([process.execPath, import.meta.path, ...process.argv.slice(2)], { env, stdio: ['inherit', 'inherit', 'inherit'] })
+  process.on('SIGINT', () => {})
+  process.exit(await child.exited)
+}
 const log = console.log
 console.log = (...args: unknown[]) => { if (typeof args[0] === 'string' && args[0].startsWith('[gpuix]')) return; log(...args) }
 
