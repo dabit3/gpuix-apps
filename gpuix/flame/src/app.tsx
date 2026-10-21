@@ -338,13 +338,22 @@ export function FlameApp({ source, initialView = 'flame', initialOrder = 'heavy'
   const stats = useMemo(() => topFunctions(profile), [profile])
   const statOf = useMemo(() => new Map(stats.map((s) => [s.frame, s])), [stats])
   const sorted = useMemo(() => [...stats].sort((a, b) => (sortBy === 'self' ? b.self - a.self : b.total - a.total)).slice(0, 400), [stats, sortBy])
-  const sandwichFrame = selFrame ?? stats[0]?.frame ?? 0
+  const sandwichFrame = selFrame != null && profile.frames[selFrame] ? selFrame : (stats[0]?.frame ?? 0)
   const sw = useMemo(() => (view === 'sandwich' ? sandwich(profile, sandwichFrame) : null), [view, profile, sandwichFrame])
   const matched = useMemo(() => matchedTime(profile, query), [profile, query])
 
+  const profileRef = useRef(profile)
+  profileRef.current = profile
   useEffect(
     () =>
       source.subscribe((next) => {
+        // Frame indices are per-profile; carry the selection over by identity.
+        setSelFrame((sel) => {
+          if (sel == null) return null
+          const key = profileRef.current.frames[sel]?.key
+          const i = key ? next.frames.findIndex((f) => f.key === key) : -1
+          return i > 0 ? i : null
+        })
         setProfile((prev) => {
           const delta = (next.total - prev.total) / Math.max(1, prev.total)
           setToast({
