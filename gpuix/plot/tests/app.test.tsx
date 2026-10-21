@@ -78,12 +78,18 @@ describeNative('plot window', () => {
     expect(await text('status-text')).toBe('LIVE')
   })
 
-  it('scrolling pans back through time', async () => {
+  it('up zooms in at the live edge, then scrolling pans back through time', async () => {
+    const full = plotter.view()
+    root.renderer.simulateKeystrokes('up')
+    await settle()
     const before = plotter.view()
+    expect(before.x1 - before.x0).toBeCloseTo((full.x1 - full.x0) * 0.7, 6)
+    expect(plotter.follow).toBe(true)
     await app.getByTestId('chart').wheel(0, 120)
     await settle()
     const after = plotter.view()
-    expect(after.x1).not.toBe(before.x1)
+    expect(after.x1).toBeLessThan(before.x1)
+    expect(after.x0).toBeGreaterThanOrEqual(full.x0 - 1e-6)
     expect(after.x1 - after.x0).toBeCloseTo(before.x1 - before.x0, 6)
     root.renderer.simulateKeystrokes('r')
     await settle()

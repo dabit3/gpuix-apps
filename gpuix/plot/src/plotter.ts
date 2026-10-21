@@ -140,7 +140,8 @@ export class Plotter {
     const live = this.paused ? this.pausedAt : this.liveEnd(now)
     const first = this.store.firstX()
     let end = v.x1 + frac * w
-    if (Number.isFinite(first)) end = Math.max(end, first + w * 0.25)
+    // Don't pan past the first sample into empty space.
+    if (Number.isFinite(first)) end = Math.max(end, Math.min(first + w, live))
     this.span = w
     if (end >= live && !this.paused) {
       this.follow = true

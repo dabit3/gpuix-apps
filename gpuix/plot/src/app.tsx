@@ -326,9 +326,6 @@ function Chart({ plotter, raster, perf, viewRef, frameRef, fps, onPress }: { plo
       const target = plotter.yRange(v, Math.max(2, Math.min(7, Math.floor(h / 60))))
       if (!target) {
         if (lastKey.current !== 'empty') {
-          raster.resize(w, h)
-          raster.draw({ x0: 0, x1: 1, y0: 0, y1: 1, mode: 'line', series: [], yTicks: [], xTicks: [], bg: BG, grid: GRID, gridHi: GRID_HI })
-          img.current?.setImagePixels(raster.w, raster.h, raster.buf, { format: 'bgra' })
           lastKey.current = 'empty'
           frameRef.current = null
           setFrame(null)
@@ -349,7 +346,8 @@ function Chart({ plotter, raster, perf, viewRef, frameRef, fps, onPress }: { plo
       const vis = plotter.visibleSeries()
       const key = `${v.x0}|${v.x1}|${y0}|${y1}|${plotter.store.version}|${plotter.mode}|${w}|${h}|${vis.map((s) => s.name).join(',')}`
       if (key === lastKey.current) return
-      lastKey.current = key
+      // Not mounted yet (first data frame): publish the frame now and upload on the next tick.
+      lastKey.current = img.current ? key : ''
       const t0 = performance.now()
       const yTicks = niceTicks(y0, y1, Math.max(2, Math.min(7, Math.floor(h / 60))))
       const xCount = Math.max(2, Math.floor(w / 130))
@@ -456,10 +454,11 @@ function Chart({ plotter, raster, perf, viewRef, frameRef, fps, onPress }: { plo
               return
             }
             const d = Math.abs(dx) > Math.abs(dy) ? dx : dy
-            if (d) plotter.pan(-d * (e.precise ? 1 / w : 0.006))
+            if (d) plotter.pan(-d * (e.precise ? 1 / w : 0.004))
           }}
         >
-          <img ref={img} testId="chart-img" objectFit="fill" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }} />
+          {/* Mounted with the first data frame: an <img> with no pixels yet paints a grey placeholder. */}
+          {f ? <img ref={img} testId="chart-img" objectFit="fill" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }} /> : null}
           {!f ? (
             <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
               <text testId="empty" style={{ color: T.faint, fontSize: 13 }}>{`Waiting for numbers from ${plotter.label || 'the source'}…`}</text>
