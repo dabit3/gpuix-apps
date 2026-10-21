@@ -2,6 +2,9 @@
   "name": "devin-terminal",
   "type": "module",
   "private": true,
+  "bin": {
+    "devin-tui": "./app.tsx"
+  },
   "scripts": {
     "dev": "bun --hot app.tsx",
     "window": "bun app.tsx --window",

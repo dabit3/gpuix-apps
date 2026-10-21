@@ -8,6 +8,7 @@ import {
   SelectItem,
   SelectTrigger,
   useGpuix,
+  useWindowSize,
   type KeyEvent,
   type NativeRenderer,
   type PublicInstance,
@@ -35,31 +36,33 @@ import {
 import { filterSessions, formatDuration, reducer, type PanelTab, type State } from './state'
 import { Icon, type IconName } from './icons'
 
+// Painted from Ghostty's "GitHub Dark High Contrast" theme so the app blends into the terminal.
 export const C = {
-  canvas: '#101113',
-  sidebar: '#0b0c0e',
-  raised: '#17181b',
-  card: '#141518',
-  cardHead: '#1a1c1f',
-  menu: '#1c1e22',
-  hover: '#1d1f23',
-  selected: '#22252a',
-  border: '#24262b',
-  borderStrong: '#2f3238',
-  text: '#e8e9eb',
-  secondary: '#b4b7bd',
-  tertiary: '#83878f',
-  ghost: '#5d6168',
-  accent: '#2cb5a8',
-  accentSoft: '#2cb5a81f',
-  blue: '#3ea6ff',
-  add: '#3fbf8a',
-  del: '#ef6461',
-  userBubble: '#1f2226',
+  canvas: '#0a0c10',
+  sidebar: '#0d1016',
+  raised: '#141920',
+  card: '#10141a',
+  cardHead: '#161b22',
+  menu: '#1b2028',
+  hover: '#1a1f27',
+  selected: '#222934',
+  border: '#272c35',
+  borderStrong: '#3a414c',
+  text: '#f0f3f6',
+  secondary: '#c5ccd4',
+  tertiary: '#9ea7b3',
+  ghost: '#7a828e',
+  accent: '#39c5cf',
+  accentSoft: '#39c5cf1f',
+  blue: '#71b7ff',
+  add: '#26cd4d',
+  del: '#ff9492',
+  userBubble: '#1b2129',
 }
 
 const MONO = 'Menlo'
 const SIDEBAR_WIDTH = 272
+const SIDEBAR_COMPACT = 216
 const PANEL_WIDTH = 420
 const TRAFFIC_LIGHT_HEIGHT = 40
 
@@ -72,8 +75,8 @@ const NATIVE_THEME = {
   border: C.border,
   diffAdd: C.add,
   diffDel: C.del,
-  codeText: '#8fd9cf',
-  codeWash: '#2cb5a817',
+  codeText: '#56d4dd',
+  codeWash: '#39c5cf17',
 }
 
 /** Window-level key handler; `app.tsx` forwards `render({ onKeyDown })` here. */
@@ -180,7 +183,9 @@ function Sidebar({
   onNew,
   onSearch,
   searchRef,
+  width = SIDEBAR_WIDTH,
 }: {
+  width?: number
   state: State
   visible: Session[]
   onSelect: (id: string) => void
@@ -204,13 +209,13 @@ function Sidebar({
   const macWindow = process.platform === 'darwin' && !isTerminal()
 
   return (
-    <div style={{ ...col(), width: SIDEBAR_WIDTH, height: '100%', flexShrink: 0, backgroundColor: C.sidebar, borderRightWidth: 1, borderColor: C.border }}>
+    <div style={{ ...col(), width, height: '100%', flexShrink: 0, backgroundColor: C.sidebar, borderRightWidth: 1, borderColor: C.border }}>
       {macWindow && <div style={{ height: TRAFFIC_LIGHT_HEIGHT - 8, flexShrink: 0 }} />}
       <div style={row({ gap: 9, paddingLeft: 18, paddingRight: 14, paddingTop: 14, paddingBottom: 12 })}>
         <DevinMark />
         <text style={{ color: C.text, fontSize: 15, fontWeight: 600, flexGrow: 1 }}>Devin</text>
         <text testId="session-count" style={{ color: C.ghost, fontSize: 11.5 }}>
-          {`${state.sessions.length} sessions · ${running} running`}
+          {width < SIDEBAR_WIDTH ? `${running} running` : `${state.sessions.length} sessions · ${running} running`}
         </text>
       </div>
       <SidebarButton icon="compose" label="New session" hint="⌘N" onClick={onNew} testId="new-session" active={state.selectedId === null} />
@@ -255,7 +260,7 @@ function Sidebar({
           </div>
           <div style={col({ flexGrow: 1, minWidth: 0 })}>
             <text style={{ color: C.text, fontSize: 12.5 }}>Nader Dabit</text>
-            <text style={{ color: C.ghost, fontSize: 11 }}>Acme Corp · Team plan</text>
+            <text style={{ color: C.ghost, fontSize: 11, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>Acme Corp · Team plan</text>
           </div>
           <Icon name="more" size={14} color={C.tertiary} />
         </div>
@@ -368,7 +373,7 @@ function BrowserCard({ step, large }: { step: Extract<Step, { kind: 'browser' }>
     <div style={{ ...col(), borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
       <div style={{ ...row({ gap: 8 }), paddingLeft: 10, paddingRight: 10, height: 34, backgroundColor: C.cardHead, borderBottomWidth: 1, borderColor: C.border }}>
         <div style={row({ gap: 5 })}>
-          {['#ef6461', '#f2b84b', '#3fbf8a'].map((c) => (
+          {['#ff9492', '#f0b72f', '#26cd4d'].map((c) => (
             <div key={c} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c, opacity: 0.8 }} />
           ))}
         </div>
@@ -386,7 +391,7 @@ function BrowserCard({ step, large }: { step: Extract<Step, { kind: 'browser' }>
         </div>
         <div style={row({ gap: 8 })}>
           {[0.9, 0.55, 0.7].map((w, i) => (
-            <div key={i} style={{ height: 34, flexGrow: w, borderRadius: 6, backgroundColor: i === 1 ? '#2cb5a8' : '#e5e7eb' }} />
+            <div key={i} style={{ height: 34, flexGrow: w, borderRadius: 6, backgroundColor: i === 1 ? '#39c5cf' : '#e5e7eb' }} />
           ))}
         </div>
         <div style={{ height: 8, width: '70%', borderRadius: 4, backgroundColor: '#d1d5db' }} />
@@ -440,7 +445,7 @@ function WorkGroup({ event, onToggle }: { event: Extract<TranscriptEvent, { kind
 }
 
 function CheckDot({ state }: { state: Check['state'] }) {
-  const color = state === 'pass' ? C.add : state === 'fail' ? C.del : '#f2b84b'
+  const color = state === 'pass' ? C.add : state === 'fail' ? C.del : '#f0b72f'
   return (
     <div style={{ ...row({ justifyContent: 'center' }), width: 14, height: 14, borderRadius: 7, backgroundColor: state === 'pending' ? C.card : color, borderWidth: state === 'pending' ? 2 : 0, borderColor: color }}>
       {state === 'pass' && <Icon name="check" size={9} color="#06201d" />}
@@ -457,7 +462,7 @@ function PRCard({ event }: { event: Extract<TranscriptEvent, { kind: 'pr' }> }) 
         <div style={row({ gap: 8 })}>
           <Icon name="gitBranch" size={14} color={stateColor} />
           <text style={{ color: C.text, fontSize: 14, fontWeight: 600, flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{event.title}</text>
-          <div style={{ ...row(), height: 20, paddingLeft: 8, paddingRight: 8, borderRadius: 10, backgroundColor: event.state === 'merged' ? '#3ea6ff22' : '#3fbf8a22' }}>
+          <div style={{ ...row(), height: 20, paddingLeft: 8, paddingRight: 8, borderRadius: 10, backgroundColor: event.state === 'merged' ? '#71b7ff22' : '#26cd4d22' }}>
             <text style={{ color: stateColor, fontSize: 11, fontWeight: 600 }}>{event.state === 'merged' ? 'Merged' : 'Open'}</text>
           </div>
         </div>
@@ -520,7 +525,7 @@ const EventView = memo(function EventView({ event, sessionId, onToggleWork }: { 
 const MENU: StyleDesc = { minWidth: 230, padding: 4, backgroundColor: C.menu, borderWidth: 1, borderColor: C.borderStrong, borderRadius: 10 }
 
 function menuItemStyle(state: { selected: boolean; highlighted: boolean }): StyleDesc {
-  return { ...row({ gap: 10 }), width: '100%', paddingLeft: 9, paddingRight: 9, paddingTop: 6, paddingBottom: 6, borderRadius: 7, cursor: 'pointer', backgroundColor: state.highlighted ? '#2a2d33' : C.menu, hover: { backgroundColor: '#2a2d33' } }
+  return { ...row({ gap: 10 }), width: '100%', paddingLeft: 9, paddingRight: 9, paddingTop: 6, paddingBottom: 6, borderRadius: 7, cursor: 'pointer', backgroundColor: state.highlighted ? '#262d38' : C.menu, hover: { backgroundColor: '#262d38' } }
 }
 
 const MODE_ICON: Record<AgentMode, IconName> = { normal: 'sparkle', fast: 'zap', ultra: 'sliders' }
@@ -649,7 +654,7 @@ function Composer({
         <Button
           testId="send"
           onClick={() => canSend && onSubmit(draft)}
-          style={{ ...row({ justifyContent: 'center' }), width: 30, height: 30, borderRadius: 15, cursor: 'pointer', backgroundColor: canSend ? C.accent : C.hover, hover: { backgroundColor: canSend ? '#3cc9bb' : C.selected } }}
+          style={{ ...row({ justifyContent: 'center' }), width: 30, height: 30, borderRadius: 15, cursor: 'pointer', backgroundColor: canSend ? C.accent : C.hover, hover: { backgroundColor: canSend ? '#56d4dd' : C.selected } }}
         >
           <Icon name="send" size={15} color={canSend ? '#06201d' : C.ghost} />
         </Button>
@@ -745,16 +750,16 @@ function IconButton({ icon, onClick, testId, active }: { icon: IconName; onClick
   )
 }
 
-function SessionHeader({ session, panelOpen, onTogglePanel }: { session: Session; panelOpen: boolean; onTogglePanel: () => void }) {
+function SessionHeader({ session, panelOpen, onTogglePanel, compact = false }: { session: Session; panelOpen: boolean; onTogglePanel: () => void; compact?: boolean }) {
   return (
     <div style={{ ...row({ gap: 10 }), height: 52, paddingLeft: 20, paddingRight: 12, borderBottomWidth: 1, borderColor: C.border, flexShrink: 0 }}>
       <div style={col({ flexGrow: 1, minWidth: 0, gap: 2 })}>
         <text testId="session-title" style={{ color: C.text, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{session.title}</text>
-        <div style={row({ gap: 6 })}>
+        <div style={row({ gap: 6, minWidth: 0, overflow: 'hidden' })}>
           <Icon name="folder" size={11} color={C.ghost} />
-          <text style={{ color: C.tertiary, fontSize: 11.5 }}>{session.repo}</text>
-          <Icon name="gitBranch" size={11} color={C.ghost} />
-          <text style={{ color: C.tertiary, fontSize: 11.5, fontFamily: MONO }}>{session.branch}</text>
+          <text style={{ color: C.tertiary, fontSize: 11.5, whiteSpace: 'nowrap' }}>{session.repo}</text>
+          {!compact && <Icon name="gitBranch" size={11} color={C.ghost} />}
+          {!compact && <text style={{ color: C.tertiary, fontSize: 11.5, fontFamily: MONO, whiteSpace: 'nowrap' }}>{session.branch}</text>}
         </div>
       </div>
       <div style={{ ...row({ gap: 6 }), height: 24, paddingLeft: 9, paddingRight: 10, borderRadius: 12, backgroundColor: C.raised, borderWidth: 1, borderColor: C.border }}>
@@ -765,8 +770,8 @@ function SessionHeader({ session, panelOpen, onTogglePanel }: { session: Session
         <Icon name={MODE_ICON[session.mode]} size={11} color={session.mode === 'ultra' ? C.accent : C.tertiary} />
         <text testId="session-mode" style={{ color: C.secondary, fontSize: 11.5 }}>{MODES.find((m) => m.value === session.mode)?.label ?? ''}</text>
       </div>
-      <IconButton icon="share" />
-      <IconButton icon="panelRight" testId="toggle-panel" onClick={onTogglePanel} active={panelOpen} />
+      {!compact && <IconButton icon="share" />}
+      {!compact && <IconButton icon="panelRight" testId="toggle-panel" onClick={onTogglePanel} active={panelOpen} />}
     </div>
   )
 }
@@ -807,12 +812,20 @@ function HomeView(props: React.ComponentProps<typeof Composer> & { onSuggest: (t
 
 /* ───────────────────────────── App ───────────────────────────── */
 
-export function DevinApp({ speed = 1, initialSelected = 's-rate-limit' }: { speed?: number; initialSelected?: string | null }) {
+export interface DevinAppProps {
+  speed?: number
+  initialSelected?: string | null
+  initialMode?: AgentMode
+  /** Starts a new session with this prompt on launch (the CLI's positional argument). */
+  initialPrompt?: string
+}
+
+export function DevinApp({ speed = 1, initialSelected = 's-rate-limit', initialMode = 'normal', initialPrompt }: DevinAppProps) {
   const [state, dispatch] = useReducer(reducer, undefined, (): State => ({
     sessions: initialSessions(),
     selectedId: initialSelected,
     search: '',
-    mode: 'normal',
+    mode: initialMode,
     panelOpen: true,
     panelTab: 'shell',
     repo: REPOS[1]!,
@@ -826,6 +839,10 @@ export function DevinApp({ speed = 1, initialSelected = 's-rate-limit' }: { spee
   const stateRef = useRef(state)
   stateRef.current = state
 
+  // Reflow for narrow hosts (a Ghostty split): drop the right panel, then shrink and finally hide the sidebar.
+  const { width: hostWidth } = useWindowSize()
+  const compact = hostWidth > 0 && hostWidth < 1080
+  const tiny = hostWidth > 0 && hostWidth < 600
   const visible = useMemo(() => filterSessions(state.sessions, state.search), [state.sessions, state.search])
   const selected = state.sessions.find((s) => s.id === state.selectedId) ?? null
 
@@ -876,6 +893,13 @@ export function DevinApp({ speed = 1, initialSelected = 's-rate-limit' }: { spee
     },
     [schedule],
   )
+
+  const launched = useRef(false)
+  useEffect(() => {
+    if (launched.current || !initialPrompt) return
+    launched.current = true
+    createSession(initialPrompt, stateRef.current.repo)
+  }, [initialPrompt, createSession])
 
   const submit = useCallback(
     (text: string) => {
@@ -960,11 +984,11 @@ export function DevinApp({ speed = 1, initialSelected = 's-rate-limit' }: { spee
       onKeyDown={(event) => renderer && windowKeyHandler?.(event, renderer)}
       style={{ ...row({ alignItems: 'stretch' }), width: '100%', height: '100%', backgroundColor: C.canvas }}
     >
-      <Sidebar state={state} visible={visible} onSelect={select} onNew={newSession} onSearch={(value) => dispatch({ type: 'search', value })} searchRef={searchRef} />
+      {!tiny && <Sidebar width={compact ? SIDEBAR_COMPACT : SIDEBAR_WIDTH} state={state} visible={visible} onSelect={select} onNew={newSession} onSearch={(value) => dispatch({ type: 'search', value })} searchRef={searchRef} />}
       <div style={{ ...col(), flexGrow: 1, minWidth: 0, height: '100%' }}>
         {selected ? (
           <>
-            <SessionHeader session={selected} panelOpen={state.panelOpen} onTogglePanel={() => dispatch({ type: 'panel', open: !state.panelOpen })} />
+            <SessionHeader compact={compact} session={selected} panelOpen={state.panelOpen} onTogglePanel={() => dispatch({ type: 'panel', open: !state.panelOpen })} />
             <virtual-list key={selected.id} testId="transcript" alignment="top" followTail estimatedItemHeight={160} overdraw={600} style={{ flexGrow: 1, minHeight: 0, paddingTop: 12, paddingBottom: 12 }}>
               {selected.events.map((e) => (
                 <EventView key={e.id} event={e} sessionId={selected.id} onToggleWork={onToggleWork} />
@@ -978,7 +1002,7 @@ export function DevinApp({ speed = 1, initialSelected = 's-rate-limit' }: { spee
           <HomeView {...composerProps} placeholder="e.g. Add dark mode to the settings page and persist the choice" repo={state.repo} onRepo={(repo) => dispatch({ type: 'repo', repo })} onSuggest={(text, repo) => createSession(text, repo)} />
         )}
       </div>
-      {selected && (
+      {selected && !compact && (
         <motion.div initial={false} animate={{ width: state.panelOpen ? PANEL_WIDTH : 0 }} transition={{ duration: 0.25, ease: 'easeOut' }} style={{ height: '100%', overflow: 'hidden', flexShrink: 0 }}>
           <RightPanel session={selected} tab={state.panelTab} onTab={(tab) => dispatch({ type: 'panel', tab })} />
         </motion.div>

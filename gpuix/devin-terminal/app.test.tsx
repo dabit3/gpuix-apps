@@ -29,6 +29,7 @@ describeNative('devin-terminal', () => {
 
     expect(await app.getByTestId('session-title').textContent()).toBe('Move API rate limiting to Redis')
     expect(await app.getByTestId('session-count').textContent()).toBe('13 sessions · 1 running')
+    expect(await app.getByTestId('tab-shell').count()).toBe(1)
 
     await app.getByTestId('session-s-index').click()
     expect(await app.getByTestId('session-title').textContent()).toBe('Slow billing dashboard query')
@@ -76,4 +77,18 @@ describeNative('devin-terminal', () => {
     expect(renderer.getAllText().join(' ')).toContain('Add SSO login with Okta')
     expect(renderer.getAllText().join(' ')).not.toContain('Upgrade Terraform AWS provider to v6')
   }, 60_000)
+  it('reflows into a narrow split and starts the CLI prompt as a new session', async () => {
+    const { render, renderer } = createTestRoot({ width: 700, height: 900 })
+    render(<DevinApp speed={4} initialMode="ultra" initialPrompt="Add dark mode to the settings page" />)
+    const app = await connectTest(renderer)
+
+    await waitForText(app, 'session-title', 'Add dark mode to the settings page')
+    expect(await app.getByTestId('session-mode').textContent()).toBe('Ultra')
+    await waitForText(app, 'session-count', '2 running')
+    expect(await app.getByTestId('tab-shell').count()).toBe(0)
+    expect(await app.getByTestId('search').count()).toBe(1)
+
+    await app.getByTestId('session-s-index').click()
+    expect(await app.getByTestId('session-title').textContent()).toBe('Slow billing dashboard query')
+  })
 })

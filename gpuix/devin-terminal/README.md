@@ -1,21 +1,61 @@
 # devin-terminal
 
-A high-fidelity mirror of the Devin web app (app.devin.ai), written in React and painted by [GPUIX](https://github.com/remorses/gpuix) (GPUI / Metal). It runs **inside Ghostty** using GPUIX terminal mode, where frames go to the terminal over the kitty graphics protocol. The same React tree also opens as a normal native macOS window.
+A high-fidelity mirror of the Devin web app (app.devin.ai), written in React and painted by [GPUIX](https://github.com/remorses/gpuix) (GPUI / Metal). It runs **inside Ghostty** as a CLI, `devin-tui`, using GPUIX terminal mode: frames go to the terminal over the **Kitty Graphics protocol**. Create GUIs, use them as TUIs: split it into panes, zoom a split, run it over SSH. The same React tree also opens as a normal native macOS window.
 
-![Devin mirror running inside Ghostty](media/screenshot.png)
+![Two Devin mirrors in Ghostty splits (GitHub Dark High Contrast)](media/screenshot.png)
 
-Demo video (Ghostty first, native window at the end): [`media/demo.mp4`](media/demo.mp4)
+Demo video: [`media/demo.mp4`](media/demo.mp4). Ghostty with `theme = GitHub Dark High Contrast` opens on the prompt, `devin-tui` paints the app in the terminal, Cmd-D splits the pane and a second `devin-tui -m ultra "..."` streams a run beside it, the divider is dragged so both apps reflow, the split is zoomed, Ctrl-C returns to the prompt, then `ssh -t localhost devin-tui -s haptics` runs it over SSH.
 
 ## Run
 
 ```bash
 bun install
-bun app.tsx              # terminal mode (run it inside Ghostty or kitty)
-bun app.tsx --window     # same app in a native macOS window
+bun link                 # puts `devin-tui` on your PATH (package.json "bin")
+devin-tui                # terminal mode, inside Ghostty or kitty
+devin-tui -s terraform   # open the first session matching "terraform"
+devin-tui -m ultra "Add dark mode to the settings page"   # start a new session and stream the run
+devin-tui --window       # same app in a native macOS window
+devin-tui --help
+bun app.tsx [args]       # same thing without bun link
 bun run dev              # terminal mode with --hot
-bun test                 # GPUIX native test renderer behavior test
+bun test                 # GPUIX native test renderer behavior tests
 bun run typecheck
 ```
+
+```
+devin-tui [options] [prompt]
+  prompt              start a new session with this prompt and stream the run
+  -s, --session <q>   open the first session matching <q> (title, repo or branch)
+  -m, --mode <mode>   agent mode for new sessions: normal | fast | ultra
+  -w, --window        open a native window instead of painting into the terminal
+  -h, --help          show this help
+```
+
+Don't pipe anything into `devin-tui`: GPUIX 0.11.0 treats a stdin pipe as the automation protocol, and terminal mode needs the TTY. Ctrl-C quits and restores the prompt.
+
+## Ghostty setup used for the demo
+
+```
+# ~/.config/ghostty/config
+theme = GitHub Dark High Contrast
+font-size = 15
+window-padding-x = 10
+window-padding-y = 8
+keybind = super+k=unbind   # let the app own Cmd-K (search) and Cmd-N (new session)
+keybind = super+n=unbind
+```
+
+The app palette is read from Ghostty's `GitHub Dark High Contrast` theme file (`#0a0c10` background, `#f0f3f6` text, `#71b7ff` blue, `#26cd4d` green, `#39c5cf` cyan accent), so the GUI blends into the terminal around it.
+
+## Splits and reflow
+
+The app follows the terminal's size through `useWindowSize()`:
+
+- **≥ 1080 px**: full layout (260 px sidebar, transcript, optional 400 px right panel).
+- **600–1080 px** (a half split): 216 px compact sidebar, the right panel is hidden, and the header drops branch/share/panel buttons.
+- **< 600 px** (a narrow split): transcript and composer only.
+
+Splitting with Cmd-D, dragging the divider, or zooming a split (Cmd-Shift-Enter) reflows it live, and each pane is its own independent app.
 
 Env flags: `GPUIX_WINDOW=1` (same as `--window`), `GPUIX_BACKGROUND=1` (don't steal focus, maps to `focus: false`), `GPUIX_DEBUG_OVERLAY=1` (GPUI frame-time overlay).
 
@@ -35,11 +75,12 @@ Env flags: `GPUIX_WINDOW=1` (same as `--window`), `GPUIX_BACKGROUND=1` (don't st
 
 ## Test
 
-`app.test.tsx` renders the real app in the GPUIX native test renderer and asserts behavior: switching sessions changes the header and status, New session + Ultra mode + typed prompt creates a new sidebar entry with the right title and mode, the simulated run reaches "Working", then "Finished" with all PR checks passing and the running counter drops, ↓/↑ move the selection, ⌘K focuses search, typed keystrokes filter the list and Esc restores it. It also writes `test-screenshots/streaming.png`.
+`app.test.tsx` renders the real app in the GPUIX native test renderer and asserts behavior. Test 1: switching sessions changes the header and status, New session + Ultra mode + typed prompt creates a new sidebar entry with the right title and mode, the simulated run reaches "Working", then "Finished" with all PR checks passing and the running counter drops, ↓/↑ move the selection, ⌘K focuses search, typed keystrokes filter the list and Esc restores it. It also writes `test-screenshots/streaming.png`. Test 2 renders at 700 px wide (a Ghostty half split) with the CLI's `initialPrompt` and `ultra` mode: the prompt becomes a streaming Ultra session, the right panel is gone, and the compact sidebar still switches sessions.
 
 ```
 (pass) devin-terminal > switches sessions, changes agent mode, and streams a new session to a finished PR
- 1 pass  0 fail  15 expect() calls
+(pass) devin-terminal > reflows into a narrow split and starts the CLI prompt as a new session
+ 2 pass  0 fail  20 expect() calls
 ```
 
 ## Performance (Apple Paravirtual Metal VM, not real Apple Silicon)
@@ -51,7 +92,8 @@ Env flags: `GPUIX_WINDOW=1` (same as `--window`), `GPUIX_BACKGROUND=1` (don't st
 | Worst frame (first paint, includes font/layout warm-up) | ~37 ms |
 | RSS (bun + native renderer) | ~177 MB at start, ~195 MB after a streamed run |
 | CPU while idle / streaming | ~2–4 % |
-| Terminal mode in Ghostty | frames sent via kitty graphics shared memory; interaction feels immediate at this window size (1360×966 terminal), see demo |
+| Terminal mode in Ghostty | frames sent via kitty graphics shared memory; clicks and keys respond within a frame or two in a 1442×928 Ghostty window, including two instances side by side |
+| Over SSH (`ssh -t localhost devin-tui`) | frames sent inline (zlib + base64); first frame appeared well under 1 s after Enter in the recording, clicks still responsive |
 
 Paravirtual Metal is slower than an M-series GPU, so expect better numbers on real hardware.
 
@@ -61,5 +103,7 @@ Paravirtual Metal is slower than an M-series GPU, so expect better numbers on re
 2. **Text color does not inherit.** Every `<text>` sets `color`; otherwise it paints black on the dark theme.
 3. **Shadow fields** are `blurRadius` / `spreadRadius` / `offsetX` / `offsetY` (not CSS shorthand); `testId` is not accepted on `motion.div` (put it on a child).
 4. **Markdown width.** A `<markdown>` block inside a flex column overflows unless the column has `width: '100%'` and `minWidth: 0`.
-5. **Terminal launch logs.** Terminal mode prints `gpui_macos::text_system` duplicate-font warnings to stderr before the first frame; harmless but visible in the terminal.
+5. **Terminal launch logs.** Terminal mode holds stdout/stderr until exit, then dumps native `INFO`/`WARN` logs (e.g. `gpui_macos::text_system` duplicate-font warnings) onto the restored prompt. Workaround: the `app.tsx` shebang sets `RUST_LOG=error` and `[gpuix]` JS logs are filtered unless `GPUIX_VERBOSE=1`.
 6. **`simulateInput` is not on the test renderer** in 0.11.0; `simulateKeystrokes('t e r r a f o r m')` works for typing into a focused `<input>`.
+7. **Ghostty splits work, tmux doesn't.** Each Ghostty split gets its own kitty-graphics surface, so two GPUIX apps side by side, divider drags and split zoom all reflow cleanly. tmux is unsupported, as the README says.
+8. **SSH works** (`ssh -t localhost devin-tui`): the remote app paints and takes clicks; `-t` is required for the TTY.

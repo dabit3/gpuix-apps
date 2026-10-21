@@ -44,11 +44,11 @@ export type Session = {
 }
 
 export const STATUS_COLOR: Record<Status, string> = {
-  running: '#3ea6ff',
-  blocked: '#f2b84b',
-  finished: '#3fbf8a',
-  failed: '#ef6461',
-  sleeping: '#6b7079',
+  running: '#71b7ff',
+  blocked: '#f0b72f',
+  finished: '#26cd4d',
+  failed: '#ff9492',
+  sleeping: '#7a828e',
 }
 
 export const STATUS_LABEL: Record<Status, string> = {
