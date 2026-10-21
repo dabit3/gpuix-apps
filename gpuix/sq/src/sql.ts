@@ -56,7 +56,8 @@ export function complete(word: string, schema: Array<{ name: string; kind: 'tabl
     return (t?.columns ?? []).filter((c) => c.name.toLowerCase().startsWith(rest)).slice(0, limit).map((c) => ({ label: `${t!.name}.${c.name}`, detail: c.type, kind: 'column' }))
   }
   const out: Completion[] = []
-  for (const t of schema) if (t.name.toLowerCase().startsWith(lw)) out.push({ label: t.name, detail: t.kind, kind: t.kind })
+  const tables = schema.filter((t) => t.name.toLowerCase().startsWith(lw)).sort((x, y) => x.name.length - y.name.length || x.name.localeCompare(y.name))
+  for (const t of tables) out.push({ label: t.name, detail: t.kind, kind: t.kind })
   const seen = new Set<string>()
   for (const t of schema) for (const c of t.columns) if (c.name.toLowerCase().startsWith(lw) && !seen.has(c.name)) { seen.add(c.name); out.push({ label: c.name, detail: `${t.name} · ${c.type}`, kind: 'column' }) }
   for (const k of KEYWORDS) if (k.startsWith(lw) && k !== lw && lw.length >= 2) out.push({ label: k.toUpperCase(), detail: 'keyword', kind: 'keyword' })
