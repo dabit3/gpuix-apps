@@ -165,7 +165,8 @@ export function ClaudeDesk({ storePath, streamer, titler }: Props) {
   }, [isEmpty, isStreaming, data.activeId, overlayOpen, focusComposer])
 
   const selectThread = useCallback((id: string) => {
-    setData((d) => ({ ...d, activeId: id }))
+    // A click on a row's trash icon also bubbles to the row; ignore deleted ids.
+    setData((d) => (d.threads.some((t) => t.id === id) ? { ...d, activeId: id } : d))
     setFindActive(0)
   }, [])
 
