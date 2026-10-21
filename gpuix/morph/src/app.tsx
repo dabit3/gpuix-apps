@@ -120,7 +120,8 @@ export function App({ controller, theme, autoTick = true, size: fixed }: { contr
 
       {/* artboard */}
       <div testId="artboard" onClick={() => { c.toggle(); paint() }} onScroll={onWheel} style={{ position: 'absolute', left: L.art.x, top: L.art.y, width: L.art.w, height: L.art.h, borderRadius: 14, borderWidth: 1, borderColor: ch.line, overflow: 'hidden', cursor: 'pointer' }}>
-        <Stage scene={scene} pal={pal} width={L.art.w} height={L.art.h} />
+        {/* overflow clips square, so the canvas carries the inner radius itself */}
+        <Stage scene={scene} pal={pal} width={L.art.w} height={L.art.h} radius={13} />
       </div>
 
       {/* timeline */}

@@ -259,7 +259,7 @@ const contents: Record<StateId, Content> = {
 }
 
 /** The one shape, its content layers, and the cursor, drawn into a `size`-px square-ish artboard (scene = 1080 wide). */
-export function Stage({ scene, pal, width, height }: { scene: Scene; pal: Palette; width: number; height: number }) {
+export function Stage({ scene, pal, width, height, radius = 0 }: { scene: Scene; pal: Palette; width: number; height: number; radius?: number }) {
   const K = width / 1080
   const s = K * scene.camera
   const u = s * scene.box.scale
@@ -279,7 +279,7 @@ export function Stage({ scene, pal, width, height }: { scene: Scene; pal: Palett
   const cs = 30 * K * (1 - 0.1 * cur.press)
   const curX = cx + cur.x * s, curY = cy + cur.y * s
   return (
-    <div testId="stage" style={{ position: 'relative', width, height, backgroundColor: pal.canvas, overflow: 'hidden', pointerEvents: 'none' }}>
+    <div testId="stage" style={{ position: 'relative', width, height, borderRadius: radius, backgroundColor: pal.canvas, overflow: 'hidden', pointerEvents: 'none' }}>
       <div testId="shape" style={{ position: 'absolute', left: cx - bw / 2, top: cy - bh / 2, width: bw, height: bh, borderRadius: Math.min(scene.box.r * u, bw / 2, bh / 2), backgroundColor: scene.box.fill, borderWidth: Math.max(1, u), borderColor: scene.box.border, overflow: 'hidden', pointerEvents: 'none' }}>
         {layers}
         {prims.length ? <Raster wPx={bw} hPx={bh} rPx={scene.box.r * u} prims={prims} /> : null}
