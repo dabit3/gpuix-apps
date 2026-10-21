@@ -124,6 +124,11 @@ generation, and JSON flattening.
    `renderer`. The README examples read like they are on the hook result.
 4. **Cmd-A in a terminal-mode `<input>`** didn't select the field's text in Ghostty (Cmd is taken by the terminal), so
    req adds Ctrl-U to clear the URL field.
-5. `import.meta.dir` is Bun-only. Code that the vitest test renderer imports has to use
+5. **`<textarea>` scroll range follows its rows, not its laid-out box.** With `height: '100%'` (or an explicit
+   `height`) in a flex pane that's shorter than the content, the editor grows past the pane and draws over
+   whatever is below it. If you clip it, wheel scrolling stops before the last lines. Workaround in
+   `RequestEditor`: measure the pane with `onLayout`, absolutely position the textarea inside it, and set
+   `maxRows` to the rows that fit. Repro: put a 14-line JSON body in a textarea inside a 160 px-tall flex pane.
+6. `import.meta.dir` is Bun-only. Code that the vitest test renderer imports has to use
    `fileURLToPath(new URL('../fonts', import.meta.url))`. This one is minor and not GPUIX's fault, but it's easy to
    trip over when following the examples.

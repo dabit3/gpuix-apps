@@ -884,7 +884,8 @@ function RequestEditor({
   onTab: (t: 'params' | 'headers' | 'body') => void
   update: (p: Partial<RequestDraft>) => void
 }) {
-  const [editorH, setEditorH] = useState(0)
+  // GPUI's editor sizes its scroll viewport from rows, not from the laid-out box, so cap rows to what fits.
+  const [editorRows, setEditorRows] = useState(0)
   const params = parseQuery(draft.url)
   const bodyCheck = draft.bodyType === 'json' && draft.body.trim() ? parseJson(draft.body) : null
   return (
@@ -940,7 +941,7 @@ function RequestEditor({
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 }}>
             <div
-              onLayout={(e) => setEditorH(e.height ?? 0)}
+              onLayout={(e) => setEditorRows(Math.max(2, Math.floor(((e.height ?? 0) - 10) / 20)))}
               style={{ display: 'flex', position: 'relative', flexGrow: 1, flexBasis: 0, minHeight: 0, overflow: 'hidden' }}
             >
               <textarea
@@ -948,9 +949,10 @@ function RequestEditor({
                 value={draft.body}
                 placeholder={draft.bodyType === 'json' ? '{\n  "key": "value"\n}' : 'Request body'}
                 theme={THEME}
-                minRows={4}
+                minRows={editorRows ? Math.min(4, editorRows) : 4}
+                maxRows={editorRows || undefined}
                 onChange={(e) => update({ body: e.value ?? '' })}
-                style={{ position: 'absolute', top: 10, left: 8, right: 8, height: Math.max(40, editorH - 10), fontSize: 13, lineHeight: 20, fontFamily: MONO, color: C.text, backgroundColor: '#00000000', borderWidth: 0, paddingLeft: 8, paddingRight: 8 }}
+                style={{ position: 'absolute', top: 10, left: 8, right: 8, fontSize: 13, lineHeight: 20, fontFamily: MONO, color: C.text, backgroundColor: '#00000000', borderWidth: 0, paddingLeft: 8, paddingRight: 8 }}
               />
             </div>
             {draft.bodyType === 'json' && (
