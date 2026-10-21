@@ -1,0 +1,26 @@
+{
+  "name": "mdlive",
+  "version": "0.1.0",
+  "description": "Live GitHub-flavoured Markdown preview that renders inside your terminal (Ghostty / kitty) with GPUIX",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "mdlive": "./mdlive.tsx"
+  },
+  "scripts": {
+    "dev": "bun --hot mdlive.tsx examples/notes.md",
+    "start": "bun mdlive.tsx examples/notes.md",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.11.0",
+    "@gpuix/react": "0.11.0",
+    "react": "19"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "typescript": "^5.9.3"
+  }
+}
