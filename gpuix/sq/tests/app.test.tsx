@@ -87,4 +87,65 @@ d('sq app', () => {
     unmount()
     db.close()
   }, 60_000)
+  it('resizes a column from a header-edge drag released over the next header, without sorting', async () => {
+    const db = new SqDb(file)
+    const { render, renderer, unmount } = createTestRoot({ width: 1400, height: 900 })
+    render(<SqApp db={db} pollMs={1000} initialSql="SELECT id, total FROM orders LIMIT 5" />)
+    await wait()
+    renderer.flush()
+    const find = (testId: string): number => {
+      const walk = (n: any): number | undefined => {
+        if (!n || typeof n !== 'object') return undefined
+        if (n.testId === testId && typeof n.id === 'number') return n.id
+        for (const v of Object.values(n)) {
+          const hit = Array.isArray(v) ? v.map(walk).find((x) => x !== undefined) : typeof v === 'object' ? walk(v) : undefined
+          if (hit !== undefined) return hit
+        }
+        return undefined
+      }
+      const id = walk(JSON.parse(renderer.getAutomationTree()))
+      expect(id).toBeNumber()
+      return id!
+    }
+    const colBefore = renderer.getElementBounds(find('col-id'))!
+    const handle = renderer.getElementBounds(find('resize-id'))!
+    const target = renderer.getElementBounds(find('col-total'))!
+    expect(colBefore.width).toBeGreaterThan(0)
+    const x = handle.x + handle.width / 2
+    const y = handle.y + handle.height / 2
+    // GPUIX terminal mode reports the press, then the release as a click on whatever is
+    // under the pointer (no drag moves), so drive the drag exactly that way.
+    const end = target.x + target.width / 2
+    renderer.nativeSimulateMouseMove(x, y)
+    renderer.flush()
+    renderer.nativeSimulateMouseDown(x, y, 0)
+    renderer.flush()
+    renderer.nativeSimulateClick(end, y, 0)
+    await wait()
+    renderer.flush()
+    const colAfter = renderer.getElementBounds(find('col-id'))!
+    expect(colAfter.width).toBeGreaterThan(colBefore.width + (end - x) * 0.8)
+
+    // A native-window drag streams moves with the left button (pressedButton 0) held.
+    const h2 = renderer.getElementBounds(find('resize-total'))!
+    const before2 = renderer.getElementBounds(find('col-total'))!.width
+    const hx = h2.x + h2.width / 2
+    renderer.nativeSimulateMouseMove(hx, y)
+    renderer.flush()
+    renderer.nativeSimulateMouseDown(hx, y, 0)
+    renderer.flush()
+    for (const dx of [15, 30, 45, 60]) {
+      renderer.nativeSimulateMouseMove(hx + dx, y, 0)
+      await wait(10)
+      renderer.flush()
+    }
+    renderer.nativeSimulateMouseUp(hx + 60, y, 0)
+    await wait()
+    renderer.flush()
+    expect(renderer.getElementBounds(find('col-total'))!.width).toBeGreaterThan(before2 + 45)
+    const app = await connectTest(renderer)
+    expect(await app.getByTestId('sort-arrow').count()).toBe(0)
+    unmount()
+    db.close()
+  }, 30_000)
 })

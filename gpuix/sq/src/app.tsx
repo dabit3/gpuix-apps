@@ -361,6 +361,7 @@ export function SqApp({ db, initialSql, pollMs = 250 }: { db: SqDb; initialSql?:
   const resRef = useRef(res)
   resRef.current = res
   const drag = useRef<{ col: number; x: number; w: number } | null>(null)
+  const dragMoved = useRef(0)
 
   const execute = useCallback((text: string, opts: { silent?: boolean; keepView?: boolean } = {}) => {
     const q = text.trim()
@@ -555,7 +556,28 @@ export function SqApp({ db, initialSql, pollMs = 250 }: { db: SqDb; initialSql?:
     setStart(0)
     setGen((g) => g + 1)
   }
+  // In terminal mode GPUIX delivers no drag moves and reports the release only as a click
+  // on whatever is under the pointer, so a resize can also finish from a click.
+  const finishDrag = (e: EventPayload) => {
+    const d = drag.current
+    if (!d) return false
+    drag.current = null
+    if (e.x == null || Math.abs(e.x - d.x) < 2) return true
+    const w = Math.max(48, Math.round(d.w + e.x - d.x))
+    dragMoved.current = Date.now()
+    setWidths((ws) => { const n = ws.slice(); n[d.col] = w; return n })
+    return true
+  }
+  const dragMove = (e: EventPayload) => {
+    const d = drag.current
+    if (!d) return
+    if (e.pressedButton == null) return
+    const w = Math.max(48, Math.round(d.w + (e.x ?? 0) - d.x))
+    if (w !== d.w) dragMoved.current = Date.now()
+    setWidths((ws) => { const n = ws.slice(); n[d.col] = w; return n })
+  }
   const toggleSort = (c: number) => {
+    if (Date.now() - dragMoved.current < 400) return
     setSort((s) => (s?.col === c ? (s.desc ? null : { col: c, desc: true }) : { col: c, desc: false }))
     setPageStart(0)
     setStart(0)
@@ -637,35 +659,32 @@ export function SqApp({ db, initialSql, pollMs = 250 }: { db: SqDb; initialSql?:
           )}
           <div style={{ display: 'flex', flexDirection: 'row', flexGrow: 1, minHeight: 0 }}>
             <div
-              onMouseMove={(e: EventPayload) => {
-                const d = drag.current
-                if (!d) return
-                if (!e.pressedButton) { drag.current = null; return }
-                const w = Math.max(48, Math.round(d.w + (e.x ?? 0) - d.x))
-                setWidths((ws) => { const n = ws.slice(); n[d.col] = w; return n })
-              }}
-              onMouseUp={() => { drag.current = null }}
+              onMouseMove={dragMove}
+              onMouseUp={finishDrag}
               style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, flexBasis: 0, minWidth: 0 }}
             >
               {tab === 'results' && res && (
                 <>
-                  <div testId="grid-header" style={{ display: 'flex', flexDirection: 'row', height: 30, flexShrink: 0, alignItems: 'center', borderBottomWidth: 1, borderColor: T.borderStrong, backgroundColor: T.panel, overflow: 'hidden' }}>
+                  <div testId="grid-header" onMouseMove={dragMove} onMouseUp={finishDrag} style={{ display: 'flex', flexDirection: 'row', height: 30, flexShrink: 0, alignItems: 'center', borderBottomWidth: 1, borderColor: T.borderStrong, backgroundColor: T.panel, overflow: 'hidden' }}>
                     <div style={{ width: GUTTER, flexShrink: 0 }} />
                     {res.columns.map((c, ci) => (
                       <div key={c + ci} style={{ width: widths[ci] ?? 120, flexShrink: 0, height: 30, display: 'flex', flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderColor: T.border }}>
-                        <div testId={`col-${c}`} onClick={() => toggleSort(ci)} style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, height: 30, paddingLeft: 10, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer', hover: { backgroundColor: T.hover } }}>
+                        <div testId={`col-${c}`} onMouseMove={dragMove} onMouseUp={finishDrag} onClick={(e: EventPayload) => { if (!finishDrag(e)) toggleSort(ci) }} style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, height: 30, paddingLeft: 10, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer', hover: { backgroundColor: T.hover } }}>
                           <text style={{ fontSize: 12, fontWeight: 600, fontFamily: MONO, color: sort?.col === ci ? T.blue : T.fg, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{c}</text>
                           {sort?.col === ci && <text testId="sort-arrow" style={{ fontSize: 10, color: T.blue }}>{sort.desc ? '▼' : '▲'}</text>}
                         </div>
                         <div
                           testId={`resize-${c}`}
-                          onMouseDown={(e: EventPayload) => { drag.current = { col: ci, x: e.x ?? 0, w: widths[ci] ?? 120 } }}
-                          style={{ width: 7, height: 30, cursor: 'col-resize', hover: { backgroundColor: '#71b7ff55' } }}
+                          onClick={finishDrag}
+                          onMouseMove={dragMove}
+                          onMouseUp={finishDrag}
+                          onMouseDown={(e: EventPayload) => { if (!finishDrag(e)) drag.current = { col: ci, x: e.x ?? 0, w: widths[ci] ?? 120 } }}
+                          style={{ width: isTerminal() ? 16 : 7, height: 30, cursor: 'col-resize', hover: { backgroundColor: '#71b7ff55' } }}
                         />
                       </div>
                     ))}
                   </div>
-                  <Grid res={res} order={order} widths={widths} pageStart={pageStart} start={start} sel={sel} onPick={(r, c) => setSel([r, c])} listRef={listRef} onVisibleRange={onVisibleRange} gen={gen} fresh={fresh} />
+                  <Grid res={res} order={order} widths={widths} pageStart={pageStart} start={start} sel={sel} onPick={(r, c) => { drag.current = null; setSel([r, c]) }} listRef={listRef} onVisibleRange={onVisibleRange} gen={gen} fresh={fresh} />
                   {total > PAGE && (
                     <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, height: 30, flexShrink: 0, paddingLeft: 14, paddingRight: 10, borderTopWidth: 1, borderColor: T.border }}>
                       <text testId="page-label" style={{ fontSize: 11.5, fontFamily: MONO, color: T.dim, flexGrow: 1 }}>{`rows ${fmtN(pageStart + 1)}–${fmtN(pageEnd)} of ${fmtN(total)}`}</text>

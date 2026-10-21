@@ -74,10 +74,11 @@ Queries run synchronously on the JS thread, so a slow query blocks input until i
 ## Findings (GPUIX 0.11.0, Bun 1.4.3)
 
 1. **Terminal mode works well in Ghostty.** Click, hover, drag, scroll, typing, Tab and ⌃ chords all arrive; splits and divider drags reflow the app every frame; Ctrl-C restores the prompt.
-2. **Held stderr dumps on exit.** In terminal mode the native INFO/WARN lines (`gpui_terminal::kitty sending frames…`, duplicate-font warnings) and React key warnings print after the app quits, under the prompt. `RUST_LOG=error` did not silence them; redirecting the child's stderr did.
-3. **⌘ shortcuts are owned by the host terminal.** ⌘↵ toggled Ghostty fullscreen instead of reaching the app. Terminal-mode apps need ⌃ alternatives.
-4. **No SQL in `<code language>`** and `whiteSpace: 'pre'` / `letterSpacing` are not supported styles, hence the overlay editor.
-5. **`<virtual-list>` count changes are expensive** at very large counts (seen in an earlier experiment), so the grid pages 20k rows at a time with Prev/Next.
-6. Not GPUIX, but worth knowing: in **bun:sqlite**, a statement cached by `db.query()` (even after `.all()` on `EXPLAIN QUERY PLAN`) can keep a read transaction open, pinning the connection to an old snapshot so external writes never appear. sq prepares and finalizes every statement instead.
+2. **`pressedButton` is `0` for the left button.** Drag code written as `if (!e.pressedButton) return` never runs for a left-button drag. The first build had that bug, so column resize did nothing and the release click sorted the neighbouring column. Check `e.pressedButton == null` instead. In terminal mode, pointer positions are also cell-quantized (about 10 px left of the real pointer at 15 pt), so sq widens the resize handle to 16 px there. A drag-release can also land as a plain click on another header, so sq finishes the resize from that click and doesn't sort. Ghostty may also draw its own text-selection tint over the frame during a drag.
+3. **Held stderr dumps on exit.** In terminal mode the native INFO/WARN lines (`gpui_terminal::kitty sending frames…`, duplicate-font warnings) and React key warnings print after the app quits, under the prompt. `RUST_LOG=error` did not silence them; redirecting the child's stderr did.
+4. **⌘ shortcuts are owned by the host terminal.** ⌘↵ toggled Ghostty fullscreen instead of reaching the app. Terminal-mode apps need ⌃ alternatives.
+5. **No SQL in `<code language>`** and `whiteSpace: 'pre'` / `letterSpacing` are not supported styles, hence the overlay editor.
+6. **`<virtual-list>` count changes are expensive** at very large counts (seen in an earlier experiment), so the grid pages 20k rows at a time with Prev/Next.
+7. Not GPUIX, but worth knowing: in **bun:sqlite**, a statement cached by `db.query()` (even after `.all()` on `EXPLAIN QUERY PLAN`) can keep a read transaction open, pinning the connection to an old snapshot so external writes never appear. sq prepares and finalizes every statement instead.
 
 Embedding in VS Code, Zed or Codex terminals and the SSH path were not part of this experiment's demo.
