@@ -9,7 +9,8 @@
     "dev": "GPUIX_TERMINAL=1 bun --hot jx.tsx data/github-events.json.gz",
     "start": "bun jx.tsx data/github-events.json.gz",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bench": "bun bench.tsx"
   },
   "dependencies": {
     "@gpuix/native": "0.11.0",

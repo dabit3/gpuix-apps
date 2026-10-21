@@ -221,6 +221,8 @@ class Parser {
         fn = chain(fn, (v) => [Array.isArray(v) ? (v.at(idx) ?? null) : null])
       } else if (this.s[this.i] === '?') {
         this.i++
+        const f = fn
+        fn = (v) => { try { return f(v) } catch { return [] } }
       } else return fn
     }
   }
