@@ -26,6 +26,14 @@ export type AppProps = {
 }
 
 /** Window-level key events land here (terminal + native window), and tests call it directly. */
+// GPUIX 0.11.0 terminal mode reports printable keys as key "space" with the
+// real character in keyChar, so prefer keyChar for single printable chars.
+export function keyName(e: { key?: string; keyChar?: string | null }): string {
+  const c = e.keyChar
+  if (c && c.length === 1 && c > ' ') return c.toLowerCase()
+  return (e.key ?? '').toLowerCase()
+}
+
 export const keyBus: { handler: ((e: KeyEvent) => void) | null } = { handler: null }
 
 const NARROW_COL = 760
@@ -266,7 +274,7 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
 
   const onKey = useCallback(
     (e: KeyEvent) => {
-      const k = (e.key ?? '').toLowerCase()
+      const k = keyName(e)
       const m = (e as { modifiers?: { shift?: boolean; ctrl?: boolean; cmd?: boolean } }).modifiers ?? {}
       if (k === 'escape') {
         if (findOpen) closeFind()
@@ -352,7 +360,6 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
       ref={rootRef}
       tabIndex={-1}
       autoFocus
-      onKeyDown={(e) => onKey(e as KeyEvent)}
       onLayout={(e) => {
         setWinW(e.width ?? 1200)
         setWinH(e.height ?? 800)
@@ -709,9 +716,12 @@ const BlockView = memo(function BlockView({
           key={flashN}
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
-          transition={{ duration: 1.6, delay: 0.5, ease: 'easeOut' }}
-          style={{ position: 'absolute', left: -16, top: gapTop, bottom: 14, width: 3, borderRadius: 2, backgroundColor: t.green, pointerEvents: 'none' }}
-        />
+          transition={{ duration: 1.8, delay: 1.4, ease: 'easeOut' }}
+          style={{ position: 'absolute', left: -18, right: -12, top: gapTop - 6, bottom: 8, pointerEvents: 'none' }}
+        >
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 8, backgroundColor: alpha(t.green, 0.12) }} />
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, borderRadius: 2, backgroundColor: t.green }} />
+        </motion.div>
       )}
       {b.kind === 'code' ? (
         <CodeCard b={b} t={t} theme={theme} />

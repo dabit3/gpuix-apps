@@ -5,7 +5,7 @@ import { copyFileSync, mkdtempSync, readFileSync, renameSync, writeFileSync } fr
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseArgs } from './mdlive'
-import { App, keyBus } from './src/App'
+import { App, keyBus, keyName } from './src/App'
 import { changedBlock, parseBlocks, stats } from './src/doc'
 import { loadPalette } from './src/theme'
 
@@ -132,8 +132,12 @@ test('wide/narrow toggle changes the reading column and the TOC hides in a narro
   const narrow = await docW()
   await app.getByTestId('width-toggle-wide').click()
   await until(async () => (await docW()) > narrow + 100)
-  key('w')
+  // GPUIX 0.11.0 terminal mode delivers printable keys as key "space" + keyChar
+  keyBus.handler?.({ key: 'space', keyChar: 'w', modifiers: { shift: false, ctrl: false, alt: false, cmd: false } } as never)
   await until(async () => Math.abs((await docW()) - narrow) < 2)
+  expect(keyName({ key: 'space', keyChar: 'w' })).toBe('w')
+  expect(keyName({ key: 'space', keyChar: ' ' })).toBe('space')
+  expect(keyName({ key: 'down', keyChar: null })).toBe('down')
 
   const half = await setup(undefined, 700)
   await until(async () => (await half.app.getByTestId('doc-scroll').bounds())!.x < 2)
