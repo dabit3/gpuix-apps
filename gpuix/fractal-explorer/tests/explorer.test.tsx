@@ -181,6 +181,29 @@ describeNative('fractal explorer window', () => {
     expect(readFileSync(shotA).equals(readFileSync(shotB))).toBe(false)
   })
 
+  it('arrow keys pan after picking a palette instead of reopening the Select', async () => {
+    await app.getByTestId('palette-trigger').click()
+    pump()
+    await app.getByTestId('palette-glacier').click()
+    await settle()
+    await new Promise((r) => setTimeout(r, 30))
+    pump()
+    const before = explorer.cam.im
+    root.renderer.simulateKeystrokes('up')
+    await settle()
+    expect(explorer.palette).toBe('glacier')
+    expect(explorer.cam.im).toBeGreaterThan(before)
+    expect(await app.getByTestId('palette-coral').count()).toBe(0)
+  })
+
+  it('dragging the slider knob changes the iteration count', async () => {
+    const before = Number(await text('iter-value'))
+    await app.getByTestId('iter-knob').dragBy(-60, 0, { steps: 6 })
+    await new Promise((r) => setTimeout(r, 120))
+    pump()
+    expect(Number(await text('iter-value'))).toBeLessThan(before)
+  })
+
   it('S saves a PNG of the current view', async () => {
     await app.getByTestId('app').press('s')
     for (let i = 0; i < 200 && !readdirSync(saveDir).some((f) => f.startsWith('Fractal')); i++) {

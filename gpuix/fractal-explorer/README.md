@@ -49,7 +49,7 @@ bun run typecheck  # tsc --noEmit
 
 ## Tests
 
-`tests/explorer.test.tsx` (13 tests, ~5 s) mounts the real `FractalApp` in GPUIX's native test renderer and drives it
+`tests/explorer.test.tsx` (15 tests, ~6 s) mounts the real `FractalApp` in GPUIX's native test renderer and drives it
 through automation locators:
 
 - bookmark click → camera animates and lands exactly on the bookmark; readouts and iteration count update
@@ -58,6 +58,8 @@ through automation locators:
 - wheel zooms in; `=` halves the width; `R` flies home and the zoom readout returns to `1.00×`
 - palette Select switches the colour map (screenshots differ)
 - `S` writes a PNG of the view (checks IHDR width/height) and shows the toast
+- after picking a palette, a raw `up` keystroke pans the camera and does not reopen the Select
+- dragging the slider knob itself changes the iteration count
 - pure math: interior/exterior colouring, tile coverage, slider log mapping, PNG signature, and finite camera paths
   between 10¹² zoom and home (regression test for the NaN bug below)
 
@@ -96,7 +98,16 @@ In the app, the abyss shows a ~23–25 ms preview first, so flights stay interac
 5. The scroll event includes window `x`/`y`, which is the right anchor for zoom-under-pointer. You don't need to track
    the last hover position.
 
-App bug found and fixed along the way: the van Wijk path used `log(sqrt(b² + 1) − b)`, which cancels to `log(0)` when
+Bugs the testing-agent run found, now fixed with regression tests (both tests fail on the old code):
+
+- **Slider knob ate the press.** The filled knob and fill bar are positioned children, so they blocked the
+  slider's `onMouseDown`, and dragging the knob did nothing. They now use `pointerEvents: 'none'`, as the README
+  advises for switch thumbs.
+- **Up arrow reopened the palette.** A closed `Select` keeps keyboard focus, and arrow keys open it again (while
+  the root shortcut still panned). `onOpenChange(false)` now hands focus back to the root with
+  `renderer.focusElement(rootRef.current.id)`.
+
+Another app bug found and fixed along the way: the van Wijk path used `log(sqrt(b² + 1) − b)`, which cancels to `log(0)` when
 flying out from 10¹² zoom and turned the camera into NaN. It now uses the stable `−asinh(b)`, and `Explorer` falls
 back to home if the camera is ever non-finite.
 

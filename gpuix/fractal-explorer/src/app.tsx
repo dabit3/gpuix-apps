@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@gpuix/react'
-import type { EventPayload, ImgInstance } from '@gpuix/react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, useGpuixRequired } from '@gpuix/react'
+import type { EventPayload, ImgInstance, PublicInstance } from '@gpuix/react'
 import { BOOKMARKS, type Bookmark, type Camera, formatCoord, formatZoom } from './camera'
 import { type Explorer, type Stats } from './engine'
 import { PALETTES, type PaletteId, paletteById, paletteSwatches } from './fractal'
@@ -48,10 +48,10 @@ function Swatches({ id, width }: { id: PaletteId; width: number }) {
   )
 }
 
-function PaletteSelect({ value, onChange }: { value: PaletteId; onChange: (id: PaletteId) => void }) {
+function PaletteSelect({ value, onChange, onClose }: { value: PaletteId; onChange: (id: PaletteId) => void; onClose: () => void }) {
   const items = PALETTES.map((p) => ({ value: p.id, label: p.name }))
   return (
-    <Select items={items} value={value} onValueChange={(v) => onChange(v as PaletteId)}>
+    <Select items={items} value={value} onValueChange={(v) => onChange(v as PaletteId)} onOpenChange={(open) => !open && onClose()}>
       <SelectTrigger
         testId="palette-trigger"
         style={(s) => ({
@@ -139,10 +139,12 @@ function IterSlider({ value, onChange }: { value: number; onChange: (n: number) 
         onMouseMove={(e) => dragging.current && set(e.x ?? 0)}
         onMouseUp={() => (dragging.current = false)}
       >
-        <div style={{ position: 'relative', flexGrow: 1, height: 4, borderRadius: 2, backgroundColor: '#2a2d33' }}>
-          <div style={{ position: 'absolute', left: 0, top: 0, height: 4, width: Math.round(t * trackW), borderRadius: 2, backgroundColor: C.accent }} />
+        <div style={{ position: 'relative', flexGrow: 1, height: 4, borderRadius: 2, backgroundColor: '#2a2d33', pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, height: 4, width: Math.round(t * trackW), borderRadius: 2, backgroundColor: C.accent, pointerEvents: 'none' }} />
           <div
+            testId="iter-knob"
             style={{
+              pointerEvents: 'none',
               position: 'absolute',
               top: -6,
               left: Math.round(t * trackW) - 8,
@@ -238,6 +240,8 @@ export function FractalApp({ explorer, saveDir }: FractalAppProps) {
   const [toast, setToast] = useState<string | null>(null)
   const mainImg = useRef<ImgInstance>(null)
   const juliaImg = useRef<ImgInstance>(null)
+  const rootRef = useRef<PublicInstance>(null)
+  const renderer = useGpuixRequired()
   const view = useRef({ x: SIDEBAR, y: 0 })
   const hover = useRef({ x: 0, y: 0 })
   const drag = useRef<{ x: number; y: number } | null>(null)
@@ -267,6 +271,12 @@ export function FractalApp({ explorer, saveDir }: FractalAppProps) {
       .catch((err) => setToast(`Save failed: ${String(err)}`))
   }
 
+  // A closed Select keeps focus and opens again on arrow keys, so hand focus back to the shortcut root.
+  const refocus = () =>
+    setTimeout(() => {
+      if (rootRef.current) renderer.focusElement?.(rootRef.current.id)
+    }, 0)
+
   const onKey = (e: EventPayload) => {
     if (e.modifiers?.cmd || e.modifiers?.ctrl) return
     const key = (e.key ?? '').toLowerCase()
@@ -288,6 +298,7 @@ export function FractalApp({ explorer, saveDir }: FractalAppProps) {
   return (
     <div
       testId="app"
+      ref={rootRef}
       autoFocus
       tabIndex={0}
       onKeyDown={onKey}
@@ -317,7 +328,7 @@ export function FractalApp({ explorer, saveDir }: FractalAppProps) {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <Label>Palette</Label>
-          <PaletteSelect value={s.palette} onChange={(id) => explorer.setPalette(id)} />
+          <PaletteSelect value={s.palette} onChange={(id) => explorer.setPalette(id)} onClose={refocus} />
         </div>
         <IterSlider value={s.maxIter} onChange={(n) => explorer.setMaxIter(n)} />
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
