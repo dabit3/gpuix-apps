@@ -134,7 +134,7 @@ if (file) {
       if (!existsSync(file)) return
       try { const spec = readSpec(file); v.load(spec, `reloaded ${v.source} · ${spec.meta.name} · ${spec.parts.length} parts`) } catch (e) {
         const msg = e instanceof SpecError ? `${e.issues.length} issue${e.issues.length === 1 ? '' : 's'} · ${e.issues[0]!.path} ${e.issues[0]!.message}` : (e as Error).message
-        v.say(`${v.source}: ${msg} (kept last good spec)`, 'err')
+        v.say(`kept last good spec · ${v.source}: ${msg}`, 'err')
       }
     }, 120)
   })

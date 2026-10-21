@@ -241,8 +241,8 @@ export function App({ v, theme }: { v: Viewer; theme: Theme }) {
         )}
       </div>
       {toast && (
-        <div style={{ position: 'absolute', left: 14, top: 54, display: 'flex', paddingLeft: 10, paddingRight: 10, paddingTop: 5, paddingBottom: 5, borderRadius: 6, borderWidth: 1, borderColor: toast.kind === 'err' ? theme.bad : toast.kind === 'ok' ? alpha(theme.good, 0.6) : theme.line, backgroundColor: mix(theme.bg, toast.kind === 'err' ? theme.bad : theme.good, 0.1), pointerEvents: 'none' }}>
-          <text testId="toast" style={{ color: toast.kind === 'err' ? theme.bad : theme.good, fontSize: 12, fontFamily: MONO }}>{toast.text}</text>
+        <div style={{ position: 'absolute', left: 14, top: 54, maxWidth: Math.max(200, w - 28), display: 'flex', paddingLeft: 10, paddingRight: 10, paddingTop: 5, paddingBottom: 5, borderRadius: 6, borderWidth: 1, borderColor: toast.kind === 'err' ? theme.bad : toast.kind === 'ok' ? alpha(theme.good, 0.6) : theme.line, backgroundColor: mix(theme.bg, toast.kind === 'err' ? theme.bad : theme.good, 0.1), pointerEvents: 'none' }}>
+          <text testId="toast" style={{ color: toast.kind === 'err' ? theme.bad : theme.good, fontSize: 12, fontFamily: MONO, flexShrink: 1 }}>{toast.text}</text>
         </div>
       )}
       <Toolbar v={v} theme={theme} compact={compact} />
