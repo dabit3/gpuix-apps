@@ -1,0 +1,11 @@
+{
+  "name": "tiny-shop",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "lint": "bun scripts/lint.ts",
+    "typecheck": "bun build src/index.ts --target=bun --outdir=.build --no-bundle"
+  }
+}
