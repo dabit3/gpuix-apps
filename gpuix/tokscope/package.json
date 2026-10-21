@@ -1,0 +1,28 @@
+{
+  "name": "tokscope",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun bin/tokscope.ts sample/",
+    "audit": "bun bin/tokscope.ts --audit sample/",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "sample": "bun sample/generate.ts",
+    "replay": "bun scripts/replay.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.11.0",
+    "@gpuix/react": "0.11.0",
+    "react": "19"
+  },
+  "version": "0.1.0",
+  "description": "Token-efficiency audit for agent transcripts, rendered in the terminal with GPUIX",
+  "bin": {
+    "tokscope": "bin/tokscope.ts"
+  }
+}
