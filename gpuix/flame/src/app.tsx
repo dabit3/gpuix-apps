@@ -148,7 +148,7 @@ function Graph(p: GraphProps) {
       onLayout={(e: EventPayload) => setBox({ x: e.x ?? 0, y: e.y ?? 0, w: e.width ?? 0, h: e.height ?? 0 })}
       onMouseMove={(e: EventPayload) => {
         const [lx, ly] = local(e)
-        p.onHover(hitTest(p.layout, p.viewport, W, H, p.up, lx, ly), lx, ly)
+        p.onHover(hitTest(p.layout, p.viewport, W, H, p.up, lx, ly), e.x ?? 0, e.y ?? 0)
       }}
       onMouseLeave={() => p.onHover(null, 0, 0)}
       onClick={(e: EventPayload) => {
@@ -618,8 +618,8 @@ export function FlameApp({ source, initialView = 'flame', initialOrder = 'heavy'
           testId="tooltip"
           style={{
             position: 'absolute',
-            left: Math.min(Math.max(8, hover.x + 30), size.width - 300),
-            top: Math.min(hover.y + 96, size.height - 120),
+            left: Math.max(8, Math.min(hover.x + 16, size.width - 296)),
+            top: hover.y > size.height * 0.5 ? Math.max(8, hover.y - 140) : hover.y + 20,
             width: 280,
             display: 'flex',
             flexDirection: 'column',
