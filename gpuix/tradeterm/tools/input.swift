@@ -1,7 +1,8 @@
 // Real HID input for demos: posts CGEvents at the session tap (keyboard text, shortcuts, mouse).
 // usage:
 //   input "text" [delayMs]                 type text (unicode key events, "\n" = Return)
-//   input --key <keycode> [cmd|shift|cmdshift]
+//   input --key <keycode> [cmd|shift|ctrl combos]
+//   input --scroll x y dy [steps]          glide to x,y then smooth pixel-wheel steps
 //   input --move x y [ms]                  eased glide from the current position
 //   input --click x y                      glide briefly, then click
 //   input --drag x1 y1 x2 y2 [ms] [holdMs] press, eased drag at 60 Hz, hold, release
@@ -35,7 +36,7 @@ func num(_ i: Int, _ d: Double) -> Double { args.count > i ? Double(args[i])! : 
 switch args.count > 1 ? args[1] : "" {
 case "--key":
   var f: CGEventFlags = []
-  if args.count > 3 { if args[3].contains("cmd") { f.insert(.maskCommand) }; if args[3].contains("shift") { f.insert(.maskShift) } }
+  if args.count > 3 { if args[3].contains("cmd") { f.insert(.maskCommand) }; if args[3].contains("shift") { f.insert(.maskShift) }; if args[3].contains("ctrl") { f.insert(.maskControl) } }
   key(CGKeyCode(Int(args[2])!), f)
 case "--move":
   glide(current(), CGPoint(x: num(2, 0), y: num(3, 0)), num(4, 350), .mouseMoved)
@@ -43,6 +44,22 @@ case "--click":
   let p = CGPoint(x: num(2, 0), y: num(3, 0))
   glide(current(), p, 220, .mouseMoved)
   usleep(60_000); mouse(.leftMouseDown, p); usleep(70_000); mouse(.leftMouseUp, p)
+case "--scroll":
+  let p = CGPoint(x: num(2, 0), y: num(3, 0))
+  glide(current(), p, 200, .mouseMoved)
+  let steps = Int(num(5, 30))
+  for _ in 0..<steps {
+    CGEvent(scrollWheelEvent2Source: src, units: .pixel, wheelCount: 2, wheel1: Int32(num(4, 0) / Double(steps)), wheel2: 0, wheel3: 0)!.post(tap: .cghidEventTap)
+    usleep(16_667)
+  }
+case "--hscroll":
+  let p = CGPoint(x: num(2, 0), y: num(3, 0))
+  glide(current(), p, 200, .mouseMoved)
+  let steps = Int(num(5, 30))
+  for _ in 0..<steps {
+    CGEvent(scrollWheelEvent2Source: src, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: Int32(num(4, 0) / Double(steps)), wheel3: 0)!.post(tap: .cghidEventTap)
+    usleep(16_667)
+  }
 case "--drag":
   let a = CGPoint(x: num(2, 0), y: num(3, 0)), b = CGPoint(x: num(4, 0), y: num(5, 0))
   glide(current(), a, 200, .mouseMoved)

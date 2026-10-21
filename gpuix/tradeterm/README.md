@@ -117,4 +117,5 @@ The original prompt asked for a React + Vite web app with a Canvas 2D engine, a 
 - GPUIX holds stdout/stderr until exit; the `#!/usr/bin/env -S RUST_LOG=error bun` shebang keeps INFO logs from spilling under the prompt.
 - Absolutely-positioned overlays (crosshair lines, axis tags, the zoom selection) need `pointerEvents: 'none'` or they swallow the pane's mouse events.
 - A component that calls `setState` from inside an `<img>` redraw layout effect, combined with a dependency that is a fresh `[]` every render, produces "Maximum update depth exceeded" right away, and GPUIX shows React's error overlay inside the terminal (nice for debugging). Keep redraw keys referentially stable.
+- Every painted `<text>` is selectable, so a drag that misses a chart pane starts a text selection that highlights the whole sidebar. A charting app wants none of that: `userSelect: 'none'` on the root turns it off for everything.
 - `createTestRoot()` + `connectTest()` make UI tests easy, including `dragBy` and `wheel(…, { modifiers: 'ctrl' })`.

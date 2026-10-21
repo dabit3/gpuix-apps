@@ -329,10 +329,11 @@ export function App(props: AppProps) {
       const t = TOOLS.find((t) => t.key === k)!.id
       setTool((cur) => (cur === t ? null : t))
     } else if (k === 'escape') {
-      if (tool || pending) {
+      if (sweepOpen) setSweepOpen(false)
+      else if (tool || pending) {
         setTool(null)
         setPending(null)
-      } else if (sweepOpen) setSweepOpen(false)
+      }
       else if (hlTrade != null) setHlTrade(null)
       else resetView()
     } else if (k === 'backspace' || k === 'delete' || k === 'x') deleteLast()
@@ -457,7 +458,7 @@ export function App(props: AppProps) {
         const h = Math.round(e.height ?? 0)
         if (w && h && (w !== size.w || h !== size.h)) setSize({ w, h })
       }}
-      style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: T.bg }}
+      style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: T.bg, userSelect: 'none' }}
     >
       {/* Header */}
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', height: 44, paddingLeft: 16, paddingRight: 12, gap: 14, flexShrink: 0, borderBottomWidth: 1, borderColor: T.border }}>
