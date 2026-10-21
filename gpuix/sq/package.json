@@ -1,0 +1,22 @@
+{
+  "name": "sq",
+  "private": true,
+  "type": "module",
+  "bin": { "sq": "./bin/sq.ts" },
+  "scripts": {
+    "dev": "GPUIX_TERMINAL=1 bun --hot src/main.tsx sample.db",
+    "sample": "bun scripts/make-sample.ts sample.db",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.11.0",
+    "@gpuix/react": "0.11.0",
+    "react": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "typescript": "^5"
+  }
+}
