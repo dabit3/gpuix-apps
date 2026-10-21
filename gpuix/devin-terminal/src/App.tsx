@@ -33,7 +33,7 @@ import {
   type Step,
   type TranscriptEvent,
 } from './data'
-import { filterSessions, formatDuration, reducer, type PanelTab, type State } from './state'
+import { byRecent, filterSessions, formatDuration, reducer, type PanelTab, type State } from './state'
 import { Icon, type IconName } from './icons'
 import { C, setTheme, type ThemeName } from './theme'
 import type { DevinApi } from './api'
@@ -48,6 +48,7 @@ const SIDEBAR_COMPACT = 232
 const PANEL_WIDTH = 400
 const TRAFFIC_LIGHT_HEIGHT = 40
 const NO_REPO = 'No repository'
+const MAX_PAGES = 20
 const CLEAR = '#00000000'
 const PLACEHOLDER = 'Ask Devin to build features, fix bugs, or work on your code'
 
@@ -147,7 +148,7 @@ function buildTree(visible: Session[], expanded: Record<string, boolean>, search
   const out: TreeRow[] = []
   const walk = (s: Session, depth: number) => {
     const children = kids.get(s.id) ?? []
-    const open = expanded[s.id] ?? (depth === 0 && children.some((c) => c.status === 'running' || c.status === 'blocked'))
+    const open = expanded[s.id] ?? false
     out.push({ session: s, depth, hasChildren: children.length > 0, open })
     if (open && depth < 3) for (const c of children) walk(c, depth + 1)
   }
@@ -188,6 +189,7 @@ const SessionRow = memo(function SessionRow({
       }}
     >
       <div
+        testId={`expand-${s.id}`}
         onClick={item.hasChildren ? () => onToggle(s.id, !item.open) : undefined}
         style={{ ...row({ justifyContent: 'center' }), width: 20, height: 34, flexShrink: 0, cursor: item.hasChildren ? 'pointer' : 'default' }}
       >
@@ -257,7 +259,7 @@ function Sidebar({
   onToggleTheme,
   live,
   liveError,
-  hasMore,
+  limit,
   onLoadMore,
   userName,
 }: {
@@ -272,13 +274,24 @@ function Sidebar({
   onToggleTheme: () => void
   live: boolean
   liveError: string | null
-  hasMore: boolean
+  limit: number
   onLoadMore: () => void
   userName: string
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const searching = state.search.trim().length > 0
-  const rows = useMemo(() => buildTree(visible, expanded, searching), [visible, expanded, searching])
+  const allRows = useMemo(() => buildTree(visible, expanded, searching), [visible, expanded, searching])
+  const rows = useMemo(() => {
+    if (searching || !live) return allRows
+    let top = 0
+    const out: TreeRow[] = []
+    for (const r of allRows) {
+      if (r.depth === 0 && ++top > limit) break
+      out.push(r)
+    }
+    return out
+  }, [allRows, searching, live, limit])
+  const hasMore = live && !searching && allRows.filter((r) => r.depth === 0).length > limit
   const onToggle = useCallback((id: string, open: boolean) => setExpanded((e) => ({ ...e, [id]: open })), [])
   const running = state.sessions.filter((s) => s.status === 'running').length
   const macWindow = process.platform === 'darwin' && !isTerminal()
@@ -1072,7 +1085,6 @@ export function DevinApp({
   const [kind, setKind] = useState<'agent' | 'ask'>('agent')
   const [liveError, setLiveError] = useState<string | null>(null)
   const [pageSize, setPageSize] = useState(40)
-  const [hasMore, setHasMore] = useState(false)
   const { renderer } = useGpuix()
   const searchRef = useRef<PublicInstance | null>(null)
   const composerRef = useRef<PublicInstance | null>(null)
@@ -1112,34 +1124,52 @@ export function DevinApp({
     }
   }, [live])
 
-  // Live: the session list, refreshed in the background.
+  // Live: page through the account's sessions once (the API lists by creation time, the sidebar sorts by activity),
+  // then keep the newest page fresh in the background.
   const pendingQuery = useRef(sessionQuery)
   useEffect(() => {
     if (!client) return
     let alive = true
-    const load = async () => {
+    const applyQuery = (all: Session[]) => {
+      if (!pendingQuery.current) return
+      const match = filterSessions(byRecent(all), pendingQuery.current)[0]
+      if (match) {
+        pendingQuery.current = undefined
+        dispatch({ type: 'select', id: match.id })
+      }
+    }
+    const loadAll = async () => {
+      const all: Session[] = []
+      let cursor: string | undefined
       try {
-        const page = await client.listSessions(pageSize)
-        if (!alive) return
-        dispatch({ type: 'load', sessions: page.items.map((s) => sessionFromApi(s)) })
-        setHasMore(page.hasMore)
-        setLiveError(null)
-        if (pendingQuery.current) {
-          const match = filterSessions(page.items.map((s) => sessionFromApi(s)), pendingQuery.current)[0]
-          pendingQuery.current = undefined
-          if (match) dispatch({ type: 'select', id: match.id })
+        for (let page = 0; page < MAX_PAGES && alive; page++) {
+          const res = await client.listSessions(100, cursor)
+          all.push(...res.items.map((s) => sessionFromApi(s)))
+          dispatch({ type: page === 0 ? 'load' : 'merge', sessions: page === 0 ? [...all] : res.items.map((s) => sessionFromApi(s)) })
+          setLiveError(null)
+          applyQuery(all)
+          if (!res.hasMore || !res.cursor) break
+          cursor = res.cursor
         }
       } catch (error) {
         if (alive) setLiveError((error as Error).message)
       }
     }
-    void load()
-    const id = setInterval(load, Math.max(pollMs * 3, 3000))
+    const refresh = async () => {
+      try {
+        const res = await client.listSessions(100)
+        if (alive) dispatch({ type: 'merge', sessions: res.items.map((s) => sessionFromApi(s)) })
+      } catch (error) {
+        if (alive) setLiveError((error as Error).message)
+      }
+    }
+    void loadAll()
+    const id = setInterval(refresh, Math.max(pollMs * 3, 3000))
     return () => {
       alive = false
       clearInterval(id)
     }
-  }, [client, pageSize, pollMs])
+  }, [client, pollMs])
 
   // Live: the open session's messages and status, polled while it is selected.
   useEffect(() => {
@@ -1363,7 +1393,7 @@ export function DevinApp({
           onToggleTheme={toggleTheme}
           live={live}
           liveError={liveError}
-          hasMore={hasMore}
+          limit={pageSize}
           onLoadMore={() => setPageSize((n) => n + 40)}
           userName={userName}
         />

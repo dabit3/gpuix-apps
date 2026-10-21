@@ -4,7 +4,7 @@ The Devin web app (app.devin.ai), rebuilt in React and painted by [GPUIX](https:
 
 ![devin-tui in Ghostty: a live session on the left, a second instance in light mode on the right](media/screenshot.png)
 
-Demo video: [`media/demo.mp4`](media/demo.mp4), real time and real input, no overlays. Ghostty (`theme = GitHub Dark High Contrast`) opens on the prompt, `devin-tui` loads the account's real sessions (parents with nested child sessions, waiting/working dots, PR counts), a live session's transcript and PR tabs are browsed, ⌘K search filters the list, a new prompt starts a real Devin session whose reply streams in, Cmd-D splits the pane and `devin-tui -t light -s canvas` opens a second instance in light mode, the divider is dragged so both reflow, the split is zoomed, and Ctrl-C returns each pane to its prompt.
+Demo video: [`media/demo.mp4`](media/demo.mp4), real time and real input, no overlays. Ghostty (`theme = GitHub Dark High Contrast`) opens on the prompt, `devin-tui` loads the account's real sessions sorted by activity (child sessions stay collapsed under their parents), ⌘K search opens the real `TryDevin.ai` session (transcript, PR tabs) and then `Build iPhone Duo Apps`, a new prompt starts a real Devin session whose reply streams in, Cmd-D splits the pane and `devin-tui -t light -s duo` opens a second instance in light mode, the divider is dragged so both reflow, the split is zoomed, and Ctrl-C returns each pane to its prompt.
 
 ## Run
 
@@ -44,13 +44,13 @@ Don't pipe anything into `devin-tui`: GPUIX 0.11.0 treats a stdin pipe as the au
 
 | UI | Endpoint |
 |---|---|
-| Sidebar (polled every 9 s, "Load more…" pages by 40) | `GET /v3/organizations/{org}/sessions?first=N` |
+| Sidebar: every page once at launch (cursor pagination), then the newest page every 9 s; sorted by `updated_at`, "Load more…" shows 40 more | `GET /v3/organizations/{org}/sessions?first=100&after=…` |
 | Open session: status, ACUs, PRs (polled every 3 s) | `GET /v3/organizations/{org}/sessions/{id}` |
 | Transcript (polled every 3 s, cursor pagination) | `GET /v3/organizations/{org}/sessions/{id}/messages` |
 | Composer on the home view | `POST /v3/organizations/{org}/sessions` (`prompt`, `devin_mode`, `repos`, tag `devin-tui`) |
 | Composer inside a session | `POST /v3/organizations/{org}/sessions/{id}/messages` |
 
-- Sessions nest under their `parent_session_id`, like the web app. A parent with a working or waiting child opens automatically.
+- Sessions nest under their `parent_session_id`, like the web app, collapsed until you click the chevron. The API lists by creation time, so the client sorts by last activity.
 - `status` + `status_detail` map to the dots and the footer line: working (blue, pulsing), waiting for user / approval (orange, "Action required"), finished, suspended ("Devin went to sleep"), error.
 - The gap between messages becomes a "Worked for 46s" row, and a running session ends with a live "Working for …" timer. New Devin messages type in as they arrive.
 - The web app's inline markup is cleaned up: `<ref_file>` / `<ref_snippet>` become `file.ts:3-9`, `ATTACHMENT:{...}` payloads become links.

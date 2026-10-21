@@ -133,8 +133,12 @@ describeNative('devin-terminal', () => {
     expect(await app.getByTestId('home-title').textContent()).toBe('Devin')
     await waitForText(app, 'session-count', '2 sessions · 1 running')
     expect(await app.getByTestId('data-source').textContent()).toBe('Live · api.devin.ai')
-    // The waiting child is nested under its parent and the parent opens automatically.
+    // Children start collapsed under their parent; the chevron reveals the waiting child.
+    expect(renderer.getAllText().join(' ')).not.toContain('Write the regression test')
+    await app.getByTestId('expand-aaa').click()
     expect(renderer.getAllText().join(' ')).toContain('Waiting for you')
+    await app.getByTestId('expand-aaa').click()
+    expect(renderer.getAllText().join(' ')).not.toContain('Write the regression test')
 
     await app.getByTestId('session-aaa').click()
     await waitForText(app, 'session-title', 'Fix login redirect loop')

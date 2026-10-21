@@ -24,6 +24,7 @@ export type Action =
   | { type: 'tick'; seconds: number }
   | { type: 'run'; sessionId: string; action: RunAction }
   | { type: 'load'; sessions: Session[] }
+  | { type: 'merge'; sessions: Session[] }
   | { type: 'upsert'; session: Session }
   | { type: 'events'; id: string; events: TranscriptEvent[] }
   | { type: 'rekey'; from: string; session: Session }
@@ -73,6 +74,13 @@ function applyRun(s: Session, a: RunAction): Session {
           : e,
       )
   }
+}
+
+/** Live sessions sorted by last activity, like the web app (the API lists by creation time). Local/demo sessions keep their order. */
+export function byRecent(sessions: Session[]): Session[] {
+  const pending = sessions.filter((s) => !s.live || s.id.startsWith('pending-'))
+  const live = sessions.filter((s) => s.live && !s.id.startsWith('pending-')).sort((a, b) => b.live!.updatedAt - a.live!.updatedAt)
+  return [...pending, ...live]
 }
 
 /** Merges a fresh API snapshot into what we already have, keeping the loaded transcript and optimistic title/repo. */
@@ -147,7 +155,14 @@ export function reducer(state: State, action: Action): State {
       const ids = new Set(action.sessions.map((s) => s.id))
       const pending = state.sessions.filter((s) => s.id.startsWith('pending-'))
       const kept = state.sessions.filter((s) => s.id === state.selectedId && !ids.has(s.id) && !s.id.startsWith('pending-'))
-      return { ...state, sessions: [...pending, ...action.sessions.map((s) => mergeLive(byId.get(s.id), s)), ...kept] }
+      return { ...state, sessions: [...pending, ...byRecent(action.sessions.map((s) => mergeLive(byId.get(s.id), s))), ...kept] }
+    }
+    case 'merge': {
+      const incoming = new Map(action.sessions.map((s) => [s.id, s]))
+      const known = new Set(state.sessions.map((s) => s.id))
+      const merged = state.sessions.map((s) => (incoming.has(s.id) ? mergeLive(s, incoming.get(s.id)!) : s))
+      const added = action.sessions.filter((s) => !known.has(s.id))
+      return { ...state, sessions: byRecent([...added, ...merged]) }
     }
     case 'upsert': {
       const exists = state.sessions.some((s) => s.id === action.session.id)

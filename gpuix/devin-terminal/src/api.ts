@@ -30,7 +30,7 @@ type Page<T> = { items: T[]; end_cursor?: string | null; has_next_page?: boolean
 export type DevinConfig = { apiKey: string; orgId: string; baseUrl?: string; fetch?: typeof fetch }
 
 export interface DevinApi {
-  listSessions(first?: number): Promise<{ items: ApiSession[]; hasMore: boolean }>
+  listSessions(first?: number, after?: string): Promise<{ items: ApiSession[]; hasMore: boolean; cursor?: string | null }>
   getSession(id: string): Promise<ApiSession>
   listMessages(id: string): Promise<ApiMessage[]>
   createSession(prompt: string, opts?: { mode?: string; repos?: string[]; tags?: string[] }): Promise<ApiSession>
@@ -58,9 +58,10 @@ export class DevinClient implements DevinApi {
     return (await res.json()) as T
   }
 
-  async listSessions(first = 50): Promise<{ items: ApiSession[]; hasMore: boolean }> {
-    const page = await this.req<Page<ApiSession>>(`/sessions?first=${first}`)
-    return { items: page.items, hasMore: page.has_next_page ?? false }
+  async listSessions(first = 50, after?: string): Promise<{ items: ApiSession[]; hasMore: boolean; cursor?: string | null }> {
+    const q = after ? `&after=${encodeURIComponent(after)}` : ''
+    const page = await this.req<Page<ApiSession>>(`/sessions?first=${first}${q}`)
+    return { items: page.items, hasMore: page.has_next_page ?? false, cursor: page.end_cursor }
   }
 
   getSession(id: string): Promise<ApiSession> {
