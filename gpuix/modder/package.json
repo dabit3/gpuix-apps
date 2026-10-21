@@ -1,0 +1,26 @@
+{
+  "name": "modder",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "modder": "./src/cli.ts",
+    "grovekeep": "./game/cli.ts"
+  },
+  "scripts": {
+    "start": "bun src/cli.ts ./game",
+    "game": "bun game/cli.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.11.0",
+    "@gpuix/react": "0.11.0",
+    "react": "19"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "@types/react": "^19.0.0",
+    "typescript": "^5.9.0"
+  }
+}

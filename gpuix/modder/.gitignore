@@ -1,0 +1,5 @@
+node_modules
+.modder
+workspace
+*.log
+screens

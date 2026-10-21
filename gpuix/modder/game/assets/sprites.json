@@ -1,0 +1,83 @@
+{
+  "resolution": 12,
+  "palette": {
+    "outline": "#141821",
+    "skin": "#f2c79b",
+    "skinShade": "#c98f63",
+    "hair": "#6b3f2a",
+    "tunic": "#3f8fd8",
+    "tunicShade": "#2a5f9e",
+    "belt": "#7a4b2a",
+    "boot": "#3a2a22",
+    "steel": "#d9dee3",
+    "steelShade": "#9ea7b3",
+    "wood": "#a8713f",
+    "slime": "#56c25a",
+    "slimeShade": "#2f8a3e",
+    "slimeLight": "#b6f2a0",
+    "eye": "#141821",
+    "grass": "#2f6b3a",
+    "grassLight": "#3d8547",
+    "grassDark": "#245530",
+    "leaf": "#1d4a2a",
+    "leafLight": "#2e6b3a",
+    "bark": "#5a3a24",
+    "petal": "#f0b72f",
+    "petal2": "#ff9492",
+    "path": "#8b7a5a",
+    "pathDark": "#6e5f45"
+  },
+  "sprites": {
+    "hero": {
+      "keys": { "k": "outline", "s": "skin", "z": "skinShade", "h": "hair", "t": "tunic", "u": "tunicShade", "b": "belt", "o": "boot" },
+      "rows": [
+        "....kkkk....",
+        "...khhhhk...",
+        "..khhhhhhk..",
+        "..khssssk...",
+        "..kssksskk..",
+        "..kzssssk...",
+        ".kkttttttk..",
+        "ksktttttuks.",
+        ".kkbbbbbbk..",
+        "..ktuuutuk..",
+        "..kok..kok..",
+        "..kk....kk.."
+      ]
+    },
+    "slime": {
+      "keys": { "k": "outline", "b": "slime", "d": "slimeShade", "w": "slimeLight", "e": "eye" },
+      "rows": [
+        "....kkkk....",
+        "..kkbbbbkk..",
+        ".kbbwwbbbbk.",
+        ".kbwbbbbbbk.",
+        "kbbbbbbbbbbk",
+        "kbbekbbekbbk",
+        "kbbekbbekbbk",
+        "kbbbbbbbbbbk",
+        "kddbbbbbbddk",
+        ".kddddddddk.",
+        "..kkkkkkkk..",
+        "............"
+      ]
+    },
+    "twig-sword": {
+      "keys": { "k": "outline", "s": "steel", "z": "steelShade", "w": "wood" },
+      "rows": [
+        "..........k.",
+        ".........ksk",
+        "........kszk",
+        ".......kszk.",
+        "......kszk..",
+        ".....kszk...",
+        "..k.kszk....",
+        "..kkszk.....",
+        "...kwk......",
+        "..kwkk......",
+        ".kwk........",
+        ".kk........."
+      ]
+    }
+  }
+}

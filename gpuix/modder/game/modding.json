@@ -1,0 +1,12 @@
+{
+  "engine": "grovekeep",
+  "engineVersion": "0.3.0",
+  "runtime": "bun",
+  "language": "typescript",
+  "modApi": 1,
+  "modsDir": "mods",
+  "hooksFrom": ["engine.ts", "modapi.ts"],
+  "singlePlayer": true,
+  "network": false,
+  "license": "MIT (game and mod API). Mods load from mods/*/manifest.json or a --profile folder."
+}
