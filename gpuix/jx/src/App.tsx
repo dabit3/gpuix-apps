@@ -492,14 +492,14 @@ export function App({ docs: initialDocs, watch = false, initialFilter = '', init
         {(diffMode
           ? [['↑↓', 'scroll'], ['n N', 'next change'], ['q', 'quit']]
           : [['↑↓', 'move'], ['←→', 'fold'], ['f', 'filter'], ['/', 'search'], ['y', 'copy path'], ['Y', 'copy value'], ['e', 'expand'], ['s', 'schema'], ['q', 'quit']]
-        ).filter((_, i) => W >= 760 || i < 5).map(([k, label]) => (
+        ).filter(fitsHints(W)).map(([k, label]) => (
           <div key={k} style={{ display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center' }}>
             <text style={{ color: T.text, fontWeight: 500 }}>{k}</text>
             <text style={{ color: T.dim }}>{label}</text>
           </div>
         ))}
         <div style={{ flexGrow: 1 }} />
-        <text testId="position" style={{ color: T.dim, whiteSpace: 'nowrap' }}>{diffMode ? `${diffRows.length.toLocaleString()} rows` : `${Math.min(cursor + 1, rows.length).toLocaleString()}/${rows.length.toLocaleString()}`}</text>
+        <text testId="position" style={{ color: T.dim, whiteSpace: 'nowrap', flexShrink: 0 }}>{diffMode ? `${diffRows.length.toLocaleString()} rows` : `${Math.min(cursor + 1, rows.length).toLocaleString()}/${rows.length.toLocaleString()}`}</text>
       </div>
 
       {toast ? (
@@ -509,6 +509,15 @@ export function App({ docs: initialDocs, watch = false, initialFilter = '', init
       ) : null}
     </div>
   )
+}
+
+/** Keep footer hints that fit beside the position counter (monospace, ~7.8 px per char at 13 px). */
+function fitsHints(width: number) {
+  let used = 28 + 150
+  return ([k, label]: string[]) => {
+    used += (k!.length + label!.length + 1) * 7.8 + 22
+    return used <= width
+  }
 }
 
 function Crumbs({ path, onPick }: { path: Seg[]; onPick: (p: Seg[]) => void }) {

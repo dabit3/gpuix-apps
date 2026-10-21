@@ -169,3 +169,16 @@ describe('jx app', () => {
     expect(ui.text()).toContain('forks')
   })
 })
+
+describe('narrow panes', () => {
+  it('drops footer hints so the position counter stays visible in a half-width split', () => {
+    const t = createTestRoot({ width: 790, height: 600 })
+    t.render(<App docs={[{ name: 'events.json', bytes: 1, root: events }]} />)
+    t.renderer.flush()
+    const pos = t.renderer.findByTestId('position')!
+    const b = t.renderer.getElementBounds(pos.id)!
+    expect(b.x + b.width).toBeLessThanOrEqual(790)
+    expect(b.x).toBeGreaterThan(300)
+    expect(t.renderer.findByTestId('schema')).toBeUndefined()
+  })
+})
