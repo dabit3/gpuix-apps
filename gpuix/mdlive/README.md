@@ -6,6 +6,8 @@ It is a [GPUIX](https://github.com/remorses/gpuix) app (React for Zed's GPUI, Me
 
 ![mdlive in a Ghostty split next to nvim](media/screenshot.png)
 
+Demo (real time, real input in Ghostty): [`media/demo.mp4`](media/demo.mp4)
+
 ## Features
 
 - **Live reload**: watches the file's directory, so both in-place writes and editor atomic-rename saves (nvim, VS Code) are picked up. A status dot and "Updated just now" confirm each save.
