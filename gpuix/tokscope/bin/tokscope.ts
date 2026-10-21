@@ -71,6 +71,11 @@ if (!process.stdin.isTTY) {
   process.exit(1)
 }
 
+const log = console.log
+console.log = (...a: unknown[]) => {
+  if (typeof a[0] === 'string' && a[0].startsWith('[gpuix]')) return
+  log(...a)
+}
 const React = await import('react')
 const { render } = await import('@gpuix/react')
 const { App } = await import('../src/app')

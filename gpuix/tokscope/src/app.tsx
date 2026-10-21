@@ -49,6 +49,13 @@ function normKey(e: { key?: string; keyChar?: string }): string {
   return (e.key ?? '').toLowerCase()
 }
 
+function shortPath(p: string): string {
+  const cwd = process.cwd()
+  if (p === cwd) return '.'
+  if (p.startsWith(cwd + '/')) return p.slice(cwd.length + 1) + '/'
+  return p.replace(process.env.HOME ?? '~', '~')
+}
+
 export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps) {
   const win = useWindowSize()
   const width = win.width || 1200
@@ -174,7 +181,7 @@ export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps
         </div>
         {!compact && (
           <Txt c={C.dim} s={12} mono nowrap grow>
-            {paths.map((p) => p.replace(process.env.HOME ?? '~', '~')).join('  ')}
+            {paths.map(shortPath).join('  ')}
           </Txt>
         )}
         {compact && <div style={{ flexGrow: 1 }} />}
@@ -219,7 +226,7 @@ export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps
       </div>
 
       {/* KPIs */}
-      <Kpis t={t} tasks={tasks} after={after} activeFixes={activeFixes.length} reported={current?.reportedCostUSD} compact={compact} />
+      <Kpis t={t} tasks={tasks} after={after} activeFixes={activeFixes.length} reported={current?.reportedCostUSD} compact={compact} narrow={narrow} />
 
       <div style={{ ...row, alignItems: 'stretch', gap: 14, flexGrow: 1, minHeight: 0 }}>
         {!narrow && <Sidebar sessions={sessions} sel={sel} onSel={(id) => (setSel(id), setFollow(false), setHoverReq(null))} pulse={pulse} now={now} />}
@@ -228,7 +235,7 @@ export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps
           {sessions.length === 0 ? (
             <Empty paths={paths} />
           ) : tab === 'Overview' ? (
-            <Overview scope={scope} t={t} hoverReq={hoverReq} setHoverReq={setHoverReq} hoverSeg={hoverSeg} setHoverSeg={setHoverSeg} compact={compact} chartH={Math.max(90, Math.min(220, height - 520))} />
+            <Overview scope={scope} t={t} hoverReq={hoverReq} setHoverReq={setHoverReq} hoverSeg={hoverSeg} setHoverSeg={setHoverSeg} compact={compact} chartH={Math.max(70, Math.min(220, height - (narrow ? 720 : 660)))} />
           ) : tab === 'Offenders' ? (
             <Offenders offenders={offenders} repeats={repeats} open={open} setOpen={setOpen} total={t.cost} />
           ) : tab === 'Fixes' ? (
@@ -262,8 +269,8 @@ export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps
   )
 }
 
-function Kpis({ t, tasks, after, activeFixes, reported, compact }: { t: ReturnType<typeof totals>; tasks: number; after: number; activeFixes: number; reported?: number; compact: boolean }) {
-  const items: Array<[string, string, string, string?]> = [
+function Kpis({ t, tasks, after, activeFixes, reported, compact, narrow }: { t: ReturnType<typeof totals>; tasks: number; after: number; activeFixes: number; reported?: number; compact: boolean; narrow?: boolean }) {
+  const all: Array<[string, string, string, string?]> = [
     ['Cost', fmt$(t.cost), reported != null ? `harness reported ${fmt$(reported)}` : `${t.requests} requests`],
     ['Per task', fmt$(t.cost / Math.max(1, tasks)), `${tasks} task${tasks === 1 ? '' : 's'} · ${(t.requests / Math.max(1, tasks)).toFixed(1)} turns`],
     ['Cache hit', `${(t.cacheHit * 100).toFixed(1)}%`, `${t.cacheBreaks} break${t.cacheBreaks === 1 ? '' : 's'}`, t.cacheHit > 0.8 ? C.green : t.cacheHit > 0.5 ? C.yellow : C.red],
@@ -271,6 +278,7 @@ function Kpis({ t, tasks, after, activeFixes, reported, compact }: { t: ReturnTy
     ['Output', fmtK(t.usage.output), `${fmt$(t.segCost.output)} · ${((t.segCost.output / (t.cost || 1)) * 100).toFixed(0)}% of cost`],
     ['With fixes', activeFixes ? fmt$(after / Math.max(1, tasks)) : '—', activeFixes ? `per task · −${(((t.cost - after) / (t.cost || 1)) * 100).toFixed(0)}% with ${activeFixes}` : 'toggle fixes in view 3', activeFixes ? C.green : C.dim],
   ]
+  const items = narrow ? all.filter(([label]) => label !== 'Input' && label !== 'Output') : all
   return (
     <div style={{ ...row, flexWrap: 'wrap', gap: 10, flexShrink: 0, alignItems: 'stretch' }}>
       {items.map(([label, value, sub, color]) => (
