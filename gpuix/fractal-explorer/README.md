@@ -49,7 +49,7 @@ bun run typecheck  # tsc --noEmit
 
 ## Tests
 
-`tests/explorer.test.tsx` (15 tests, ~6 s) mounts the real `FractalApp` in GPUIX's native test renderer and drives it
+`tests/explorer.test.tsx` (16 tests, ~6 s) mounts the real `FractalApp` in GPUIX's native test renderer and drives it
 through automation locators:
 
 - bookmark click → camera animates and lands exactly on the bookmark; readouts and iteration count update
@@ -106,6 +106,9 @@ Bugs the testing-agent run found, now fixed with regression tests (both tests fa
 - **Up arrow reopened the palette.** A closed `Select` keeps keyboard focus, and arrow keys open it again (while
   the root shortcut still panned). `onOpenChange(false)` now hands focus back to the root with
   `renderer.focusElement(rootRef.current.id)`.
+
+- **R zoomed the wrong way when already centred.** `zoomPath`'s pure-zoom branch read `S` through its closure
+  after replacing it with `|S|`, so any same-centre zoom *in* (e.g. R on a resized window) zoomed out instead.
 
 Another app bug found and fixed along the way: the van Wijk path used `log(sqrt(b² + 1) − b)`, which cancels to `log(0)` when
 flying out from 10¹² zoom and turned the camera into NaN. It now uses the stable `−asinh(b)`, and `Explorer` falls

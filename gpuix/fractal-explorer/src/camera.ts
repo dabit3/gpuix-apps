@@ -58,9 +58,9 @@ export function zoomPath(from: Camera, to: Camera, speed = 1): CameraPath {
   let S: number
   let fn: (t: number) => Camera
   if (d2 < 1e-30 || d2 / (w0 * w0) < 1e-12) {
-    S = Math.log(w1 / w0) / RHO
-    fn = (t) => ({ re: ux0 + t * dx, im: uy0 + t * dy, w: w0 * Math.exp(RHO * t * S) })
-    S = Math.abs(S)
+    const k = Math.log(w1 / w0)
+    S = Math.abs(k) / RHO
+    fn = (t) => (t >= 1 ? { ...to } : { re: ux0 + t * dx, im: uy0 + t * dy, w: w0 * Math.exp(t * k) })
   } else {
     const d1 = Math.sqrt(d2)
     const b0 = (w1 * w1 - w0 * w0 + RHO ** 4 * d2) / (2 * w0 * RHO * RHO * d1)

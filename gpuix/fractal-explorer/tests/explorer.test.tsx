@@ -55,6 +55,16 @@ describe('fractal math', () => {
     }
   })
 
+  it('pure zooms at a fixed centre head toward the target width', () => {
+    const home = { re: -0.65, im: 0, w: 3.6 }
+    for (const from of [{ ...home, w: 4.1 }, { ...home, w: 1.2 }]) {
+      const path = zoomPath(from, home)
+      const mid = path(0.5).w
+      expect(Math.min(from.w, home.w) < mid && mid < Math.max(from.w, home.w)).toBe(true)
+      expect(path(1)).toEqual(home)
+    }
+  })
+
   it('maps the iteration slider on a log scale', () => {
     expect(tToIter(0)).toBe(50)
     expect(tToIter(1)).toBe(10000)
