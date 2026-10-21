@@ -94,4 +94,6 @@ const { ModderApp } = await import('./app')
 const { loadGhosttyTheme } = await import('./theme')
 const { createElement } = await import('react')
 const targets = expandTargets(dirs)
+// @gpuix/react console.logs mount progress; terminal mode replays it under the prompt on exit.
+{ const log = console.log; console.log = (...a: unknown[]) => { if (typeof a[0] === 'string' && a[0].startsWith('[gpuix]')) return; log(...a) } }
 render(createElement(ModderApp, { targets, theme: loadGhosttyTheme(), workspace: ws ? () => ws : undefined, yes: !!values.yes }), { terminal: !values.window, title: 'modder', width: 1440, height: 900 } as never)
