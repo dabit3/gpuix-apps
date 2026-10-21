@@ -1,5 +1,4 @@
-#!/usr/bin/env bun
-import './env.ts'
+#!/usr/bin/env -S RUST_LOG=warn bun
 import { render } from '@gpuix/react'
 import { existsSync } from 'node:fs'
 import { FlameApp, type Order, type View } from './app.tsx'
