@@ -130,7 +130,7 @@ test('wide/narrow toggle changes the reading column and the TOC hides in a narro
   const { app } = await setup()
   const docW = async () => (await app.getByTestId('doc').bounds())!.width
   const narrow = await docW()
-  await app.getByTestId('width-toggle-wide').click()
+  await app.getByTestId('width-toggle').click()
   await until(async () => (await docW()) > narrow + 100)
   // GPUIX 0.11.0 terminal mode delivers printable keys as key "space" + keyChar
   keyBus.handler?.({ key: 'space', keyChar: 'w', modifiers: { shift: false, ctrl: false, alt: false, cmd: false } } as never)

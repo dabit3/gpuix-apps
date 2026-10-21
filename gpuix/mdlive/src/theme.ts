@@ -85,7 +85,7 @@ export function uiTheme(p: Palette) {
     bg: p.bg,
     surface: mix(p.bg, p.fg, 0.04),
     raised: mix(p.bg, p.fg, 0.08),
-    hairline: mix(p.bg, p.fg, 0.12),
+    hairline: mix(p.bg, p.fg, 0.08),
     text: p.fg,
     text2: mix(p.fg, grey, 0.55),
     text3: p.ansi[0] ?? '#7a828e',

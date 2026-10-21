@@ -37,9 +37,9 @@ export function keyName(e: { key?: string; keyChar?: string | null }): string {
 export const keyBus: { handler: ((e: KeyEvent) => void) | null } = { handler: null }
 
 const NARROW_COL = 760
-const TOC_W = 236
+const TOC_W = 224
 const TOC_MIN_WINDOW = 860
-const BAR_H = 40
+const BAR_H = 46
 
 const tildify = (p: string) => (p.startsWith(homedir()) ? `~${p.slice(homedir().length)}` : p)
 
@@ -115,6 +115,7 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
   const [query, setQuery] = useState('')
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const [flash, setFlash] = useState<{ key: string; n: number } | null>(null)
+  const [toast, setToast] = useState<{ msg: string; n: number } | null>(null)
   const [winW, setWinW] = useState(1200)
   const [winH, setWinH] = useState(800)
   const [colW, setColW] = useState(700)
@@ -296,6 +297,7 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
           break
         case 'f':
           setFollow((v) => !v)
+          setToast({ msg: follow ? 'Not following edits' : 'Following edits', n: Date.now() })
           break
         case 'n':
           if (findOpen && query) findNext(!!m.shift)
@@ -340,7 +342,7 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
           process.exit(0)
       }
     },
-    [activeKey, closeFind, findNext, findOpen, openFind, query, renderer, scrollBy, scrollToBlock, toc, typing, updateActive],
+    [activeKey, closeFind, findNext, findOpen, follow, openFind, query, renderer, scrollBy, scrollToBlock, toc, typing, updateActive],
   )
   useEffect(() => {
     keyBus.handler = onKey
@@ -369,10 +371,11 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
         flexDirection: 'column',
         width: '100%',
         height: '100%',
+        position: 'relative',
         backgroundColor: t.bg,
       }}
     >
-      {/* top bar */}
+      {/* header */}
       <div
         style={{
           display: 'flex',
@@ -380,45 +383,48 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
           alignItems: 'center',
           height: BAR_H,
           flexShrink: 0,
-          paddingLeft: macWindow ? 86 : 16,
+          paddingLeft: macWindow ? 86 : 22,
           paddingRight: 12,
-          gap: 10,
+          gap: 8,
           borderBottomWidth: 1,
           borderColor: t.hairline,
           userSelect: 'none',
         }}
       >
-        <LiveDot t={t} pulse={reloads} />
         <text testId="file-name" style={{ color: t.text, fontSize: 13.5, fontWeight: 600 }}>
           {basename(path)}
         </text>
         {!compact && (
-          <text style={{ color: t.text3, fontSize: 12.5, flexShrink: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <text style={{ color: t.text3, fontSize: 13, flexShrink: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {tildify(dirname(path))}
           </text>
         )}
         <div style={{ flexGrow: 1 }} />
-        <text testId="word-count" style={{ color: t.text2, fontSize: 12.5 }}>
+        {!compact && (
+          <>
+            <motion.div key={reloads} initial={reloads ? { opacity: 0.2 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.5, ease: 'easeOut' }} style={{ display: 'flex' }}>
+              <text testId="status-updated" style={{ color: now - updatedAt < 3000 ? t.text2 : t.text3, fontSize: 12.5 }}>
+                {snap ? `Updated ${ago(now - updatedAt)}` : 'Not found'}
+              </text>
+            </motion.div>
+            <text style={{ color: t.text3, fontSize: 12.5 }}>·</text>
+          </>
+        )}
+        <text testId="word-count" style={{ color: t.text3, fontSize: 12.5 }}>
           {`${st.words.toLocaleString('en-US')} words`}
         </text>
         <text style={{ color: t.text3, fontSize: 12.5 }}>·</text>
-        <text testId="read-time" style={{ color: t.text2, fontSize: 12.5 }}>
+        <text testId="read-time" style={{ color: t.text3, fontSize: 12.5 }}>
           {`${st.minutes} min read`}
         </text>
+        <div style={{ width: 8 }} />
         {!compact && (
           <>
-            <div style={{ width: 6 }} />
-            <Segmented
-              t={t}
-              testId="width-toggle"
-              options={['Narrow', 'Wide']}
-              value={wide ? 'Wide' : 'Narrow'}
-              onChange={(v) => setWide(v === 'Wide')}
-            />
-            <IconButton t={t} testId="toc-toggle" label="Contents" active={showToc} onClick={() => setTocOpen((v) => !v)} glyph="≡" />
+            <IconButton t={t} testId="width-toggle" icon={WIDE_SVG} active={wide} onClick={() => setWide((v) => !v)} />
+            <IconButton t={t} testId="toc-toggle" icon={SIDEBAR_SVG} active={showToc} onClick={() => setTocOpen((v) => !v)} />
           </>
         )}
-        <IconButton t={t} testId="find-toggle" label="Find" active={findOpen} onClick={() => (findOpen ? closeFind() : openFind())} glyph="⌕" />
+        <IconButton t={t} testId="find-toggle" icon={SEARCH_SVG} active={findOpen} onClick={() => (findOpen ? closeFind() : openFind())} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'row', flexGrow: 1, minHeight: 0 }}>
@@ -435,18 +441,16 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
               flexDirection: 'column',
               width: TOC_W,
               flexShrink: 0,
-              paddingTop: 18,
+              paddingTop: 30,
               paddingLeft: 14,
               paddingRight: 10,
-              gap: 1,
-              borderRightWidth: 1,
-              borderColor: t.hairline,
+              gap: 0,
               userSelect: 'none',
               overflow: 'scroll',
             }}
           >
-            <text style={{ color: t.text3, fontSize: 11, fontWeight: 600, paddingLeft: 10, paddingBottom: 8 }}>
-              CONTENTS
+            <text style={{ color: t.text3, fontSize: 12, fontWeight: 500, paddingLeft: 20, paddingBottom: 10 }}>
+              Contents
             </text>
             {toc.map((h) => (
               <TocRow
@@ -484,7 +488,7 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
                 maxWidth: wide ? 100000 : NARROW_COL + padX * 2,
                 paddingLeft: padX,
                 paddingRight: padX,
-                paddingTop: 28,
+                paddingTop: 40,
                 paddingBottom: Math.max(160, winH - BAR_H * 2 - 120),
               }}
             >
@@ -528,96 +532,32 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
         </div>
       </div>
 
-      {/* status bar */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          height: 28,
-          flexShrink: 0,
-          paddingLeft: 16,
-          paddingRight: 16,
-          gap: 14,
-          borderTopWidth: 1,
-          borderColor: t.hairline,
-          userSelect: 'none',
-        }}
-      >
-        <text testId="status-updated" style={{ color: t.text3, fontSize: 12 }}>
-          {snap ? `Updated ${ago(now - updatedAt)}` : 'Not found'}
-        </text>
-        <text testId="status-follow" style={{ color: follow ? t.green : t.text3, fontSize: 12 }}>
-          {follow ? 'Follow edits' : 'Follow off'}
-        </text>
-        {!compact && (
-          <text style={{ color: t.text3, fontSize: 12 }}>{`${st.headings} sections · ${st.codeBlocks} code ${st.codeBlocks === 1 ? 'block' : 'blocks'}`}</text>
-        )}
-        <div style={{ flexGrow: 1 }} />
-        {winW >= 900 && (
-          <text style={{ color: t.text3, fontSize: 12 }}>
-            {'/ find   w width   t contents   f follow   j k scroll   [ ] sections   ^C quit'}
-          </text>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function LiveDot({ t, pulse }: { t: UiTheme; pulse: number }) {
-  return (
-    <div style={{ display: 'flex', width: 14, height: 14, alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-      <motion.div
-        key={pulse}
-        initial={pulse ? { width: 6, height: 6, opacity: 0.9, borderRadius: 3 } : false}
-        animate={{ width: 14, height: 14, opacity: 0, borderRadius: 7 }}
-        transition={{ duration: 0.9, ease: 'easeOut' }}
-        style={{ position: 'absolute', backgroundColor: t.green, pointerEvents: 'none' }}
-      />
-      <div style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: t.green }} />
-    </div>
-  )
-}
-
-function Segmented({
-  t,
-  options,
-  value,
-  onChange,
-  testId,
-}: {
-  t: UiTheme
-  options: string[]
-  value: string
-  onChange: (v: string) => void
-  testId: string
-}) {
-  return (
-    <div testId={testId} style={{ display: 'flex', flexDirection: 'row', padding: 2, borderRadius: 7, backgroundColor: t.surface, borderWidth: 1, borderColor: t.hairline }}>
-      {options.map((o) => (
-        <div
-          key={o}
-          testId={`${testId}-${o.toLowerCase()}`}
-          onClick={() => onChange(o)}
-          style={{
-            display: 'flex',
-            paddingLeft: 9,
-            paddingRight: 9,
-            height: 22,
-            alignItems: 'center',
-            borderRadius: 5,
-            backgroundColor: o === value ? t.raised : undefined,
-            cursor: 'pointer',
-          }}
-        >
-          <text style={{ color: o === value ? t.text : t.text3, fontSize: 12, fontWeight: o === value ? 600 : 400 }}>{o}</text>
+      {toast && (
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 24, display: 'flex', flexDirection: 'row', justifyContent: 'center', pointerEvents: 'none' }}>
+          <motion.div
+            key={toast.n}
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            transition={{ duration: 0.6, delay: 1.4, ease: 'easeOut' }}
+            style={{ display: 'flex', alignItems: 'center', height: 32, paddingLeft: 16, paddingRight: 16, borderRadius: 16, backgroundColor: t.raised, borderWidth: 1, borderColor: t.hairline }}
+          >
+            <text testId="status-follow" style={{ color: t.text, fontSize: 12.5 }}>
+              {toast.msg}
+            </text>
+          </motion.div>
         </div>
-      ))}
+      )}
     </div>
   )
 }
 
-function IconButton({ t, glyph, label, active, onClick, testId }: { t: UiTheme; glyph: string; label: string; active: boolean; onClick: () => void; testId: string }) {
+const ICON = (body: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="#000" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
+const WIDE_SVG = ICON('<path d="M2.5 8h11M5 5.5 2.5 8 5 10.5M11 5.5 13.5 8 11 10.5"/>')
+const SIDEBAR_SVG = ICON('<rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2"/><path d="M6 2.75v10.5"/>')
+const SEARCH_SVG = ICON('<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/>')
+
+function IconButton({ t, icon, active, onClick, testId }: { t: UiTheme; icon: string; active: boolean; onClick: () => void; testId: string }) {
   const [hover, setHover] = useState(false)
   return (
     <div
@@ -627,19 +567,17 @@ function IconButton({ t, glyph, label, active, onClick, testId }: { t: UiTheme; 
       onMouseLeave={() => setHover(false)}
       style={{
         display: 'flex',
-        flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        height: 26,
-        paddingLeft: 8,
-        paddingRight: 9,
+        justifyContent: 'center',
+        width: 30,
+        height: 28,
         borderRadius: 7,
-        backgroundColor: active ? alpha(t.blue, 0.16) : hover ? t.surface : undefined,
+        backgroundColor: active ? t.raised : hover ? t.surface : undefined,
         cursor: 'pointer',
+        flexShrink: 0,
       }}
     >
-      <text style={{ color: active ? t.blue : t.text2, fontSize: 14, fontWeight: 600 }}>{glyph}</text>
-      <text style={{ color: active ? t.blue : t.text2, fontSize: 12 }}>{label}</text>
+      <svg source={icon} style={{ width: 16, height: 16, color: active ? t.text : hover ? t.text2 : t.text3 }} />
     </div>
   )
 }
@@ -659,18 +597,16 @@ function TocRow({ t, title, slug, level, active, onClick }: { t: UiTheme; title:
         minHeight: 28,
         paddingLeft: 10 + (level - 1) * 12,
         paddingRight: 8,
-        borderRadius: 6,
-        backgroundColor: active ? alpha(t.blue, 0.13) : hover ? t.surface : undefined,
         cursor: 'pointer',
         flexShrink: 0,
       }}
     >
-      <div style={{ width: 2, height: 14, borderRadius: 1, marginRight: 8, backgroundColor: active ? t.blue : '#00000000' }} />
+      <motion.div initial={false} animate={{ opacity: active ? 1 : 0 }} transition={{ duration: 0.18 }} style={{ width: 2, height: 14, borderRadius: 1, marginRight: 8, backgroundColor: t.blue }} />
       <text
         style={{
-          color: active ? t.blue : level === 1 ? t.text : t.text2,
+          color: active || hover ? t.text : t.text3,
           fontSize: 13,
-          fontWeight: active || level === 1 ? 600 : 400,
+          fontWeight: active ? 500 : 400,
           flexShrink: 1,
           minWidth: 0,
           whiteSpace: 'nowrap',
@@ -704,7 +640,7 @@ const BlockView = memo(function BlockView({
   const refCb = useRef(registerRef)
   refCb.current = registerRef
   const ref = useCallback((el: PublicInstance | null) => refCb.current(el), [])
-  const gapTop = b.kind === 'heading' ? (b.level === 1 ? 8 : 22) : 0
+  const gapTop = b.kind === 'heading' ? (b.level === 1 ? 0 : 26) : 0
   return (
     <div
       ref={ref}
@@ -716,11 +652,11 @@ const BlockView = memo(function BlockView({
           key={flashN}
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
-          transition={{ duration: 1.8, delay: 1.4, ease: 'easeOut' }}
-          style={{ position: 'absolute', left: -18, right: -12, top: gapTop - 6, bottom: 8, pointerEvents: 'none' }}
+          transition={{ duration: 1.6, delay: 1.2, ease: 'easeOut' }}
+          style={{ position: 'absolute', left: -16, right: -12, top: gapTop - 6, bottom: 8, pointerEvents: 'none' }}
         >
-          <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 8, backgroundColor: alpha(t.green, 0.12) }} />
-          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, borderRadius: 2, backgroundColor: t.green }} />
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 8, backgroundColor: alpha(t.blue, 0.09) }} />
+          <div style={{ position: 'absolute', left: 0, top: 4, bottom: 4, width: 3, borderRadius: 2, backgroundColor: t.blue }} />
         </motion.div>
       )}
       {b.kind === 'code' ? (
@@ -735,9 +671,6 @@ const BlockView = memo(function BlockView({
         </div>
       ) : (
         <markdown source={b.src} theme={theme} style={{ width: '100%', minWidth: 0 }} />
-      )}
-      {b.kind === 'heading' && b.level! <= 2 && (
-        <div style={{ height: 1, marginTop: 8, backgroundColor: t.hairline }} />
       )}
     </div>
   )
@@ -760,22 +693,22 @@ function TaskRow({ task, t, theme, onToggle }: { task: Task; t: UiTheme; theme: 
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: 17,
-          height: 17,
+          width: 16,
+          height: 16,
           marginTop: 3,
           flexShrink: 0,
           borderRadius: 5,
-          borderWidth: task.checked ? 0 : 1.5,
-          borderColor: hover ? t.green : t.text3,
-          backgroundColor: task.checked ? t.green : hover ? alpha(t.green, 0.12) : undefined,
+          borderWidth: task.checked ? 0 : 1.25,
+          borderColor: hover ? t.text2 : t.text3,
+          backgroundColor: task.checked ? t.text : hover ? t.surface : undefined,
           cursor: 'pointer',
         }}
       >
         {task.checked && (
-          <svg source={CHECK_SVG} style={{ width: 11, height: 11, color: t.bg }} />
+          <svg source={CHECK_SVG} style={{ width: 10, height: 10, color: t.bg }} />
         )}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, flexShrink: 1, minWidth: 0, opacity: task.checked ? 0.6 : 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, flexShrink: 1, minWidth: 0, opacity: task.checked ? 0.45 : 1 }}>
         <markdown source={task.checked ? `~~${task.text}~~` : task.text} theme={theme} style={{ width: '100%', minWidth: 0 }} />
       </div>
     </div>
@@ -783,15 +716,12 @@ function TaskRow({ task, t, theme, onToggle }: { task: Task; t: UiTheme; theme: 
 }
 
 function CodeCard({ b, t, theme }: { b: Block; t: UiTheme; theme: GpuixTheme }) {
-  const lines = b.src.split('\n').length
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, borderRadius: 9, borderWidth: 1, borderColor: t.hairline, backgroundColor: t.surface, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', height: 30, paddingLeft: 14, paddingRight: 12, borderBottomWidth: 1, borderColor: t.hairline, userSelect: 'none' }}>
-        <text style={{ color: t.text2, fontSize: 12, fontWeight: 600, fontFamily: 'Menlo' }}>{b.lang ?? 'text'}</text>
-        <div style={{ flexGrow: 1 }} />
-        <text style={{ color: t.text3, fontSize: 11.5 }}>{`${lines} ${lines === 1 ? 'line' : 'lines'}`}</text>
-      </div>
-      <code code={b.src} language={b.lang} showLineNumbers={lines > 3} theme={theme} style={{ paddingTop: 10, paddingBottom: 10, paddingLeft: 14, paddingRight: 14, minWidth: 0, fontFamily: 'Menlo' }} />
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, borderRadius: 10, backgroundColor: t.surface, overflow: 'hidden', position: 'relative' }}>
+      <code code={b.src} language={b.lang} theme={theme} style={{ paddingTop: 16, paddingBottom: 16, paddingLeft: 18, paddingRight: 18, minWidth: 0, fontFamily: 'Menlo' }} />
+      {b.lang && (
+        <text style={{ position: 'absolute', top: 10, right: 14, color: t.text3, fontSize: 11.5, fontFamily: 'Menlo', userSelect: 'none' }}>{b.lang}</text>
+      )}
     </div>
   )
 }
@@ -809,7 +739,7 @@ function ImageBlock({ b, t, maxW }: { b: Block; t: UiTheme; maxW: number }) {
   const h = Math.round((w / size.width) * size.height)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
-      <img src={b.path!} style={{ width: w, height: h, borderRadius: 9 }} />
+      <img src={b.path!} style={{ width: w, height: h, borderRadius: 10 }} />
       {b.alt && <text style={{ color: t.text3, fontSize: 12.5 }}>{b.alt}</text>}
     </div>
   )
@@ -858,11 +788,11 @@ function FindBar({
         borderWidth: 1,
         borderColor: t.hairline,
         backgroundColor: t.raised,
-        boxShadow: [{ offsetX: 0, offsetY: 8, blurRadius: 24, spreadRadius: 0, color: '#00000088' }],
+        boxShadow: [{ offsetX: 0, offsetY: 10, blurRadius: 30, spreadRadius: 0, color: '#00000070' }],
         userSelect: 'none',
       }}
     >
-      <text style={{ color: t.text3, fontSize: 14 }}>⌕</text>
+      <svg source={SEARCH_SVG} style={{ width: 15, height: 15, color: t.text3 }} />
       <input
         ref={inputRef}
         testId="find-input"

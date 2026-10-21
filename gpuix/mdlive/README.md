@@ -11,13 +11,13 @@ Demo (real time, real input in Ghostty): [`media/demo.mp4`](media/demo.mp4)
 ## Features
 
 - **Live reload**: watches the file's directory, so both in-place writes and editor atomic-rename saves (nvim, VS Code) are picked up. A status dot and "Updated just now" confirm each save.
-- **Follow edits**: on each save mdlive diffs the parsed blocks, scrolls to the first changed block and flashes a green bar next to it. Toggle with `f`.
+- **Follow edits**: on each save mdlive diffs the parsed blocks, scrolls to the first changed block and briefly highlights it. Toggle with `f` (a small toast confirms).
 - **GFM**: headings, emphasis, blockquotes, lists, tables, fenced code with syntax highlighting (`<code>`), local images (`<img>`, path resolved next to the file), task lists.
 - **Task lists you can click**: checkboxes toggle `[ ]` / `[x]` in the source file itself, so nvim sees the change too.
 - **Contents sidebar** with the active section highlighted as you scroll. Click to jump, or `[` / `]` for previous/next section. It hides itself when the pane gets narrow (a split) and comes back when you widen it.
 - **Find in page** (`/`): live match count, `Enter` / `Shift-Enter` to step through matches, `Esc` to close.
 - **Reading modes**: a narrow 760 px column or wide full-pane layout (`w`, or `-w` on the command line).
-- **Word count and reading time** in the header, sections and code-block counts in the footer.
+- **Word count and reading time** in the header, next to when the file was last updated.
 - **Theme from Ghostty**: the background, text and accents come from the active Ghostty theme file (default `GitHub Dark High Contrast`), so the app blends into the terminal instead of sitting in a box.
 
 ## Run it
