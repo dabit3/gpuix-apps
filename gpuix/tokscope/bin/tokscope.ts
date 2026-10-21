@@ -27,7 +27,7 @@ keys
 examples
   tokscope ~/.claude/projects
   tokscope sample/
-  tokscope live/ & bun scripts/replay.ts sample/... live/   # watch a log grow`
+  tokscope sample/ live/        # then, in a split pane: bun replay`
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,

@@ -47,7 +47,7 @@ for (const line of lines) {
     const what = (block?.type === 'tool_use' ? `${block.name} ${JSON.stringify(block.input)}` : String(block?.text ?? block?.thinking ?? '')).replace(/\s+/g, ' ')
     const room = Math.max(8, cols - head.length - 1)
     console.log(`\x1b[1m${String(seen.size).padStart(3)}\x1b[0m  in ${k(inp).padStart(6)}  \x1b[${color}mcache ${String(hit).padStart(3)}%\x1b[0m  out ${k(u.output_tokens).padStart(5)}  ${dim(what.length > room ? what.slice(0, room - 1) + '…' : what)}`)
-    await sleep(900)
+    await sleep(500)
   } else if (d.type === 'user' && Array.isArray(d.message?.content) && d.message.content[0]?.type === 'tool_result') {
     await sleep(250)
   } else await sleep(60)
