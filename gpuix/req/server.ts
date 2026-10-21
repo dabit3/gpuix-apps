@@ -125,4 +125,4 @@ const server = Bun.serve({
 })
 
 console.log(`\n  ${c.bold('orders-api')} ${c.grey('v1.4.2')}  listening on ${c.cyan(`http://localhost:${server.port}`)}`)
-console.log(c.grey(`  routes: /health · /api/products · /api/products/:id · POST /api/orders · /api/reports/daily\n`))
+console.log(c.grey(`  GET /api/products · POST /api/orders · GET /api/reports/daily\n`))

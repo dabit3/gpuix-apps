@@ -266,16 +266,19 @@ export function App({ paths, sender = sendRequest, initial, copy = copyText }: A
       } else if (mod && e.key === 'l') {
         e.preventDefault?.()
         focus(urlRef)
+      } else if (e.modifiers?.ctrl && e.key === 'u' && focused != null && focused === urlRef.current?.id) {
+        e.preventDefault?.()
+        update({ url: '' })
       } else if (e.key === 'escape') {
         if (response.kind === 'loading') cancel()
         else if (query) setQuery('')
       }
     },
-    [renderer, send, quickSave, copyCurl, findInResponse, focus, response.kind, cancel, query],
+    [renderer, send, quickSave, copyCurl, findInResponse, focus, update, response.kind, cancel, query],
   )
   windowKeys.current = onKey
 
-  const showSidebar = width >= 980
+  const showSidebar = width >= 900
   const mainWidth = width - (showSidebar ? 256 : 0)
   const sideBySide = mainWidth >= 900
 
@@ -502,8 +505,8 @@ function Sidebar({
                   }
                   style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingLeft: 12, paddingRight: 14, cursor: 'pointer', userSelect: 'none' }}
                 >
-                  <T size={11} color={C.faint} style={{ width: 12 }}>
-                    {closed.has(col.id) ? '▸' : '▾'}
+                  <T size={8} color={C.faint} style={{ width: 12 }}>
+                    {closed.has(col.id) ? '▶' : '▼'}
                   </T>
                   <T size={12.5} weight={600} color={C.dim} style={{ flexGrow: 1 }}>
                     {col.name}
@@ -1441,8 +1444,8 @@ function JsonLine({ row, onToggle }: { row: JsonRow; onToggle: (path: string) =>
         hover: { backgroundColor: '#ffffff08' },
       }}
     >
-      <T size={11} color={C.faint} style={{ width: 14, flexShrink: 0 }}>
-        {container && row.count > 0 ? (row.collapsed ? '▸' : '▾') : ' '}
+      <T size={8} color={C.faint} style={{ width: 14, flexShrink: 0 }}>
+        {container && row.count > 0 ? (row.collapsed ? '▶' : '▼') : ' '}
       </T>
       {key}
       {row.kind === 'leaf' && (
