@@ -258,16 +258,23 @@ function Title({ hud, W, H, small, opts, audioMs, audioOn }: { hud: HudState; W:
 }
 
 function Lab({ boot: b, W, H, small }: { boot: Boot; W: number; H: number; small: boolean }) {
-  const cols = small ? 3 : 4
-  const cell = Math.floor(Math.min((W - 40) / cols - 16, (H - 90) / Math.ceil(b.mats.length / cols) - 40))
+  // Pick the column count that gives the biggest swatch while every label row still fits the pane.
+  const n = b.mats.length, GAP = 16, LABEL = 58
+  let cols = 3, cell = 0
+  for (let c = small ? 2 : 3; c <= 8; c++) {
+    const rows = Math.ceil(n / c)
+    const s = Math.floor(Math.min((W - 40 - GAP * (c - 1)) / c, (H - 40 - 36 - GAP * (rows - 1)) / rows - LABEL))
+    if (s > cell) { cell = s; cols = c }
+  }
+  cell = Math.max(32, cell)
   return (
     <div style={{ position: 'absolute', left: 0, top: 0, width: W, height: H, backgroundColor: T.bg, display: 'flex', flexDirection: 'column', padding: 20, gap: 12 }}>
       <div style={{ display: 'flex', gap: 14, alignItems: 'baseline' }}>
         <text style={txt(T.fg, 18, { fontWeight: 700 })}>{`Texture lab`}</text>
         <text style={txt(T.mute, 13)}>{`every surface is a short op list run at boot · t to return`}</text>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-        {b.mats.map((tex, i) => <Swatch key={i} i={i} tex={tex} size={Math.max(48, cell)} />)}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: GAP, width: cols * cell + GAP * (cols - 1) }}>
+        {b.mats.map((tex, i) => <Swatch key={i} i={i} tex={tex} size={cell} />)}
       </div>
     </div>
   )
