@@ -217,7 +217,7 @@ export function App({ v, theme }: { v: Viewer; theme: Theme }) {
       tabIndex={-1}
       autoFocus
       testId="root"
-      onKeyDown={(e: KeyEvent) => { if (v.key(keyName(e), isShift(e.modifiers))) e.preventDefault() }}
+      onKeyDown={(e: KeyEvent) => { if (v.key(keyName(e), isShift(e.modifiers))) { e.preventDefault(); e.stopPropagation() } }}
       style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: theme.bg }}
     >
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12, height: 44, paddingLeft: 14, paddingRight: 14, borderBottomWidth: 1, borderColor: theme.line, flexShrink: 0, overflow: 'hidden' }}>
@@ -251,7 +251,14 @@ export function App({ v, theme }: { v: Viewer; theme: Theme }) {
 }
 
 export function start(v: Viewer, theme: Theme, opts: { terminal: boolean }) {
-  return render(<App v={v} theme={theme} />, { terminal: opts.terminal, title: `anatomy · ${v.spec.meta.name}`, width: 1400, height: 900 } as Parameters<typeof render>[1])
+  return render(<App v={v} theme={theme} />, {
+    terminal: opts.terminal,
+    title: `anatomy · ${v.spec.meta.name}`,
+    width: 1400,
+    height: 900,
+    // Fallback for when a click leaves no element focused (seen after a double-click in Ghostty).
+    onKeyDown(e: KeyEvent) { if (v.key(keyName(e), isShift(e.modifiers))) e.preventDefault() },
+  } as Parameters<typeof render>[1])
 }
 
 export { SPEEDS }
