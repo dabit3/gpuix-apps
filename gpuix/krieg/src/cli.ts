@@ -2,6 +2,10 @@
 // krieg: procedural FPS rendered inside Ghostty/kitty by GPUIX terminal mode.
 import { spawnSync } from 'node:child_process'
 
+// GPUIX logs "[gpuix] mount complete" etc. via console.log, which terminal mode holds and prints under the prompt on exit.
+const log = console.log
+console.log = (...a: unknown[]) => { if (!(typeof a[0] === 'string' && a[0].startsWith('[gpuix]'))) log(...a) }
+
 const HELP = `krieg: a .kkrieger-style procedural FPS that renders inside your terminal (Ghostty / kitty)
 
 usage
