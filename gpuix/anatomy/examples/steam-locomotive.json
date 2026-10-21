@@ -1,0 +1,3527 @@
+{
+  "$schema": "../schema/machine.schema.json",
+  "version": 1,
+  "meta": {
+    "name": "Steam locomotive (2-6-0)",
+    "description": "A Mogul steam locomotive: crossheads, main rods and coupling rods quartered at 90° and driven from one axle.",
+    "unit": "mm",
+    "camera": {
+      "view": "iso",
+      "yaw": -0.45,
+      "zoom": 1
+    },
+    "prompt": "a steam locomotive"
+  },
+  "bounds": 1200,
+  "parts": [
+    {
+      "id": "frame",
+      "label": "Frame",
+      "description": "Bar frame carrying the boiler, cylinders and axle boxes.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          620,
+          30,
+          120
+        ]
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#7a828e"
+      },
+      "transform": {
+        "position": [
+          0,
+          90,
+          0
+        ]
+      }
+    },
+    {
+      "id": "boiler",
+      "label": "Boiler",
+      "description": "Fire-tube boiler: hot gas from the firebox boils the water around the tubes.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 70,
+        "height": 440,
+        "segments": 28
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#71b7ff"
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          40,
+          105,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      },
+      "explode": [
+        0,
+        120,
+        0
+      ]
+    },
+    {
+      "id": "smokebox",
+      "label": "Smokebox",
+      "description": "Front chamber where exhaust steam drafts the fire up the chimney.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 74,
+        "height": 90,
+        "segments": 28
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          300,
+          105,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      },
+      "explode": [
+        80,
+        120,
+        0
+      ]
+    },
+    {
+      "id": "chimney",
+      "label": "Chimney",
+      "description": "Stack where exhaust steam and smoke leave in rhythmic chuffs.",
+      "geometry": {
+        "type": "lathe",
+        "points": [
+          [
+            18,
+            0
+          ],
+          [
+            16,
+            40
+          ],
+          [
+            22,
+            60
+          ],
+          [
+            24,
+            64
+          ]
+        ],
+        "segments": 16
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3",
+        "effect": "smoke",
+        "effectTarget": [
+          0,
+          1,
+          0
+        ]
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          310,
+          170,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        220,
+        0
+      ]
+    },
+    {
+      "id": "dome",
+      "label": "Steam dome",
+      "description": "Collects the driest steam at the top of the boiler for the regulator.",
+      "geometry": {
+        "type": "capsule",
+        "radius": 22,
+        "height": 14,
+        "segments": 14
+      },
+      "material": {
+        "style": "wire",
+        "color": "#e2c08d"
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          120,
+          182,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        200,
+        0
+      ]
+    },
+    {
+      "id": "firebox",
+      "label": "Firebox",
+      "description": "Coal burns here; radiant heat makes most of the steam.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          130,
+          120,
+          130
+        ]
+      },
+      "material": {
+        "style": "glow",
+        "color": "#ffa657",
+        "effect": "fire",
+        "effectTarget": [
+          0,
+          1,
+          0
+        ]
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          -250,
+          60,
+          0
+        ]
+      },
+      "explode": [
+        -80,
+        60,
+        0
+      ]
+    },
+    {
+      "id": "cab",
+      "label": "Cab",
+      "description": "Crew shelter with the regulator, reverser and firehole door.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          150,
+          150,
+          200
+        ]
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#9ea7b3"
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          -260,
+          185,
+          0
+        ]
+      },
+      "explode": [
+        -120,
+        160,
+        0
+      ]
+    },
+    {
+      "id": "rail-l",
+      "label": "Rail left",
+      "description": "Steel rail the flanged wheels ride on.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          900,
+          10,
+          10
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "transform": {
+        "position": [
+          0,
+          -5,
+          -75
+        ]
+      },
+      "explode": [
+        0,
+        -40,
+        0
+      ]
+    },
+    {
+      "id": "rail-r",
+      "label": "Rail right",
+      "description": "Steel rail the flanged wheels ride on.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          900,
+          10,
+          10
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "transform": {
+        "position": [
+          0,
+          -5,
+          75
+        ]
+      },
+      "explode": [
+        0,
+        -40,
+        0
+      ]
+    },
+    {
+      "id": "axle-1",
+      "label": "Driving axle 1",
+      "description": "Coupled axle turned by the coupling rods.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 9,
+        "height": 190,
+        "segments": 10
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "transform": {
+        "position": [
+          -150,
+          70,
+          0
+        ],
+        "rotation": [
+          90,
+          0,
+          0
+        ]
+      },
+      "animation": {
+        "type": "rotate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "drivenBy": "axle-2",
+        "ratio": 1
+      },
+      "explode": [
+        0,
+        -60,
+        0
+      ]
+    },
+    {
+      "id": "driver-1l",
+      "label": "Driving wheel 1L",
+      "description": "Spoked driving wheel with a counterweight opposite the crank pin.",
+      "geometry": {
+        "type": "torus",
+        "radius": 65,
+        "tube": 5,
+        "segments": 40
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "parentId": "axle-1",
+      "transform": {
+        "position": [
+          0,
+          -75,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -60,
+        0
+      ]
+    },
+    {
+      "id": "spoke-1l-0",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "position": [
+          33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1l-1",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -36,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1l-2",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -72,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1l-3",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -108,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1l-4",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -144,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1l-5",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "position": [
+          -33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          -180,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1l-6",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -216,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1l-7",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -252,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1l-8",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -288,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1l-9",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -324,
+          0
+        ]
+      }
+    },
+    {
+      "id": "weight-1l",
+      "label": "Counterweight",
+      "description": "Balances the rods so the engine runs smoothly at speed.",
+      "geometry": {
+        "type": "extrude",
+        "points": [
+          [
+            -34.09154463296343,
+            46.92298567374695
+          ],
+          [
+            -44.103546004801785,
+            37.66798680315066
+          ],
+          [
+            -51.67837840292533,
+            26.33144898489372
+          ],
+          [
+            -56.39745538306524,
+            13.53983110364252
+          ],
+          [
+            -58,
+            7.102951435054649e-15
+          ],
+          [
+            -56.39745538306525,
+            -13.539831103642506
+          ],
+          [
+            -51.67837840292534,
+            -26.331448984893708
+          ],
+          [
+            -44.1035460048018,
+            -37.66798680315065
+          ],
+          [
+            -34.09154463296345,
+            -46.92298567374694
+          ],
+          [
+            -17.4,
+            0
+          ]
+        ],
+        "depth": 6
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "rotation": [
+          90,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pin-1l",
+      "label": "Crank pin 1L",
+      "description": "Pin on the wheel boss where the rods attach.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 6,
+        "height": 26,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "driver-1l",
+      "transform": {
+        "position": [
+          26,
+          -14,
+          0
+        ]
+      }
+    },
+    {
+      "id": "driver-1r",
+      "label": "Driving wheel 1R",
+      "description": "Spoked driving wheel with a counterweight opposite the crank pin.",
+      "geometry": {
+        "type": "torus",
+        "radius": 65,
+        "tube": 5,
+        "segments": 40
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "parentId": "axle-1",
+      "transform": {
+        "position": [
+          0,
+          75,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        60,
+        0
+      ]
+    },
+    {
+      "id": "spoke-1r-0",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "position": [
+          33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1r-1",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -36,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1r-2",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -72,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1r-3",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -108,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1r-4",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -144,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1r-5",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "position": [
+          -33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          -180,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1r-6",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -216,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1r-7",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -252,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1r-8",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -288,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-1r-9",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -324,
+          0
+        ]
+      }
+    },
+    {
+      "id": "weight-1r",
+      "label": "Counterweight",
+      "description": "Balances the rods so the engine runs smoothly at speed.",
+      "geometry": {
+        "type": "extrude",
+        "points": [
+          [
+            -34.09154463296343,
+            46.92298567374695
+          ],
+          [
+            -44.103546004801785,
+            37.66798680315066
+          ],
+          [
+            -51.67837840292533,
+            26.33144898489372
+          ],
+          [
+            -56.39745538306524,
+            13.53983110364252
+          ],
+          [
+            -58,
+            7.102951435054649e-15
+          ],
+          [
+            -56.39745538306525,
+            -13.539831103642506
+          ],
+          [
+            -51.67837840292534,
+            -26.331448984893708
+          ],
+          [
+            -44.1035460048018,
+            -37.66798680315065
+          ],
+          [
+            -34.09154463296345,
+            -46.92298567374694
+          ],
+          [
+            -17.4,
+            0
+          ]
+        ],
+        "depth": 6
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "rotation": [
+          90,
+          -90,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pin-1r",
+      "label": "Crank pin 1R",
+      "description": "Pin on the wheel boss where the rods attach.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 6,
+        "height": 26,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "driver-1r",
+      "transform": {
+        "position": [
+          0,
+          14,
+          26
+        ]
+      }
+    },
+    {
+      "id": "axle-2",
+      "label": "Driving axle 2",
+      "description": "Main driving axle: the main rods push on its crank pins.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 9,
+        "height": 190,
+        "segments": 10
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "transform": {
+        "position": [
+          -20,
+          70,
+          0
+        ],
+        "rotation": [
+          90,
+          0,
+          0
+        ]
+      },
+      "animation": {
+        "type": "rotate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "rpm": 30,
+        "ratio": 1
+      },
+      "explode": [
+        0,
+        -60,
+        0
+      ]
+    },
+    {
+      "id": "driver-2l",
+      "label": "Driving wheel 2L",
+      "description": "Spoked driving wheel with a counterweight opposite the crank pin.",
+      "geometry": {
+        "type": "torus",
+        "radius": 65,
+        "tube": 5,
+        "segments": 40
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "parentId": "axle-2",
+      "transform": {
+        "position": [
+          0,
+          -75,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -60,
+        0
+      ]
+    },
+    {
+      "id": "spoke-2l-0",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "position": [
+          33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2l-1",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -36,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2l-2",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -72,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2l-3",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -108,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2l-4",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -144,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2l-5",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "position": [
+          -33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          -180,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2l-6",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -216,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2l-7",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -252,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2l-8",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -288,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2l-9",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -324,
+          0
+        ]
+      }
+    },
+    {
+      "id": "weight-2l",
+      "label": "Counterweight",
+      "description": "Balances the rods so the engine runs smoothly at speed.",
+      "geometry": {
+        "type": "extrude",
+        "points": [
+          [
+            -34.09154463296343,
+            46.92298567374695
+          ],
+          [
+            -44.103546004801785,
+            37.66798680315066
+          ],
+          [
+            -51.67837840292533,
+            26.33144898489372
+          ],
+          [
+            -56.39745538306524,
+            13.53983110364252
+          ],
+          [
+            -58,
+            7.102951435054649e-15
+          ],
+          [
+            -56.39745538306525,
+            -13.539831103642506
+          ],
+          [
+            -51.67837840292534,
+            -26.331448984893708
+          ],
+          [
+            -44.1035460048018,
+            -37.66798680315065
+          ],
+          [
+            -34.09154463296345,
+            -46.92298567374694
+          ],
+          [
+            -17.4,
+            0
+          ]
+        ],
+        "depth": 6
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "rotation": [
+          90,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pin-2l",
+      "label": "Crank pin 2L",
+      "description": "Pin on the wheel boss where the rods attach.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 6,
+        "height": 26,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "driver-2l",
+      "transform": {
+        "position": [
+          26,
+          -14,
+          0
+        ]
+      }
+    },
+    {
+      "id": "driver-2r",
+      "label": "Driving wheel 2R",
+      "description": "Spoked driving wheel with a counterweight opposite the crank pin.",
+      "geometry": {
+        "type": "torus",
+        "radius": 65,
+        "tube": 5,
+        "segments": 40
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "parentId": "axle-2",
+      "transform": {
+        "position": [
+          0,
+          75,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        60,
+        0
+      ]
+    },
+    {
+      "id": "spoke-2r-0",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "position": [
+          33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2r-1",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -36,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2r-2",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -72,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2r-3",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -108,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2r-4",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -144,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2r-5",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "position": [
+          -33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          -180,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2r-6",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -216,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2r-7",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -252,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2r-8",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -288,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-2r-9",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -324,
+          0
+        ]
+      }
+    },
+    {
+      "id": "weight-2r",
+      "label": "Counterweight",
+      "description": "Balances the rods so the engine runs smoothly at speed.",
+      "geometry": {
+        "type": "extrude",
+        "points": [
+          [
+            -34.09154463296343,
+            46.92298567374695
+          ],
+          [
+            -44.103546004801785,
+            37.66798680315066
+          ],
+          [
+            -51.67837840292533,
+            26.33144898489372
+          ],
+          [
+            -56.39745538306524,
+            13.53983110364252
+          ],
+          [
+            -58,
+            7.102951435054649e-15
+          ],
+          [
+            -56.39745538306525,
+            -13.539831103642506
+          ],
+          [
+            -51.67837840292534,
+            -26.331448984893708
+          ],
+          [
+            -44.1035460048018,
+            -37.66798680315065
+          ],
+          [
+            -34.09154463296345,
+            -46.92298567374694
+          ],
+          [
+            -17.4,
+            0
+          ]
+        ],
+        "depth": 6
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "rotation": [
+          90,
+          -90,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pin-2r",
+      "label": "Crank pin 2R",
+      "description": "Pin on the wheel boss where the rods attach.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 6,
+        "height": 26,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "driver-2r",
+      "transform": {
+        "position": [
+          0,
+          14,
+          26
+        ]
+      }
+    },
+    {
+      "id": "axle-3",
+      "label": "Driving axle 3",
+      "description": "Coupled axle turned by the coupling rods.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 9,
+        "height": 190,
+        "segments": 10
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "transform": {
+        "position": [
+          110,
+          70,
+          0
+        ],
+        "rotation": [
+          90,
+          0,
+          0
+        ]
+      },
+      "animation": {
+        "type": "rotate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "drivenBy": "axle-2",
+        "ratio": 1
+      },
+      "explode": [
+        0,
+        -60,
+        0
+      ]
+    },
+    {
+      "id": "driver-3l",
+      "label": "Driving wheel 3L",
+      "description": "Spoked driving wheel with a counterweight opposite the crank pin.",
+      "geometry": {
+        "type": "torus",
+        "radius": 65,
+        "tube": 5,
+        "segments": 40
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "parentId": "axle-3",
+      "transform": {
+        "position": [
+          0,
+          -75,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -60,
+        0
+      ]
+    },
+    {
+      "id": "spoke-3l-0",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "position": [
+          33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3l-1",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -36,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3l-2",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -72,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3l-3",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -108,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3l-4",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -144,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3l-5",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "position": [
+          -33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          -180,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3l-6",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -216,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3l-7",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -252,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3l-8",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -288,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3l-9",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -324,
+          0
+        ]
+      }
+    },
+    {
+      "id": "weight-3l",
+      "label": "Counterweight",
+      "description": "Balances the rods so the engine runs smoothly at speed.",
+      "geometry": {
+        "type": "extrude",
+        "points": [
+          [
+            -34.09154463296343,
+            46.92298567374695
+          ],
+          [
+            -44.103546004801785,
+            37.66798680315066
+          ],
+          [
+            -51.67837840292533,
+            26.33144898489372
+          ],
+          [
+            -56.39745538306524,
+            13.53983110364252
+          ],
+          [
+            -58,
+            7.102951435054649e-15
+          ],
+          [
+            -56.39745538306525,
+            -13.539831103642506
+          ],
+          [
+            -51.67837840292534,
+            -26.331448984893708
+          ],
+          [
+            -44.1035460048018,
+            -37.66798680315065
+          ],
+          [
+            -34.09154463296345,
+            -46.92298567374694
+          ],
+          [
+            -17.4,
+            0
+          ]
+        ],
+        "depth": 6
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "rotation": [
+          90,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pin-3l",
+      "label": "Crank pin 3L",
+      "description": "Pin on the wheel boss where the rods attach.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 6,
+        "height": 26,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "driver-3l",
+      "transform": {
+        "position": [
+          26,
+          -14,
+          0
+        ]
+      }
+    },
+    {
+      "id": "driver-3r",
+      "label": "Driving wheel 3R",
+      "description": "Spoked driving wheel with a counterweight opposite the crank pin.",
+      "geometry": {
+        "type": "torus",
+        "radius": 65,
+        "tube": 5,
+        "segments": 40
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "parentId": "axle-3",
+      "transform": {
+        "position": [
+          0,
+          75,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        60,
+        0
+      ]
+    },
+    {
+      "id": "spoke-3r-0",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "position": [
+          33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3r-1",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -36,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3r-2",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -72,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3r-3",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          31.385
+        ],
+        "rotation": [
+          0,
+          -108,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3r-4",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          19.397
+        ],
+        "rotation": [
+          0,
+          -144,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3r-5",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "position": [
+          -33,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          -180,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3r-6",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "position": [
+          -26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -216,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3r-7",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "position": [
+          -10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -252,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3r-8",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "position": [
+          10.198,
+          0,
+          -31.385
+        ],
+        "rotation": [
+          0,
+          -288,
+          0
+        ]
+      }
+    },
+    {
+      "id": "spoke-3r-9",
+      "label": "Spoke",
+      "description": "Cast spoke between hub and rim.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          56,
+          4,
+          5
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "position": [
+          26.698,
+          0,
+          -19.397
+        ],
+        "rotation": [
+          0,
+          -324,
+          0
+        ]
+      }
+    },
+    {
+      "id": "weight-3r",
+      "label": "Counterweight",
+      "description": "Balances the rods so the engine runs smoothly at speed.",
+      "geometry": {
+        "type": "extrude",
+        "points": [
+          [
+            -34.09154463296343,
+            46.92298567374695
+          ],
+          [
+            -44.103546004801785,
+            37.66798680315066
+          ],
+          [
+            -51.67837840292533,
+            26.33144898489372
+          ],
+          [
+            -56.39745538306524,
+            13.53983110364252
+          ],
+          [
+            -58,
+            7.102951435054649e-15
+          ],
+          [
+            -56.39745538306525,
+            -13.539831103642506
+          ],
+          [
+            -51.67837840292534,
+            -26.331448984893708
+          ],
+          [
+            -44.1035460048018,
+            -37.66798680315065
+          ],
+          [
+            -34.09154463296345,
+            -46.92298567374694
+          ],
+          [
+            -17.4,
+            0
+          ]
+        ],
+        "depth": 6
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "rotation": [
+          90,
+          -90,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pin-3r",
+      "label": "Crank pin 3R",
+      "description": "Pin on the wheel boss where the rods attach.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 6,
+        "height": 26,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "driver-3r",
+      "transform": {
+        "position": [
+          0,
+          14,
+          26
+        ]
+      }
+    },
+    {
+      "id": "coupling-rod-l",
+      "label": "Coupling rod L",
+      "description": "Ties the three drivers together so they turn as one.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          290,
+          10,
+          6
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "animation": {
+        "type": "follow",
+        "part": "axle-2",
+        "point": [
+          26,
+          -103,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        0,
+        -70
+      ]
+    },
+    {
+      "id": "cylinder-l",
+      "label": "Steam cylinder L",
+      "description": "Double-acting: steam pushes the piston both ways, twice per revolution.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 30,
+        "height": 110,
+        "segments": 18
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#9ea7b3"
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          300,
+          0,
+          -107
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      },
+      "explode": [
+        60,
+        0,
+        -80
+      ]
+    },
+    {
+      "id": "crosshead-l",
+      "label": "Crosshead L",
+      "description": "Slides in the guides, joining piston rod to main rod.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          30,
+          26,
+          14
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "animation": {
+        "type": "crank",
+        "crank": "axle-2",
+        "pin": [
+          26,
+          -99,
+          0
+        ],
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "rod": 220
+      },
+      "explode": [
+        40,
+        0,
+        -110
+      ]
+    },
+    {
+      "id": "piston-rod-l",
+      "label": "Piston rod L",
+      "description": "Carries piston thrust out of the cylinder to the crosshead.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 4,
+        "height": 120,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "parentId": "crosshead-l",
+      "transform": {
+        "position": [
+          60,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      }
+    },
+    {
+      "id": "piston-l",
+      "label": "Piston L",
+      "description": "Driven by expanding steam, alternately from each side.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 26,
+        "height": 18,
+        "segments": 16
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "crosshead-l",
+      "transform": {
+        "position": [
+          120,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      }
+    },
+    {
+      "id": "main-rod-l",
+      "label": "Main rod L",
+      "description": "Transfers piston thrust to the main driver’s crank pin.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          12,
+          220,
+          8
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#71b7ff"
+      },
+      "animation": {
+        "type": "rod",
+        "piston": "crosshead-l"
+      },
+      "explode": [
+        0,
+        0,
+        -90
+      ]
+    },
+    {
+      "id": "guides-l",
+      "label": "Slide bars L",
+      "description": "Keep the crosshead moving in a straight line.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          160,
+          4,
+          10
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          185,
+          0,
+          -99
+        ]
+      },
+      "explode": [
+        40,
+        0,
+        -100
+      ]
+    },
+    {
+      "id": "eccentric-l",
+      "label": "Valve gear L",
+      "description": "Swinging link that times steam admission, a quarter turn ahead of the piston.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          8,
+          70,
+          6
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          210,
+          20,
+          -111
+        ]
+      },
+      "animation": {
+        "type": "oscillate",
+        "axis": [
+          0,
+          0,
+          1
+        ],
+        "amplitude": 18,
+        "frequency": 1,
+        "driver": "axle-2",
+        "phase": 90
+      },
+      "explode": [
+        0,
+        40,
+        -120
+      ]
+    },
+    {
+      "id": "coupling-rod-r",
+      "label": "Coupling rod R",
+      "description": "Ties the three drivers together so they turn as one.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          290,
+          10,
+          6
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "animation": {
+        "type": "follow",
+        "part": "axle-2",
+        "point": [
+          1.592040838891559e-15,
+          103,
+          26
+        ]
+      },
+      "explode": [
+        0,
+        0,
+        70
+      ]
+    },
+    {
+      "id": "cylinder-r",
+      "label": "Steam cylinder R",
+      "description": "Double-acting: steam pushes the piston both ways, twice per revolution.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 30,
+        "height": 110,
+        "segments": 18
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#9ea7b3"
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          300,
+          0,
+          107
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      },
+      "explode": [
+        60,
+        0,
+        80
+      ]
+    },
+    {
+      "id": "crosshead-r",
+      "label": "Crosshead R",
+      "description": "Slides in the guides, joining piston rod to main rod.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          30,
+          26,
+          14
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "animation": {
+        "type": "crank",
+        "crank": "axle-2",
+        "pin": [
+          1.592040838891559e-15,
+          99,
+          26
+        ],
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "rod": 220
+      },
+      "explode": [
+        40,
+        0,
+        110
+      ]
+    },
+    {
+      "id": "piston-rod-r",
+      "label": "Piston rod R",
+      "description": "Carries piston thrust out of the cylinder to the crosshead.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 4,
+        "height": 120,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "parentId": "crosshead-r",
+      "transform": {
+        "position": [
+          60,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      }
+    },
+    {
+      "id": "piston-r",
+      "label": "Piston R",
+      "description": "Driven by expanding steam, alternately from each side.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 26,
+        "height": 18,
+        "segments": 16
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "crosshead-r",
+      "transform": {
+        "position": [
+          120,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      }
+    },
+    {
+      "id": "main-rod-r",
+      "label": "Main rod R",
+      "description": "Transfers piston thrust to the main driver’s crank pin.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          12,
+          220,
+          8
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#71b7ff"
+      },
+      "animation": {
+        "type": "rod",
+        "piston": "crosshead-r"
+      },
+      "explode": [
+        0,
+        0,
+        90
+      ]
+    },
+    {
+      "id": "guides-r",
+      "label": "Slide bars R",
+      "description": "Keep the crosshead moving in a straight line.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          160,
+          4,
+          10
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          185,
+          0,
+          99
+        ]
+      },
+      "explode": [
+        40,
+        0,
+        100
+      ]
+    },
+    {
+      "id": "eccentric-r",
+      "label": "Valve gear R",
+      "description": "Swinging link that times steam admission, a quarter turn ahead of the piston.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          8,
+          70,
+          6
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "frame",
+      "transform": {
+        "position": [
+          210,
+          20,
+          111
+        ]
+      },
+      "animation": {
+        "type": "oscillate",
+        "axis": [
+          0,
+          0,
+          1
+        ],
+        "amplitude": 18,
+        "frequency": 1,
+        "driver": "axle-2",
+        "phase": 180
+      },
+      "explode": [
+        0,
+        40,
+        120
+      ]
+    },
+    {
+      "id": "pony-axle-0",
+      "label": "Pony truck axle",
+      "description": "Leading axle that guides the engine into curves.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 7,
+        "height": 170,
+        "segments": 10
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "transform": {
+        "position": [
+          370,
+          40,
+          0
+        ],
+        "rotation": [
+          90,
+          0,
+          0
+        ]
+      },
+      "animation": {
+        "type": "rotate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "drivenBy": "axle-2",
+        "ratio": 1.75
+      },
+      "explode": [
+        80,
+        -40,
+        0
+      ]
+    },
+    {
+      "id": "pony-wheel-0-1",
+      "label": "Pony wheel",
+      "description": "Small unpowered leading wheel.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 40,
+        "height": 10,
+        "segments": 20,
+        "hollow": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "pony-axle-0",
+      "transform": {
+        "position": [
+          0,
+          -75,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pony-wheel-01",
+      "label": "Pony wheel",
+      "description": "Small unpowered leading wheel.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 40,
+        "height": 10,
+        "segments": 20,
+        "hollow": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "pony-axle-0",
+      "transform": {
+        "position": [
+          0,
+          75,
+          0
+        ]
+      }
+    }
+  ],
+  "connections": [],
+  "annotations": [
+    {
+      "part": "axle-2",
+      "text": "30 rpm master"
+    }
+  ]
+}

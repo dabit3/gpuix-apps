@@ -1,0 +1,4 @@
+node_modules/
+anatomy-*.png
+*.tmp.ts
+specs/machine.json

@@ -1,0 +1,861 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/dabit3/private-app-demos-2/gpuix/anatomy/schema/machine.schema.json",
+  "title": "Anatomy machine spec",
+  "description": "One machine: parts with geometry, material and motion driven from a single master clock.",
+  "type": "object",
+  "required": [
+    "version",
+    "meta",
+    "parts"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "meta": {
+      "type": "object",
+      "required": [
+        "name",
+        "description",
+        "unit"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "unit": {
+          "enum": [
+            "mm",
+            "cm",
+            "m",
+            "in"
+          ]
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "camera": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "view": {
+              "enum": [
+                "iso",
+                "perspective"
+              ]
+            },
+            "yaw": {
+              "type": "number"
+            },
+            "pitch": {
+              "type": "number"
+            },
+            "zoom": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      }
+    },
+    "bounds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Half-extent of the box every part centre must sit inside."
+    },
+    "parts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 400,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "description",
+          "geometry",
+          "material"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "geometry": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "size"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "box"
+                  },
+                  "size": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "radius",
+                  "height"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "cylinder"
+                  },
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "height": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "radiusTop": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 3,
+                    "maximum": 96
+                  },
+                  "hollow": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "radius",
+                  "height"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "cone"
+                  },
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "height": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 3,
+                    "maximum": 96
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "radius"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "sphere"
+                  },
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 3,
+                    "maximum": 96
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "radius",
+                  "tube"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "torus"
+                  },
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "tube": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 3,
+                    "maximum": 96
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "radius",
+                  "height"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "capsule"
+                  },
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "height": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 3,
+                    "maximum": 96
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "teeth",
+                  "module",
+                  "thickness"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "gear"
+                  },
+                  "teeth": {
+                    "type": "integer",
+                    "minimum": 4,
+                    "maximum": 400
+                  },
+                  "module": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "pressureAngle": {
+                    "type": "number",
+                    "minimum": 5,
+                    "maximum": 35
+                  },
+                  "bore": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "thickness": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "spokes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 24
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "radius",
+                  "wire",
+                  "turns",
+                  "height"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "spring"
+                  },
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "wire": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "turns": {
+                    "type": "number",
+                    "minimum": 0.5,
+                    "maximum": 100
+                  },
+                  "height": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "path",
+                  "radius"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "pipe"
+                  },
+                  "path": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "minItems": 2,
+                    "maxItems": 2000
+                  },
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "points",
+                  "depth"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "extrude"
+                  },
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "minItems": 3,
+                    "maxItems": 500
+                  },
+                  "depth": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "points"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "lathe"
+                  },
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "minItems": 2,
+                    "maxItems": 500
+                  },
+                  "segments": {
+                    "type": "integer",
+                    "minimum": 3,
+                    "maximum": 96
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "count",
+                  "radius",
+                  "hub",
+                  "chord"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "blades"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120
+                  },
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "hub": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "chord": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "twist": {
+                    "type": "number"
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "transform": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "position": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "rotation": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "scale": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              }
+            }
+          },
+          "material": {
+            "type": "object",
+            "required": [
+              "style",
+              "color"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "style": {
+                "enum": [
+                  "wire",
+                  "solid",
+                  "ghost",
+                  "glow"
+                ]
+              },
+              "color": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "effect": {
+                "enum": [
+                  "fire",
+                  "water",
+                  "plasma",
+                  "smoke",
+                  "electric"
+                ]
+              },
+              "effectTarget": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "pulse": {
+                "type": "object",
+                "required": [
+                  "driver",
+                  "ratio",
+                  "phase",
+                  "width"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "driver": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "ratio": {
+                    "type": "number"
+                  },
+                  "phase": {
+                    "type": "number"
+                  },
+                  "width": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 360
+                  }
+                }
+              }
+            }
+          },
+          "animation": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "axis"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "rotate"
+                  },
+                  "axis": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "rpm": {
+                    "type": "number"
+                  },
+                  "drivenBy": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "ratio": {
+                    "type": "number"
+                  },
+                  "phase": {
+                    "type": "number"
+                  },
+                  "ticks": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "axis",
+                  "amplitude",
+                  "frequency"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "oscillate"
+                  },
+                  "axis": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "amplitude": {
+                    "type": "number"
+                  },
+                  "frequency": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "phase": {
+                    "type": "number"
+                  },
+                  "driver": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "mode": {
+                    "enum": [
+                      "rotate",
+                      "translate",
+                      "scale"
+                    ]
+                  },
+                  "wave": {
+                    "enum": [
+                      "sine",
+                      "cam"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "path"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "slide"
+                  },
+                  "path": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    },
+                    "minItems": 2
+                  },
+                  "period": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "driver": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "ratio": {
+                    "type": "number"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "crank",
+                  "pin",
+                  "direction",
+                  "rod"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "crank"
+                  },
+                  "crank": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "pin": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "direction": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "rod": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "piston"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "rod"
+                  },
+                  "piston": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "part",
+                  "point"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "follow"
+                  },
+                  "part": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "point": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "explode": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        }
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "from",
+          "to",
+          "type"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "enum": [
+              "belt",
+              "chain",
+              "shaft",
+              "wire"
+            ]
+          },
+          "radiusFrom": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "radiusTo": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        }
+      }
+    },
+    "annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "part",
+          "text"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "part": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        }
+      }
+    }
+  }
+}

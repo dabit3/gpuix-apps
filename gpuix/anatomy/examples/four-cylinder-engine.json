@@ -1,0 +1,2241 @@
+{
+  "$schema": "../schema/machine.schema.json",
+  "version": 1,
+  "meta": {
+    "name": "Inline-4 engine",
+    "description": "A four-stroke inline-4 engine driven from one crankshaft: pistons, cams, valves and firing pulses all stay in sync.",
+    "unit": "mm",
+    "camera": {
+      "view": "iso",
+      "yaw": 0.45,
+      "zoom": 1
+    },
+    "prompt": "a four-cylinder engine"
+  },
+  "bounds": 1500,
+  "parts": [
+    {
+      "id": "block",
+      "label": "Cylinder block",
+      "description": "Cast housing that holds the cylinders, main bearings and coolant passages.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          456,
+          120,
+          150
+        ]
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#9ea7b3"
+      },
+      "transform": {
+        "position": [
+          0,
+          30,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "oil-pan",
+      "label": "Oil pan",
+      "description": "Sump that collects oil drained from the bearings; the pump draws from it.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          436,
+          70,
+          140
+        ]
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#7a828e"
+      },
+      "parentId": "block",
+      "transform": {
+        "position": [
+          0,
+          -125,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -120,
+        0
+      ]
+    },
+    {
+      "id": "crankshaft",
+      "label": "Crankshaft",
+      "description": "Turns the pistons’ up-and-down motion into rotation. Everything else is timed from it.",
+      "geometry": {
+        "type": "pipe",
+        "path": [
+          [
+            -268,
+            0,
+            0
+          ],
+          [
+            248,
+            0,
+            0
+          ]
+        ],
+        "radius": 22
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "animation": {
+        "type": "rotate",
+        "axis": [
+          1,
+          0,
+          0
+        ],
+        "rpm": 40
+      },
+      "explode": [
+        0,
+        -60,
+        0
+      ]
+    },
+    {
+      "id": "throw-1",
+      "label": "Crank throw 1",
+      "description": "Counterweighted web that offsets the crank pin from the main journal.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          16,
+          83,
+          52
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "crankshaft",
+      "transform": {
+        "position": [
+          -183.52,
+          21.5,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pin-1",
+      "label": "Crank pin 1",
+      "description": "Journal the connecting rods ride on, swinging around the crank axis.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 18,
+        "height": 34.4,
+        "segments": 14
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "crankshaft",
+      "transform": {
+        "position": [
+          -156,
+          43,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      }
+    },
+    {
+      "id": "throw-2",
+      "label": "Crank throw 2",
+      "description": "Counterweighted web that offsets the crank pin from the main journal.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          16,
+          83,
+          52
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "crankshaft",
+      "transform": {
+        "position": [
+          -79.52,
+          -21.5,
+          0
+        ],
+        "rotation": [
+          -180,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pin-2",
+      "label": "Crank pin 2",
+      "description": "Journal the connecting rods ride on, swinging around the crank axis.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 18,
+        "height": 34.4,
+        "segments": 14
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "crankshaft",
+      "transform": {
+        "position": [
+          -52,
+          -43,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      }
+    },
+    {
+      "id": "throw-3",
+      "label": "Crank throw 3",
+      "description": "Counterweighted web that offsets the crank pin from the main journal.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          16,
+          83,
+          52
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "crankshaft",
+      "transform": {
+        "position": [
+          24.48,
+          -21.5,
+          0
+        ],
+        "rotation": [
+          -180,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pin-3",
+      "label": "Crank pin 3",
+      "description": "Journal the connecting rods ride on, swinging around the crank axis.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 18,
+        "height": 34.4,
+        "segments": 14
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "crankshaft",
+      "transform": {
+        "position": [
+          52,
+          -43,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      }
+    },
+    {
+      "id": "throw-4",
+      "label": "Crank throw 4",
+      "description": "Counterweighted web that offsets the crank pin from the main journal.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          16,
+          83,
+          52
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "crankshaft",
+      "transform": {
+        "position": [
+          128.48,
+          21.5,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pin-4",
+      "label": "Crank pin 4",
+      "description": "Journal the connecting rods ride on, swinging around the crank axis.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 18,
+        "height": 34.4,
+        "segments": 14
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "crankshaft",
+      "transform": {
+        "position": [
+          156,
+          43,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      }
+    },
+    {
+      "id": "flywheel",
+      "label": "Flywheel",
+      "description": "Heavy ring gear that smooths power pulses; the starter meshes with its teeth.",
+      "geometry": {
+        "type": "gear",
+        "teeth": 72,
+        "module": 4,
+        "thickness": 18,
+        "bore": 30,
+        "spokes": 6
+      },
+      "material": {
+        "style": "wire",
+        "color": "#71b7ff"
+      },
+      "parentId": "crankshaft",
+      "transform": {
+        "position": [
+          238,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      },
+      "explode": [
+        140,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "crank-sprocket",
+      "label": "Crank sprocket",
+      "description": "Drives the timing chain; it has half the teeth of the cam sprocket.",
+      "geometry": {
+        "type": "gear",
+        "teeth": 18,
+        "module": 3,
+        "thickness": 14,
+        "bore": 10
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "crankshaft",
+      "transform": {
+        "position": [
+          -248,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      }
+    },
+    {
+      "id": "camshaft",
+      "label": "Camshaft",
+      "description": "Turns at exactly half crank speed so each valve opens once per four-stroke cycle.",
+      "geometry": {
+        "type": "pipe",
+        "path": [
+          [
+            -248,
+            0,
+            0
+          ],
+          [
+            188,
+            0,
+            0
+          ]
+        ],
+        "radius": 11
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "transform": {
+        "position": [
+          0,
+          333,
+          0
+        ]
+      },
+      "animation": {
+        "type": "rotate",
+        "axis": [
+          1,
+          0,
+          0
+        ],
+        "drivenBy": "crankshaft",
+        "ratio": 0.5
+      },
+      "explode": [
+        0,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "cam-sprocket",
+      "label": "Cam sprocket",
+      "description": "Twice the crank sprocket’s teeth: the 2:1 reduction of a four-stroke.",
+      "geometry": {
+        "type": "gear",
+        "teeth": 36,
+        "module": 3,
+        "thickness": 14,
+        "bore": 10,
+        "spokes": 4
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "camshaft",
+      "transform": {
+        "position": [
+          -248,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      }
+    },
+    {
+      "id": "liner-1",
+      "label": "Cylinder 1",
+      "description": "Bored sleeve the piston slides in; its walls seal the combustion gases.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 47,
+        "height": 156,
+        "segments": 20,
+        "hollow": 43
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#9ea7b3"
+      },
+      "parentId": "block",
+      "transform": {
+        "position": [
+          -156,
+          168,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        40,
+        0
+      ]
+    },
+    {
+      "id": "piston-1",
+      "label": "Piston 1",
+      "description": "Driven down by combustion pressure; follows the crank pin through the connecting rod.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 41,
+        "height": 52,
+        "segments": 20
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "transform": {
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "animation": {
+        "type": "crank",
+        "crank": "crankshaft",
+        "pin": [
+          -156,
+          43,
+          0
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "rod": 145
+      },
+      "explode": [
+        0,
+        160,
+        0
+      ]
+    },
+    {
+      "id": "rings-1",
+      "label": "Piston rings 1",
+      "description": "Spring-steel rings that seal compression and scrape oil off the bore.",
+      "geometry": {
+        "type": "torus",
+        "radius": 41,
+        "tube": 2.5,
+        "segments": 24
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "piston-1",
+      "transform": {
+        "position": [
+          0,
+          18,
+          0
+        ]
+      }
+    },
+    {
+      "id": "rod-1",
+      "label": "Connecting rod 1",
+      "description": "Links piston to crank pin; its swing turns linear force into torque.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          14,
+          145,
+          22
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "animation": {
+        "type": "rod",
+        "piston": "piston-1"
+      },
+      "explode": [
+        0,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "chamber-1",
+      "label": "Combustion chamber 1",
+      "description": "Where the compressed charge burns; the flash shows each cylinder’s power stroke in firing order.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 39,
+        "height": 14,
+        "segments": 18
+      },
+      "material": {
+        "style": "glow",
+        "color": "#ffa657",
+        "effect": "fire",
+        "effectTarget": [
+          0,
+          -1,
+          0
+        ],
+        "pulse": {
+          "driver": "crankshaft",
+          "ratio": 0.5,
+          "phase": 0,
+          "width": 70
+        }
+      },
+      "parentId": "block",
+      "transform": {
+        "position": [
+          -156,
+          228,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        200,
+        0
+      ]
+    },
+    {
+      "id": "plug-1",
+      "label": "Spark plug 1",
+      "description": "Fires a spark just before top dead centre to light the mixture.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 6,
+        "height": 40,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6",
+        "effect": "electric",
+        "effectTarget": [
+          0,
+          -38,
+          0
+        ],
+        "pulse": {
+          "driver": "crankshaft",
+          "ratio": 0.5,
+          "phase": 355,
+          "width": 18
+        }
+      },
+      "parentId": "chamber-1",
+      "transform": {
+        "position": [
+          0,
+          40,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        60,
+        0
+      ]
+    },
+    {
+      "id": "intake-valve-1",
+      "label": "Intake valve 1",
+      "description": "Opens to let fresh air-fuel charge in on the intake stroke.",
+      "geometry": {
+        "type": "lathe",
+        "points": [
+          [
+            0,
+            -38
+          ],
+          [
+            17,
+            -36
+          ],
+          [
+            17,
+            -33
+          ],
+          [
+            4,
+            -24
+          ],
+          [
+            4,
+            30
+          ],
+          [
+            0,
+            30
+          ]
+        ],
+        "segments": 12
+      },
+      "material": {
+        "style": "wire",
+        "color": "#71b7ff"
+      },
+      "parentId": "chamber-1",
+      "transform": {
+        "position": [
+          -17.2,
+          18,
+          0
+        ]
+      },
+      "animation": {
+        "type": "oscillate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "amplitude": 10,
+        "frequency": 0.5,
+        "driver": "crankshaft",
+        "mode": "translate",
+        "wave": "cam",
+        "phase": -175
+      },
+      "explode": [
+        -30,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "intake-spring-1",
+      "label": "Intake valve spring 1",
+      "description": "Helical spring that snaps the valve shut when the cam lobe passes.",
+      "geometry": {
+        "type": "spring",
+        "radius": 9,
+        "wire": 1.6,
+        "turns": 6,
+        "height": 34
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "intake-valve-1",
+      "transform": {
+        "position": [
+          0,
+          12,
+          0
+        ]
+      }
+    },
+    {
+      "id": "exhaust-valve-1",
+      "label": "Exhaust valve 1",
+      "description": "Opens near the end of the power stroke to let burned gas out.",
+      "geometry": {
+        "type": "lathe",
+        "points": [
+          [
+            0,
+            -38
+          ],
+          [
+            17,
+            -36
+          ],
+          [
+            17,
+            -33
+          ],
+          [
+            4,
+            -24
+          ],
+          [
+            4,
+            30
+          ],
+          [
+            0,
+            30
+          ]
+        ],
+        "segments": 12
+      },
+      "material": {
+        "style": "wire",
+        "color": "#ff9492"
+      },
+      "parentId": "chamber-1",
+      "transform": {
+        "position": [
+          17.2,
+          18,
+          0
+        ]
+      },
+      "animation": {
+        "type": "oscillate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "amplitude": 10,
+        "frequency": 0.5,
+        "driver": "crankshaft",
+        "mode": "translate",
+        "wave": "cam",
+        "phase": -80
+      },
+      "explode": [
+        30,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "exhaust-spring-1",
+      "label": "Exhaust valve spring 1",
+      "description": "Helical spring that snaps the valve shut when the cam lobe passes.",
+      "geometry": {
+        "type": "spring",
+        "radius": 9,
+        "wire": 1.6,
+        "turns": 6,
+        "height": 34
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "exhaust-valve-1",
+      "transform": {
+        "position": [
+          0,
+          12,
+          0
+        ]
+      }
+    },
+    {
+      "id": "liner-2",
+      "label": "Cylinder 2",
+      "description": "Bored sleeve the piston slides in; its walls seal the combustion gases.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 47,
+        "height": 156,
+        "segments": 20,
+        "hollow": 43
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#9ea7b3"
+      },
+      "parentId": "block",
+      "transform": {
+        "position": [
+          -52,
+          168,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        40,
+        0
+      ]
+    },
+    {
+      "id": "piston-2",
+      "label": "Piston 2",
+      "description": "Driven down by combustion pressure; follows the crank pin through the connecting rod.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 41,
+        "height": 52,
+        "segments": 20
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "transform": {
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "animation": {
+        "type": "crank",
+        "crank": "crankshaft",
+        "pin": [
+          -52,
+          -43,
+          5.2659812363336185e-15
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "rod": 145
+      },
+      "explode": [
+        0,
+        160,
+        0
+      ]
+    },
+    {
+      "id": "rings-2",
+      "label": "Piston rings 2",
+      "description": "Spring-steel rings that seal compression and scrape oil off the bore.",
+      "geometry": {
+        "type": "torus",
+        "radius": 41,
+        "tube": 2.5,
+        "segments": 24
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "piston-2",
+      "transform": {
+        "position": [
+          0,
+          18,
+          0
+        ]
+      }
+    },
+    {
+      "id": "rod-2",
+      "label": "Connecting rod 2",
+      "description": "Links piston to crank pin; its swing turns linear force into torque.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          14,
+          145,
+          22
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "animation": {
+        "type": "rod",
+        "piston": "piston-2"
+      },
+      "explode": [
+        0,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "chamber-2",
+      "label": "Combustion chamber 2",
+      "description": "Where the compressed charge burns; the flash shows each cylinder’s power stroke in firing order.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 39,
+        "height": 14,
+        "segments": 18
+      },
+      "material": {
+        "style": "glow",
+        "color": "#ffa657",
+        "effect": "fire",
+        "effectTarget": [
+          0,
+          -1,
+          0
+        ],
+        "pulse": {
+          "driver": "crankshaft",
+          "ratio": 0.5,
+          "phase": 90,
+          "width": 70
+        }
+      },
+      "parentId": "block",
+      "transform": {
+        "position": [
+          -52,
+          228,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        200,
+        0
+      ]
+    },
+    {
+      "id": "plug-2",
+      "label": "Spark plug 2",
+      "description": "Fires a spark just before top dead centre to light the mixture.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 6,
+        "height": 40,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6",
+        "effect": "electric",
+        "effectTarget": [
+          0,
+          -38,
+          0
+        ],
+        "pulse": {
+          "driver": "crankshaft",
+          "ratio": 0.5,
+          "phase": 85,
+          "width": 18
+        }
+      },
+      "parentId": "chamber-2",
+      "transform": {
+        "position": [
+          0,
+          40,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        60,
+        0
+      ]
+    },
+    {
+      "id": "intake-valve-2",
+      "label": "Intake valve 2",
+      "description": "Opens to let fresh air-fuel charge in on the intake stroke.",
+      "geometry": {
+        "type": "lathe",
+        "points": [
+          [
+            0,
+            -38
+          ],
+          [
+            17,
+            -36
+          ],
+          [
+            17,
+            -33
+          ],
+          [
+            4,
+            -24
+          ],
+          [
+            4,
+            30
+          ],
+          [
+            0,
+            30
+          ]
+        ],
+        "segments": 12
+      },
+      "material": {
+        "style": "wire",
+        "color": "#71b7ff"
+      },
+      "parentId": "chamber-2",
+      "transform": {
+        "position": [
+          -17.2,
+          18,
+          0
+        ]
+      },
+      "animation": {
+        "type": "oscillate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "amplitude": 10,
+        "frequency": 0.5,
+        "driver": "crankshaft",
+        "mode": "translate",
+        "wave": "cam",
+        "phase": -265
+      },
+      "explode": [
+        -30,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "intake-spring-2",
+      "label": "Intake valve spring 2",
+      "description": "Helical spring that snaps the valve shut when the cam lobe passes.",
+      "geometry": {
+        "type": "spring",
+        "radius": 9,
+        "wire": 1.6,
+        "turns": 6,
+        "height": 34
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "intake-valve-2",
+      "transform": {
+        "position": [
+          0,
+          12,
+          0
+        ]
+      }
+    },
+    {
+      "id": "exhaust-valve-2",
+      "label": "Exhaust valve 2",
+      "description": "Opens near the end of the power stroke to let burned gas out.",
+      "geometry": {
+        "type": "lathe",
+        "points": [
+          [
+            0,
+            -38
+          ],
+          [
+            17,
+            -36
+          ],
+          [
+            17,
+            -33
+          ],
+          [
+            4,
+            -24
+          ],
+          [
+            4,
+            30
+          ],
+          [
+            0,
+            30
+          ]
+        ],
+        "segments": 12
+      },
+      "material": {
+        "style": "wire",
+        "color": "#ff9492"
+      },
+      "parentId": "chamber-2",
+      "transform": {
+        "position": [
+          17.2,
+          18,
+          0
+        ]
+      },
+      "animation": {
+        "type": "oscillate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "amplitude": 10,
+        "frequency": 0.5,
+        "driver": "crankshaft",
+        "mode": "translate",
+        "wave": "cam",
+        "phase": -170
+      },
+      "explode": [
+        30,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "exhaust-spring-2",
+      "label": "Exhaust valve spring 2",
+      "description": "Helical spring that snaps the valve shut when the cam lobe passes.",
+      "geometry": {
+        "type": "spring",
+        "radius": 9,
+        "wire": 1.6,
+        "turns": 6,
+        "height": 34
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "exhaust-valve-2",
+      "transform": {
+        "position": [
+          0,
+          12,
+          0
+        ]
+      }
+    },
+    {
+      "id": "liner-3",
+      "label": "Cylinder 3",
+      "description": "Bored sleeve the piston slides in; its walls seal the combustion gases.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 47,
+        "height": 156,
+        "segments": 20,
+        "hollow": 43
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#9ea7b3"
+      },
+      "parentId": "block",
+      "transform": {
+        "position": [
+          52,
+          168,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        40,
+        0
+      ]
+    },
+    {
+      "id": "piston-3",
+      "label": "Piston 3",
+      "description": "Driven down by combustion pressure; follows the crank pin through the connecting rod.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 41,
+        "height": 52,
+        "segments": 20
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "transform": {
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "animation": {
+        "type": "crank",
+        "crank": "crankshaft",
+        "pin": [
+          52,
+          -43,
+          5.2659812363336185e-15
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "rod": 145
+      },
+      "explode": [
+        0,
+        160,
+        0
+      ]
+    },
+    {
+      "id": "rings-3",
+      "label": "Piston rings 3",
+      "description": "Spring-steel rings that seal compression and scrape oil off the bore.",
+      "geometry": {
+        "type": "torus",
+        "radius": 41,
+        "tube": 2.5,
+        "segments": 24
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "piston-3",
+      "transform": {
+        "position": [
+          0,
+          18,
+          0
+        ]
+      }
+    },
+    {
+      "id": "rod-3",
+      "label": "Connecting rod 3",
+      "description": "Links piston to crank pin; its swing turns linear force into torque.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          14,
+          145,
+          22
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "animation": {
+        "type": "rod",
+        "piston": "piston-3"
+      },
+      "explode": [
+        0,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "chamber-3",
+      "label": "Combustion chamber 3",
+      "description": "Where the compressed charge burns; the flash shows each cylinder’s power stroke in firing order.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 39,
+        "height": 14,
+        "segments": 18
+      },
+      "material": {
+        "style": "glow",
+        "color": "#ffa657",
+        "effect": "fire",
+        "effectTarget": [
+          0,
+          -1,
+          0
+        ],
+        "pulse": {
+          "driver": "crankshaft",
+          "ratio": 0.5,
+          "phase": 270,
+          "width": 70
+        }
+      },
+      "parentId": "block",
+      "transform": {
+        "position": [
+          52,
+          228,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        200,
+        0
+      ]
+    },
+    {
+      "id": "plug-3",
+      "label": "Spark plug 3",
+      "description": "Fires a spark just before top dead centre to light the mixture.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 6,
+        "height": 40,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6",
+        "effect": "electric",
+        "effectTarget": [
+          0,
+          -38,
+          0
+        ],
+        "pulse": {
+          "driver": "crankshaft",
+          "ratio": 0.5,
+          "phase": 265,
+          "width": 18
+        }
+      },
+      "parentId": "chamber-3",
+      "transform": {
+        "position": [
+          0,
+          40,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        60,
+        0
+      ]
+    },
+    {
+      "id": "intake-valve-3",
+      "label": "Intake valve 3",
+      "description": "Opens to let fresh air-fuel charge in on the intake stroke.",
+      "geometry": {
+        "type": "lathe",
+        "points": [
+          [
+            0,
+            -38
+          ],
+          [
+            17,
+            -36
+          ],
+          [
+            17,
+            -33
+          ],
+          [
+            4,
+            -24
+          ],
+          [
+            4,
+            30
+          ],
+          [
+            0,
+            30
+          ]
+        ],
+        "segments": 12
+      },
+      "material": {
+        "style": "wire",
+        "color": "#71b7ff"
+      },
+      "parentId": "chamber-3",
+      "transform": {
+        "position": [
+          -17.2,
+          18,
+          0
+        ]
+      },
+      "animation": {
+        "type": "oscillate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "amplitude": 10,
+        "frequency": 0.5,
+        "driver": "crankshaft",
+        "mode": "translate",
+        "wave": "cam",
+        "phase": -445
+      },
+      "explode": [
+        -30,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "intake-spring-3",
+      "label": "Intake valve spring 3",
+      "description": "Helical spring that snaps the valve shut when the cam lobe passes.",
+      "geometry": {
+        "type": "spring",
+        "radius": 9,
+        "wire": 1.6,
+        "turns": 6,
+        "height": 34
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "intake-valve-3",
+      "transform": {
+        "position": [
+          0,
+          12,
+          0
+        ]
+      }
+    },
+    {
+      "id": "exhaust-valve-3",
+      "label": "Exhaust valve 3",
+      "description": "Opens near the end of the power stroke to let burned gas out.",
+      "geometry": {
+        "type": "lathe",
+        "points": [
+          [
+            0,
+            -38
+          ],
+          [
+            17,
+            -36
+          ],
+          [
+            17,
+            -33
+          ],
+          [
+            4,
+            -24
+          ],
+          [
+            4,
+            30
+          ],
+          [
+            0,
+            30
+          ]
+        ],
+        "segments": 12
+      },
+      "material": {
+        "style": "wire",
+        "color": "#ff9492"
+      },
+      "parentId": "chamber-3",
+      "transform": {
+        "position": [
+          17.2,
+          18,
+          0
+        ]
+      },
+      "animation": {
+        "type": "oscillate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "amplitude": 10,
+        "frequency": 0.5,
+        "driver": "crankshaft",
+        "mode": "translate",
+        "wave": "cam",
+        "phase": -350
+      },
+      "explode": [
+        30,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "exhaust-spring-3",
+      "label": "Exhaust valve spring 3",
+      "description": "Helical spring that snaps the valve shut when the cam lobe passes.",
+      "geometry": {
+        "type": "spring",
+        "radius": 9,
+        "wire": 1.6,
+        "turns": 6,
+        "height": 34
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "exhaust-valve-3",
+      "transform": {
+        "position": [
+          0,
+          12,
+          0
+        ]
+      }
+    },
+    {
+      "id": "liner-4",
+      "label": "Cylinder 4",
+      "description": "Bored sleeve the piston slides in; its walls seal the combustion gases.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 47,
+        "height": 156,
+        "segments": 20,
+        "hollow": 43
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#9ea7b3"
+      },
+      "parentId": "block",
+      "transform": {
+        "position": [
+          156,
+          168,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        40,
+        0
+      ]
+    },
+    {
+      "id": "piston-4",
+      "label": "Piston 4",
+      "description": "Driven down by combustion pressure; follows the crank pin through the connecting rod.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 41,
+        "height": 52,
+        "segments": 20
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "transform": {
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "animation": {
+        "type": "crank",
+        "crank": "crankshaft",
+        "pin": [
+          156,
+          43,
+          0
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "rod": 145
+      },
+      "explode": [
+        0,
+        160,
+        0
+      ]
+    },
+    {
+      "id": "rings-4",
+      "label": "Piston rings 4",
+      "description": "Spring-steel rings that seal compression and scrape oil off the bore.",
+      "geometry": {
+        "type": "torus",
+        "radius": 41,
+        "tube": 2.5,
+        "segments": 24
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "piston-4",
+      "transform": {
+        "position": [
+          0,
+          18,
+          0
+        ]
+      }
+    },
+    {
+      "id": "rod-4",
+      "label": "Connecting rod 4",
+      "description": "Links piston to crank pin; its swing turns linear force into torque.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          14,
+          145,
+          22
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "animation": {
+        "type": "rod",
+        "piston": "piston-4"
+      },
+      "explode": [
+        0,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "chamber-4",
+      "label": "Combustion chamber 4",
+      "description": "Where the compressed charge burns; the flash shows each cylinder’s power stroke in firing order.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 39,
+        "height": 14,
+        "segments": 18
+      },
+      "material": {
+        "style": "glow",
+        "color": "#ffa657",
+        "effect": "fire",
+        "effectTarget": [
+          0,
+          -1,
+          0
+        ],
+        "pulse": {
+          "driver": "crankshaft",
+          "ratio": 0.5,
+          "phase": 180,
+          "width": 70
+        }
+      },
+      "parentId": "block",
+      "transform": {
+        "position": [
+          156,
+          228,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        200,
+        0
+      ]
+    },
+    {
+      "id": "plug-4",
+      "label": "Spark plug 4",
+      "description": "Fires a spark just before top dead centre to light the mixture.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 6,
+        "height": 40,
+        "segments": 8
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6",
+        "effect": "electric",
+        "effectTarget": [
+          0,
+          -38,
+          0
+        ],
+        "pulse": {
+          "driver": "crankshaft",
+          "ratio": 0.5,
+          "phase": 175,
+          "width": 18
+        }
+      },
+      "parentId": "chamber-4",
+      "transform": {
+        "position": [
+          0,
+          40,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        60,
+        0
+      ]
+    },
+    {
+      "id": "intake-valve-4",
+      "label": "Intake valve 4",
+      "description": "Opens to let fresh air-fuel charge in on the intake stroke.",
+      "geometry": {
+        "type": "lathe",
+        "points": [
+          [
+            0,
+            -38
+          ],
+          [
+            17,
+            -36
+          ],
+          [
+            17,
+            -33
+          ],
+          [
+            4,
+            -24
+          ],
+          [
+            4,
+            30
+          ],
+          [
+            0,
+            30
+          ]
+        ],
+        "segments": 12
+      },
+      "material": {
+        "style": "wire",
+        "color": "#71b7ff"
+      },
+      "parentId": "chamber-4",
+      "transform": {
+        "position": [
+          -17.2,
+          18,
+          0
+        ]
+      },
+      "animation": {
+        "type": "oscillate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "amplitude": 10,
+        "frequency": 0.5,
+        "driver": "crankshaft",
+        "mode": "translate",
+        "wave": "cam",
+        "phase": -355
+      },
+      "explode": [
+        -30,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "intake-spring-4",
+      "label": "Intake valve spring 4",
+      "description": "Helical spring that snaps the valve shut when the cam lobe passes.",
+      "geometry": {
+        "type": "spring",
+        "radius": 9,
+        "wire": 1.6,
+        "turns": 6,
+        "height": 34
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "intake-valve-4",
+      "transform": {
+        "position": [
+          0,
+          12,
+          0
+        ]
+      }
+    },
+    {
+      "id": "exhaust-valve-4",
+      "label": "Exhaust valve 4",
+      "description": "Opens near the end of the power stroke to let burned gas out.",
+      "geometry": {
+        "type": "lathe",
+        "points": [
+          [
+            0,
+            -38
+          ],
+          [
+            17,
+            -36
+          ],
+          [
+            17,
+            -33
+          ],
+          [
+            4,
+            -24
+          ],
+          [
+            4,
+            30
+          ],
+          [
+            0,
+            30
+          ]
+        ],
+        "segments": 12
+      },
+      "material": {
+        "style": "wire",
+        "color": "#ff9492"
+      },
+      "parentId": "chamber-4",
+      "transform": {
+        "position": [
+          17.2,
+          18,
+          0
+        ]
+      },
+      "animation": {
+        "type": "oscillate",
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "amplitude": 10,
+        "frequency": 0.5,
+        "driver": "crankshaft",
+        "mode": "translate",
+        "wave": "cam",
+        "phase": -260
+      },
+      "explode": [
+        30,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "exhaust-spring-4",
+      "label": "Exhaust valve spring 4",
+      "description": "Helical spring that snaps the valve shut when the cam lobe passes.",
+      "geometry": {
+        "type": "spring",
+        "radius": 9,
+        "wire": 1.6,
+        "turns": 6,
+        "height": 34
+      },
+      "material": {
+        "style": "wire",
+        "color": "#26cd4d"
+      },
+      "parentId": "exhaust-valve-4",
+      "transform": {
+        "position": [
+          0,
+          12,
+          0
+        ]
+      }
+    },
+    {
+      "id": "head-1",
+      "label": "Cylinder head",
+      "description": "Caps the cylinders and carries the valves, springs and spark plugs.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          416,
+          70,
+          136
+        ]
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#71b7ff"
+      },
+      "parentId": "block",
+      "transform": {
+        "position": [
+          0,
+          253,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        260,
+        0
+      ]
+    },
+    {
+      "id": "exhaust-1",
+      "label": "Exhaust manifold",
+      "description": "Collects hot exhaust pulses from each port and routes them to the tailpipe.",
+      "geometry": {
+        "type": "pipe",
+        "path": [
+          [
+            -156,
+            283,
+            93
+          ],
+          [
+            -52,
+            283,
+            93
+          ],
+          [
+            52,
+            283,
+            93
+          ],
+          [
+            156,
+            283,
+            93
+          ],
+          [
+            268,
+            163,
+            93
+          ]
+        ],
+        "radius": 14
+      },
+      "material": {
+        "style": "wire",
+        "color": "#ff9492",
+        "effect": "smoke",
+        "effectTarget": [
+          0,
+          1,
+          0
+        ]
+      },
+      "parentId": "block",
+      "explode": [
+        0,
+        40,
+        160
+      ]
+    },
+    {
+      "id": "alternator",
+      "label": "Alternator",
+      "description": "Belt-driven generator that charges the battery and powers the ignition.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 38,
+        "height": 60,
+        "segments": 18
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "block",
+      "transform": {
+        "position": [
+          -278,
+          170,
+          110
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      },
+      "animation": {
+        "type": "rotate",
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "drivenBy": "crankshaft",
+        "ratio": 2.4
+      },
+      "explode": [
+        -160,
+        60,
+        0
+      ]
+    },
+    {
+      "id": "crank-pulley",
+      "label": "Crank pulley",
+      "description": "Drives the accessory belt from the nose of the crankshaft.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 60,
+        "height": 22,
+        "segments": 24,
+        "hollow": 16
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3"
+      },
+      "parentId": "crankshaft",
+      "transform": {
+        "position": [
+          -283,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      },
+      "explode": [
+        -120,
+        0,
+        0
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "crank-sprocket",
+      "to": "cam-sprocket",
+      "type": "chain",
+      "radiusFrom": 27,
+      "radiusTo": 54,
+      "color": "#9ea7b3"
+    },
+    {
+      "from": "crank-pulley",
+      "to": "alternator",
+      "type": "belt",
+      "radiusFrom": 60,
+      "radiusTo": 30,
+      "color": "#7a828e"
+    }
+  ],
+  "annotations": [
+    {
+      "part": "crankshaft",
+      "text": "40 rpm master driver"
+    },
+    {
+      "part": "camshaft",
+      "text": "half crank speed via chain"
+    }
+  ]
+}

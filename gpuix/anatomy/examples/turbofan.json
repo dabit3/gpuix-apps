@@ -1,0 +1,1108 @@
+{
+  "$schema": "../schema/machine.schema.json",
+  "version": 1,
+  "meta": {
+    "name": "Two-spool turbofan",
+    "description": "A high-bypass turbofan: fan and booster on the LP spool, compressor and turbine on the HP spool, a burning annular combustor.",
+    "unit": "mm",
+    "camera": {
+      "view": "iso",
+      "yaw": -0.5,
+      "zoom": 1
+    },
+    "prompt": "a turbofan"
+  },
+  "bounds": 800,
+  "parts": [
+    {
+      "id": "nacelle",
+      "label": "Nacelle",
+      "description": "Aerodynamic cowl around the fan; most of the thrust is bypass air flowing inside it.",
+      "geometry": {
+        "type": "lathe",
+        "points": [
+          [
+            118,
+            -150
+          ],
+          [
+            128,
+            -130
+          ],
+          [
+            130,
+            -40
+          ],
+          [
+            122,
+            60
+          ],
+          [
+            112,
+            120
+          ],
+          [
+            108,
+            125
+          ]
+        ],
+        "segments": 40
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#9ea7b3"
+      },
+      "transform": {
+        "rotation": [
+          0,
+          0,
+          90
+        ]
+      },
+      "explode": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "core-case",
+      "label": "Core casing",
+      "description": "Encloses the compressor, combustor and turbines of the gas generator.",
+      "geometry": {
+        "type": "lathe",
+        "points": [
+          [
+            62,
+            -70
+          ],
+          [
+            58,
+            20
+          ],
+          [
+            50,
+            120
+          ],
+          [
+            46,
+            210
+          ],
+          [
+            38,
+            260
+          ]
+        ],
+        "segments": 32
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#71b7ff"
+      },
+      "parentId": "nacelle",
+      "explode": [
+        0,
+        -60,
+        0
+      ]
+    },
+    {
+      "id": "lp-shaft",
+      "label": "Low-pressure shaft",
+      "description": "Inner shaft: the LP turbine at the back drives the fan and booster at the front.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 5,
+        "height": 420,
+        "segments": 10
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          0,
+          70,
+          0
+        ]
+      },
+      "animation": {
+        "type": "rotate",
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "rpm": 90
+      },
+      "explode": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "hp-shaft",
+      "label": "High-pressure shaft",
+      "description": "Hollow outer shaft: the HP turbine drives the HP compressor.",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 10,
+        "height": 150,
+        "segments": 12,
+        "hollow": 7
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          0,
+          120,
+          0
+        ]
+      },
+      "animation": {
+        "type": "rotate",
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "drivenBy": "lp-shaft",
+        "ratio": -2.4
+      },
+      "explode": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "spinner",
+      "label": "Spinner",
+      "description": "Nose cone that smooths airflow into the fan hub.",
+      "geometry": {
+        "type": "cone",
+        "radius": 30,
+        "height": 48,
+        "segments": 20
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "parentId": "lp-shaft",
+      "transform": {
+        "position": [
+          0,
+          -228,
+          0
+        ],
+        "rotation": [
+          180,
+          0,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -160,
+        0
+      ]
+    },
+    {
+      "id": "fan",
+      "label": "Fan",
+      "description": "22 wide-chord blades; pushes ~90% of the engine’s air around the core as bypass thrust.",
+      "geometry": {
+        "type": "blades",
+        "count": 22,
+        "radius": 118,
+        "hub": 30,
+        "chord": 34,
+        "twist": 42
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0f3f6"
+      },
+      "parentId": "lp-shaft",
+      "transform": {
+        "position": [
+          0,
+          -190,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -120,
+        0
+      ]
+    },
+    {
+      "id": "booster-1",
+      "label": "Booster stage 1",
+      "description": "Low-pressure compressor stage on the LP shaft that pre-compresses core air.",
+      "geometry": {
+        "type": "blades",
+        "count": 28,
+        "radius": 60,
+        "hub": 34,
+        "chord": 12,
+        "twist": 30
+      },
+      "material": {
+        "style": "wire",
+        "color": "#71b7ff"
+      },
+      "parentId": "lp-shaft",
+      "transform": {
+        "position": [
+          0,
+          -140,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -90,
+        0
+      ]
+    },
+    {
+      "id": "booster-2",
+      "label": "Booster stage 2",
+      "description": "Low-pressure compressor stage on the LP shaft that pre-compresses core air.",
+      "geometry": {
+        "type": "blades",
+        "count": 28,
+        "radius": 58,
+        "hub": 34,
+        "chord": 12,
+        "twist": 30
+      },
+      "material": {
+        "style": "wire",
+        "color": "#71b7ff"
+      },
+      "parentId": "lp-shaft",
+      "transform": {
+        "position": [
+          0,
+          -118,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -78,
+        0
+      ]
+    },
+    {
+      "id": "booster-3",
+      "label": "Booster stage 3",
+      "description": "Low-pressure compressor stage on the LP shaft that pre-compresses core air.",
+      "geometry": {
+        "type": "blades",
+        "count": 28,
+        "radius": 56,
+        "hub": 34,
+        "chord": 12,
+        "twist": 30
+      },
+      "material": {
+        "style": "wire",
+        "color": "#71b7ff"
+      },
+      "parentId": "lp-shaft",
+      "transform": {
+        "position": [
+          0,
+          -96,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -66,
+        0
+      ]
+    },
+    {
+      "id": "hpc-1",
+      "label": "HP compressor stage 1",
+      "description": "High-pressure compressor stage squeezing air ~30:1 before combustion.",
+      "geometry": {
+        "type": "blades",
+        "count": 36,
+        "radius": 52,
+        "hub": 30,
+        "chord": 9,
+        "twist": 24
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "parentId": "hp-shaft",
+      "transform": {
+        "position": [
+          0,
+          -60,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -40,
+        0
+      ]
+    },
+    {
+      "id": "hpc-2",
+      "label": "HP compressor stage 2",
+      "description": "High-pressure compressor stage squeezing air ~30:1 before combustion.",
+      "geometry": {
+        "type": "blades",
+        "count": 36,
+        "radius": 49,
+        "hub": 30,
+        "chord": 9,
+        "twist": 24
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "parentId": "hp-shaft",
+      "transform": {
+        "position": [
+          0,
+          -44,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -30,
+        0
+      ]
+    },
+    {
+      "id": "hpc-3",
+      "label": "HP compressor stage 3",
+      "description": "High-pressure compressor stage squeezing air ~30:1 before combustion.",
+      "geometry": {
+        "type": "blades",
+        "count": 36,
+        "radius": 46,
+        "hub": 30,
+        "chord": 9,
+        "twist": 24
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "parentId": "hp-shaft",
+      "transform": {
+        "position": [
+          0,
+          -28,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -20,
+        0
+      ]
+    },
+    {
+      "id": "hpc-4",
+      "label": "HP compressor stage 4",
+      "description": "High-pressure compressor stage squeezing air ~30:1 before combustion.",
+      "geometry": {
+        "type": "blades",
+        "count": 36,
+        "radius": 43,
+        "hub": 30,
+        "chord": 9,
+        "twist": 24
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "parentId": "hp-shaft",
+      "transform": {
+        "position": [
+          0,
+          -12,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        -10,
+        0
+      ]
+    },
+    {
+      "id": "hpc-5",
+      "label": "HP compressor stage 5",
+      "description": "High-pressure compressor stage squeezing air ~30:1 before combustion.",
+      "geometry": {
+        "type": "blades",
+        "count": 36,
+        "radius": 40,
+        "hub": 30,
+        "chord": 9,
+        "twist": 24
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "parentId": "hp-shaft",
+      "transform": {
+        "position": [
+          0,
+          4,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "hpc-6",
+      "label": "HP compressor stage 6",
+      "description": "High-pressure compressor stage squeezing air ~30:1 before combustion.",
+      "geometry": {
+        "type": "blades",
+        "count": 36,
+        "radius": 37,
+        "hub": 30,
+        "chord": 9,
+        "twist": 24
+      },
+      "material": {
+        "style": "wire",
+        "color": "#39c5cf"
+      },
+      "parentId": "hp-shaft",
+      "transform": {
+        "position": [
+          0,
+          20,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        10,
+        0
+      ]
+    },
+    {
+      "id": "combustor",
+      "label": "Annular combustor",
+      "description": "Fuel burns continuously here; the hot gas expands through the turbines behind it.",
+      "geometry": {
+        "type": "torus",
+        "radius": 42,
+        "tube": 9,
+        "segments": 32
+      },
+      "material": {
+        "style": "glow",
+        "color": "#ffa657",
+        "effect": "fire",
+        "effectTarget": [
+          0,
+          1,
+          0
+        ]
+      },
+      "parentId": "core-case",
+      "transform": {
+        "position": [
+          0,
+          70,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        30,
+        0
+      ]
+    },
+    {
+      "id": "hpt-1",
+      "label": "HP turbine stage 1",
+      "description": "Extracts energy from the hottest gas to drive the HP compressor.",
+      "geometry": {
+        "type": "blades",
+        "count": 40,
+        "radius": 48,
+        "hub": 32,
+        "chord": 9,
+        "twist": -30
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "hp-shaft",
+      "transform": {
+        "position": [
+          0,
+          60,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        60,
+        0
+      ]
+    },
+    {
+      "id": "hpt-2",
+      "label": "HP turbine stage 2",
+      "description": "Extracts energy from the hottest gas to drive the HP compressor.",
+      "geometry": {
+        "type": "blades",
+        "count": 40,
+        "radius": 48,
+        "hub": 32,
+        "chord": 9,
+        "twist": -30
+      },
+      "material": {
+        "style": "wire",
+        "color": "#f0b72f"
+      },
+      "parentId": "hp-shaft",
+      "transform": {
+        "position": [
+          0,
+          74,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        70,
+        0
+      ]
+    },
+    {
+      "id": "lpt-1",
+      "label": "LP turbine stage 1",
+      "description": "Extracts the remaining energy to spin the fan through the LP shaft.",
+      "geometry": {
+        "type": "blades",
+        "count": 44,
+        "radius": 50,
+        "hub": 30,
+        "chord": 10,
+        "twist": -28
+      },
+      "material": {
+        "style": "wire",
+        "color": "#ffa657"
+      },
+      "parentId": "lp-shaft",
+      "transform": {
+        "position": [
+          0,
+          120,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        90,
+        0
+      ]
+    },
+    {
+      "id": "lpt-2",
+      "label": "LP turbine stage 2",
+      "description": "Extracts the remaining energy to spin the fan through the LP shaft.",
+      "geometry": {
+        "type": "blades",
+        "count": 44,
+        "radius": 53,
+        "hub": 30,
+        "chord": 10,
+        "twist": -28
+      },
+      "material": {
+        "style": "wire",
+        "color": "#ffa657"
+      },
+      "parentId": "lp-shaft",
+      "transform": {
+        "position": [
+          0,
+          138,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        104,
+        0
+      ]
+    },
+    {
+      "id": "lpt-3",
+      "label": "LP turbine stage 3",
+      "description": "Extracts the remaining energy to spin the fan through the LP shaft.",
+      "geometry": {
+        "type": "blades",
+        "count": 44,
+        "radius": 56,
+        "hub": 30,
+        "chord": 10,
+        "twist": -28
+      },
+      "material": {
+        "style": "wire",
+        "color": "#ffa657"
+      },
+      "parentId": "lp-shaft",
+      "transform": {
+        "position": [
+          0,
+          156,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        118,
+        0
+      ]
+    },
+    {
+      "id": "lpt-4",
+      "label": "LP turbine stage 4",
+      "description": "Extracts the remaining energy to spin the fan through the LP shaft.",
+      "geometry": {
+        "type": "blades",
+        "count": 44,
+        "radius": 59,
+        "hub": 30,
+        "chord": 10,
+        "twist": -28
+      },
+      "material": {
+        "style": "wire",
+        "color": "#ffa657"
+      },
+      "parentId": "lp-shaft",
+      "transform": {
+        "position": [
+          0,
+          174,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        132,
+        0
+      ]
+    },
+    {
+      "id": "nozzle",
+      "label": "Exhaust nozzle",
+      "description": "Accelerates the core exhaust; the cone and lip shape the jet.",
+      "geometry": {
+        "type": "cone",
+        "radius": 26,
+        "height": 70,
+        "segments": 18
+      },
+      "material": {
+        "style": "wire",
+        "color": "#9ea7b3",
+        "effect": "smoke",
+        "effectTarget": [
+          0,
+          1,
+          0
+        ]
+      },
+      "parentId": "core-case",
+      "transform": {
+        "position": [
+          0,
+          280,
+          0
+        ]
+      },
+      "explode": [
+        0,
+        120,
+        0
+      ]
+    },
+    {
+      "id": "pylon",
+      "label": "Pylon",
+      "description": "Strut that hangs the engine under the wing and carries fuel and bleed lines.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          30,
+          260,
+          50
+        ]
+      },
+      "material": {
+        "style": "ghost",
+        "color": "#7a828e"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          150,
+          40,
+          0
+        ]
+      },
+      "explode": [
+        100,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "ogv-1",
+      "label": "Outlet guide vane 1",
+      "description": "Static vane that straightens the swirling bypass flow behind the fan.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          60,
+          6,
+          2
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          90,
+          -150,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ogv-2",
+      "label": "Outlet guide vane 2",
+      "description": "Static vane that straightens the swirling bypass flow behind the fan.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          60,
+          6,
+          2
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          72.812,
+          -150,
+          52.901
+        ],
+        "rotation": [
+          0,
+          -36,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ogv-3",
+      "label": "Outlet guide vane 3",
+      "description": "Static vane that straightens the swirling bypass flow behind the fan.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          60,
+          6,
+          2
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          27.812,
+          -150,
+          85.595
+        ],
+        "rotation": [
+          0,
+          -72,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ogv-4",
+      "label": "Outlet guide vane 4",
+      "description": "Static vane that straightens the swirling bypass flow behind the fan.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          60,
+          6,
+          2
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          -27.812,
+          -150,
+          85.595
+        ],
+        "rotation": [
+          0,
+          -108,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ogv-5",
+      "label": "Outlet guide vane 5",
+      "description": "Static vane that straightens the swirling bypass flow behind the fan.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          60,
+          6,
+          2
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          -72.812,
+          -150,
+          52.901
+        ],
+        "rotation": [
+          0,
+          -144,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ogv-6",
+      "label": "Outlet guide vane 6",
+      "description": "Static vane that straightens the swirling bypass flow behind the fan.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          60,
+          6,
+          2
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          -90,
+          -150,
+          0
+        ],
+        "rotation": [
+          0,
+          -180,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ogv-7",
+      "label": "Outlet guide vane 7",
+      "description": "Static vane that straightens the swirling bypass flow behind the fan.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          60,
+          6,
+          2
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          -72.812,
+          -150,
+          -52.901
+        ],
+        "rotation": [
+          0,
+          -216,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ogv-8",
+      "label": "Outlet guide vane 8",
+      "description": "Static vane that straightens the swirling bypass flow behind the fan.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          60,
+          6,
+          2
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          -27.812,
+          -150,
+          -85.595
+        ],
+        "rotation": [
+          0,
+          -252,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ogv-9",
+      "label": "Outlet guide vane 9",
+      "description": "Static vane that straightens the swirling bypass flow behind the fan.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          60,
+          6,
+          2
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          27.812,
+          -150,
+          -85.595
+        ],
+        "rotation": [
+          0,
+          -288,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ogv-10",
+      "label": "Outlet guide vane 10",
+      "description": "Static vane that straightens the swirling bypass flow behind the fan.",
+      "geometry": {
+        "type": "box",
+        "size": [
+          60,
+          6,
+          2
+        ]
+      },
+      "material": {
+        "style": "wire",
+        "color": "#7a828e"
+      },
+      "parentId": "nacelle",
+      "transform": {
+        "position": [
+          72.812,
+          -150,
+          -52.901
+        ],
+        "rotation": [
+          0,
+          -324,
+          0
+        ]
+      }
+    }
+  ],
+  "connections": [],
+  "annotations": [
+    {
+      "part": "lp-shaft",
+      "text": "master: LP spool"
+    },
+    {
+      "part": "combustor",
+      "text": "continuous combustion"
+    }
+  ]
+}
