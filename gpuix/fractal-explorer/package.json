@@ -1,0 +1,21 @@
+{
+  "name": "fractal-explorer",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot app.tsx",
+    "start": "bun app.tsx",
+    "test": "bun test --timeout 60000",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.11.0",
+    "@gpuix/react": "0.11.0",
+    "react": "19"
+  }
+}
