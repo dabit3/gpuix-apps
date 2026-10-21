@@ -884,6 +884,7 @@ function RequestEditor({
   onTab: (t: 'params' | 'headers' | 'body') => void
   update: (p: Partial<RequestDraft>) => void
 }) {
+  const [editorH, setEditorH] = useState(0)
   const params = parseQuery(draft.url)
   const bodyCheck = draft.bodyType === 'json' && draft.body.trim() ? parseJson(draft.body) : null
   return (
@@ -938,7 +939,10 @@ function RequestEditor({
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 }}>
-            <div style={{ display: 'flex', flexGrow: 1, minHeight: 0, paddingTop: 10, paddingLeft: 8, paddingRight: 8 }}>
+            <div
+              onLayout={(e) => setEditorH(e.height ?? 0)}
+              style={{ display: 'flex', position: 'relative', flexGrow: 1, flexBasis: 0, minHeight: 0, overflow: 'hidden' }}
+            >
               <textarea
                 testId="body"
                 value={draft.body}
@@ -946,7 +950,7 @@ function RequestEditor({
                 theme={THEME}
                 minRows={4}
                 onChange={(e) => update({ body: e.value ?? '' })}
-                style={{ flexGrow: 1, height: '100%', fontSize: 13, lineHeight: 20, fontFamily: MONO, color: C.text, backgroundColor: '#00000000', borderWidth: 0, paddingLeft: 8, paddingRight: 8 }}
+                style={{ position: 'absolute', top: 10, left: 8, right: 8, height: Math.max(40, editorH - 10), fontSize: 13, lineHeight: 20, fontFamily: MONO, color: C.text, backgroundColor: '#00000000', borderWidth: 0, paddingLeft: 8, paddingRight: 8 }}
               />
             </div>
             {draft.bodyType === 'json' && (
