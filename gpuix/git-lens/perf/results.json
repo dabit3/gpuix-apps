@@ -1,0 +1,46 @@
+{
+  "machine": "macOS arm64 VM, Apple Paravirtual Metal GPU (slower than real Apple silicon)",
+  "largeRepo": {
+    "path": "/Users/devin/repos/express",
+    "commits": 6182,
+    "runs": [
+      {
+        "windowToFirstRowMs": 372,
+        "commits": 6182,
+        "logMs": 38,
+        "graphMs": 3,
+        "totalMs": 65,
+        "rssMb": 128
+      },
+      {
+        "windowToFirstRowMs": 348,
+        "commits": 6182,
+        "logMs": 36,
+        "graphMs": 3,
+        "totalMs": 62,
+        "rssMb": 121
+      },
+      {
+        "windowToFirstRowMs": 381,
+        "commits": 6182,
+        "logMs": 37,
+        "graphMs": 3,
+        "totalMs": 63,
+        "rssMb": 125
+      }
+    ]
+  },
+  "bigDiff": {
+    "patchLines": 5007,
+    "wheelEvents": 160,
+    "frame": {
+      "frames": 339,
+      "samples": 321,
+      "currentMs": 2.9746248722076416,
+      "p90Ms": 6.676583290100098,
+      "p99Ms": 10.09233283996582,
+      "maxMs": 16.52662467956543
+    },
+    "rssMb": 109
+  }
+}
