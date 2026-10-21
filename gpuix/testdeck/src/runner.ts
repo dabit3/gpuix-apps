@@ -99,7 +99,11 @@ export function summarize(tests: TestCase[], startedAt: number, durationMs: numb
 /** Replace the tests a partial run touched, keep everything else from the previous run. */
 export function mergeRun(prev: RunResult, next: RunResult): RunResult {
   const byId = new Map(next.tests.map((t) => [t.id, t]))
-  const tests = prev.tests.map((t) => byId.get(t.id) ?? t)
+  // bun reports tests filtered out by -t as skipped; keep their previous result.
+  const tests = prev.tests.map((t) => {
+    const n = byId.get(t.id)
+    return !n || (n.status === 'skip' && t.status !== 'skip') ? t : n
+  })
   for (const t of next.tests) if (!prev.tests.some((p) => p.id === t.id)) tests.push(t)
   const merged = summarize(tests, next.startedAt, next.durationMs, true)
   merged.error = next.error

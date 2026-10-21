@@ -55,7 +55,8 @@ describe('runTests (real bun test)', () => {
 
     const again = mergeRun(first, await runTests(dir, { files: ['m.test.ts'], namePattern: '^two$' }))
     expect(again.tests).toHaveLength(3)
-    expect(again.counts.fail).toBe(1)
+    expect(again.counts).toEqual({ pass: 1, fail: 1, skip: 1, todo: 0 })
+    expect(again.tests.find((t) => t.name === 'one')?.status).toBe('pass')
     expect(again.partial).toBe(true)
   })
 
