@@ -1,0 +1,130 @@
+{
+ "width": 40,
+ "height": 32,
+ "rows": [
+  ",,,,,,,,,,,,.=.,,,,,,,,,,,.=.d###ddddddd",
+  ",###r######,.=.,CCKCCCgTg,.=.d###ddddddd",
+  ",##########,.=.,CCCCCCggg,.=.dddrddrdddd",
+  ",##########,.=.,CCCCCCggT,.=.OOOOrrOOOOO",
+  ",######r##r,.=.,CCCCCCggg,.=.OOOOrrOOOOO",
+  ",####rrrddd,.=.,CCCCCCggg,c=.ddddddddddd",
+  ",####rrrddd,.=.,ggggggggg,.=.ddbdddddddd",
+  ",####rrrddd,.=.,gmgggmggg,.=.dddddddbddd",
+  ",r###rrrddd,.=.,mggmgggmg,.=.ddddddddddd",
+  ",,,,,,,,,,,,.=.,,,,,,,,,,,.=.ffffddfffff",
+  ".............=.............=............",
+  "=============+======cc=====+============",
+  ".............=............b=............",
+  ",,,,,,,,,,,,.=.,,,,,,,,,,,.=.,,,,,,,,,,,",
+  ",,BBBBB####,.=.,UUww_wwww,.=.,######RRA,",
+  ",,BBBBB####,.=.,w________,.=.,######RRR,",
+  ",,BBBBB####,.c.,w__p__p__,.=.,######RRR,",
+  ",,,,,,,###r,.=c,w________,.=.,,,,b,,,,,,",
+  ",,,,,,,,,,,,.=.,w__p__p__,.=.,rrrr,,,,,,",
+  ",cc,,,,,,,,,.=.,w________,.c.,rrrr,cc,,,",
+  ",,,,,,,,,,,,.=.,,,,,,,,,,,.=.,,,,,,,,,,,",
+  ".............=.............=............",
+  "=============+=============+============",
+  "............b=.............=............",
+  "gggggggggggg.=.rrrrrrrrrrr.=.,,,,,,,,,,,",
+  "ggTggggggTgg.=.rrrrrrrrrrr.=.,,,,##r###,",
+  "ggggHHHggggg.=.rbr~~~~~~rr.=.,cc,######,",
+  "ggggHHHgggggc=.rr~~~~~~rrr.=.,,,,######,",
+  "ggggg,gggggg.=.rrr~~~~~rrr.=.,,,,r####r,",
+  "ggggg,gggggg.=.rrr~~~~~rbr.=.rrrrrrrrrrr",
+  "gTggg,ggggTg.=.rrrrrr~rrrr.=.rrrrrrrrrrr",
+  "ggggg,gggggg.=.crrrrrrrrrc.=.rrrrrrrrrrr"
+ ],
+ "legend": {
+  ".": "asphalt",
+  "=": "lane",
+  "+": "crossing",
+  ",": "sidewalk",
+  "d": "dirt",
+  "g": "grass",
+  "r": "rubble",
+  "~": "radpool",
+  "_": "platform",
+  "#": "brownstone",
+  "B": "bodega",
+  "C": "church",
+  "K": "steeple",
+  "U": "kiosk",
+  "w": "lowwall",
+  "p": "pillar",
+  "O": "overpass",
+  "f": "fence",
+  "b": "barrel",
+  "c": "car",
+  "T": "tree",
+  "m": "tombstone",
+  "H": "hatch",
+  "R": "shack",
+  "A": "mast"
+ },
+ "regions": [
+  {
+   "name": "Bleecker Row",
+   "x0": 0,
+   "y0": 0,
+   "x1": 11,
+   "y1": 9
+  },
+  {
+   "name": "St. Brigid's",
+   "x0": 15,
+   "y0": 0,
+   "x1": 25,
+   "y1": 9
+  },
+  {
+   "name": "The Overpass",
+   "x0": 29,
+   "y0": 0,
+   "x1": 39,
+   "y1": 9
+  },
+  {
+   "name": "Quintero Bodega",
+   "x0": 0,
+   "y0": 13,
+   "x1": 11,
+   "y1": 20
+  },
+  {
+   "name": "Bleecker St Station",
+   "x0": 15,
+   "y0": 13,
+   "x1": 25,
+   "y1": 20
+  },
+  {
+   "name": "WKNY Radio",
+   "x0": 29,
+   "y0": 13,
+   "x1": 39,
+   "y1": 20
+  },
+  {
+   "name": "Washington Sq",
+   "x0": 0,
+   "y0": 24,
+   "x1": 11,
+   "y1": 31
+  },
+  {
+   "name": "Con Ed Crater",
+   "x0": 15,
+   "y0": 24,
+   "x1": 25,
+   "y1": 31
+  },
+  {
+   "name": "Houston Lots",
+   "x0": 29,
+   "y0": 24,
+   "x1": 39,
+   "y1": 31
+  }
+ ]
+}

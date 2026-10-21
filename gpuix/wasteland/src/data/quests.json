@@ -1,0 +1,26 @@
+{
+  "clean_water": { "title": "Clean Water", "main": true, "stages": {
+    "active": "The Shelter 34 purifier is failing. Ada thinks the Subway Union at Bleecker St Station has a spare filter cartridge.",
+    "union": "Marcus Bell will part with a filter cartridge if the tunnel rats on the platform are cleared, or for 150 caps, or for a working generator.",
+    "got": "You have a filter cartridge. Bring it to Overseer Ada at the Shelter 34 hatch.",
+    "done": "The purifier runs clean again. Shelter 34 can drink." } },
+  "overpass": { "title": "The Overpass", "main": true, "stages": {
+    "active": "Dutch Malloy's Wreckers hold the collapsed overpass and tax every water run. Deal with Dutch, one way or another.",
+    "resolved": "The overpass is settled. Tell Ada how it went.",
+    "done": "The water runs are safe. Lower Manhattan has a future." } },
+  "rusty": { "title": "Where's Rusty?", "main": false, "stages": {
+    "active": "Milo's dog Rusty ran off toward the Con Ed crater. Find him.",
+    "found": "Rusty is following you. Take him home to Milo.",
+    "done": "Rusty is home." } },
+  "bell": { "title": "The Bell of St. Brigid", "main": false, "stages": {
+    "active": "Sister Odile wants the church bell's clapper back. It was carted off to the ruins on Bleecker Row.",
+    "got": "You found the bell clapper. Return it to Sister Odile.",
+    "done": "St. Brigid's bell rings again." } },
+  "parcel": { "title": "Bodega Run", "main": false, "stages": {
+    "active": "Deliver Rosa's sealed parcel to Old Tom by the overpass.",
+    "done": "Parcel delivered." } },
+  "static": { "title": "Static on 88.1", "main": false, "stages": {
+    "active": "Velvet Jones needs a signal valve for her transmitter. The Union stores spares in a crate deep on the station platform.",
+    "got": "You have the signal valve. Bring it to Velvet at WKNY.",
+    "done": "Brass & Ash 88.1 is back on the air." } }
+}
