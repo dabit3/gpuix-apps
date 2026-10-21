@@ -38,6 +38,8 @@ export function copyToClipboard(text: string) {
 // ---------------------------------------------------------------------------
 // Rows
 
+const SNIPPET_AFTER = 60
+const SNIPPET_LEAD = 24
 const LEVEL_SHORT = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL']
 
 const Row = memo(function Row({
@@ -69,8 +71,16 @@ const Row = memo(function Row({
     const sEnd = raw.indexOf(' ', 31)
     rest = sEnd < 0 ? '' : raw.slice(sEnd + 1)
   }
-  if (rest.length > 400) rest = rest.slice(0, 400)
-  const ranges = re ? rangesIn(re, rest) : null
+  let ranges = re ? rangesIn(re, rest.length > 8000 ? rest.slice(0, 8000) : rest) : null
+  // A hit deep in the payload would sit past the ellipsis: show a snippet around it instead.
+  if (ranges && ranges.length && ranges[0]![0] > SNIPPET_AFTER) {
+    const cut = ranges[0]![0] - SNIPPET_LEAD
+    rest = '… ' + rest.slice(cut, cut + 400)
+    ranges = ranges.map(([a, b]) => [a - cut + 2, b - cut + 2] as [number, number]).filter(([, b]) => b <= rest.length)
+  } else if (rest.length > 400) {
+    rest = rest.slice(0, 400)
+    if (ranges) ranges = ranges.filter(([, b]) => b <= 400)
+  }
   const svcName = s.services[svc] ?? '-'
   const svcRanges = re ? rangesIn(re, svcName) : null
   return (
@@ -567,8 +577,16 @@ export function FirehoseApp({ ctl }: { ctl: Controller }) {
               </div>
             )}
             <div style={{ flexGrow: 1 }} />
-            {selectionLen > 0 && <text style={{ fontSize: 11.5, color: C.textDim }}>{fmt(selectionLen)} chars selected · ⌘C to copy</text>}
-            {toast && <text testId="toast" style={{ fontSize: 11.5, color: C.green }}>{toast}</text>}
+            {selectionLen > 0 && (
+              <div style={{ flexShrink: 0 }}>
+                <text style={{ fontSize: 11.5, color: C.textDim, whiteSpace: 'nowrap' }}>{`${fmt(selectionLen)} chars selected · ⌘C to copy`}</text>
+              </div>
+            )}
+            {toast && (
+              <div style={{ flexShrink: 0 }}>
+                <text testId="toast" style={{ fontSize: 11.5, color: C.green, whiteSpace: 'nowrap' }}>{toast}</text>
+              </div>
+            )}
             <div style={{ flexShrink: 0 }}>
               <text style={{ fontSize: 11.5, color: C.textMuted, fontFamily: MONO, whiteSpace: 'nowrap' }}>{`${fmt(ctl.store.textBytes / 1e6)} MB text · ${ctl.store.chunks.length} chunks`}</text>
             </div>

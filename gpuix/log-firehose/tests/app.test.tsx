@@ -64,6 +64,9 @@ d('Firehose app', () => {
     const hits = renderer.getPaintedHighlights()
     expect(hits.length).toBeGreaterThan(5)
     for (const h of hits) expect(h.text.slice(h.start, h.end).toLowerCase()).toBe('deadlock')
+    // every mounted matching row paints its hit (deep payload hits are shown as a snippet)
+    const rowsWithHits = new Set(hits.map((h) => h.elementId))
+    expect(rowsWithHits.size).toBeGreaterThanOrEqual(Math.min(expected, 20))
     renderer.captureScreenshot(path.join(SHOTS, 'search-only-matches.png'))
 
     // Next match moves the find cursor; Cmd-G style navigation reports a rank.

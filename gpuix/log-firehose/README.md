@@ -12,7 +12,7 @@ Demo (real time, real mouse and keyboard input, 81 s): [`media/demo.mp4`](media/
 - **Load file…** opens any log through the native macOS picker (`promptForPaths`). Drag-and-drop onto the window works too (`onFileDrop`). `bun run sample` writes a 2M-line, 529 MB sample.
 - **Tail-follow** with chat-tail behaviour: the list follows new lines; a wheel up pauses following and keeps the reader anchored while lines keep arriving; a "N newer lines ↓" pill, the End key or "Follow" resumes it.
 - **Filters**: level and service toggles in the sidebar with live counts; ⌥-click solos one.
-- **Search**: text or regex (`.*`), case toggle, live match highlighting on visible rows (`highlight` ranges), a match count, ↑/↓ and ⌘G/⇧⌘G next/prev, ⌘F to focus, and **Only matches**, which turns the search into a filter. Streamed lines are searched as they arrive.
+- **Search**: text or regex (`.*`), case toggle, live match highlighting on visible rows (`highlight` ranges; when a hit sits deep in the JSON payload, the row shows a `… ` snippet around it so the hit is always visible), a match count, ↑/↓ and ⌘G/⇧⌘G next/prev, ⌘F to focus, and **Only matches**, which turns the search into a filter. Streamed lines are searched as they arrive.
 - **Inspector**: click a line to see its fields, its pretty-printed JSON payload in a `<code>` block, its stack trace, and a "Show all lines for req=…" button that filters to one request across services.
 - **Rate histogram**: lines per second, stacked by severity, painted into an `<img>` with `setImagePixels` (BGRA, 2x). It shows the last 120 s live, or the whole file in buckets. Hover shows counts, a click jumps to that second, and the blue band marks the rows on screen.
 - **Jump to time**: `HH:MM[:SS[.mmm]]` binary-searches the timestamps.
@@ -47,6 +47,8 @@ Measured on this VM: **Apple Paravirtual GPU (Metal)**, 12 vCPU, 16 GB. That is 
 | Streaming frame on the GPU test renderer (833 lines/frame = 50k/s at 60 Hz) | native flush p50 ~4 ms |
 
 Before the paging workaround, the same 50k lines/s run sat at **47–53 ms frames and 1.7 GB RSS after 10 s**.
+
+During the testing agent's run, frames were 3.3–4.9 ms (p90 5.3) while it streamed at 100k/s. Later, with the store at its 6M-line cap and filter/inspector interactions, they rose to 10–28 ms (16.8 ms, p90 21.2 at 6M lines), and RSS peaked at about 2.4 GB. That run also had the screen recorder and screenshot tooling competing for the same paravirtual GPU and CPU, so treat those numbers as an upper bound. Live generation stops at the 6M-line store cap (`LogStore.maxLines`).
 
 ## GPUIX findings (v0.11.0, `@gpuix/react@0.11.0` + `@gpuix/native@0.11.0`, macOS arm64)
 
