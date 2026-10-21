@@ -42,8 +42,9 @@ case "--key":
 case "--kd", "--ku":
   let down = args[1] == "--kd"
   let e = CGEvent(keyboardEventSource: src, virtualKey: CGKeyCode(Int(args[2])!), keyDown: down)!
-  if args.count > 3 { let u = Array(args[3].utf16); e.keyboardSetUnicodeString(stringLength: u.count, unicodeString: u) }
+  if args.count > 3 && !args[3].isEmpty { let u = Array(args[3].utf16); e.keyboardSetUnicodeString(stringLength: u.count, unicodeString: u) }
   e.post(tap: .cghidEventTap)
+  usleep(40_000) // exiting right after a post can drop the event
 case "--scroll":
   let n = Int(num(3, 1))
   for _ in 0..<n {

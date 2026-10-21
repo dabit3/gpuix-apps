@@ -116,7 +116,7 @@ export class World {
     const cs = Math.cos(p.angle), sn = Math.sin(p.angle)
     const mf = inp.fwd / len, ms = inp.strafe / len
     const mx = (cs * mf - sn * ms) * sp, my = (sn * mf + cs * ms) * sp
-    this.move(p, mx, my, 0.24, true)
+    this.move(p, mx, my, 0.32, true)
     const moving = Math.abs(inp.fwd) + Math.abs(inp.strafe) > 0
     if (moving && p.vz === 0) {
       p.bob += dt * 9; p.stepAcc += sp
@@ -253,11 +253,11 @@ export class World {
       }
       if (vx || vy) { this.move(e, vx * st.speed * dt, vy * st.speed * dt, st.radius * 0.7, false); e.anim += dt * st.speed * 4 }
       if (e.state === 'attack' && e.cool <= 0) {
-        if (e.kind === 'spider') { e.cool = 0.8; this.hurt(7) }
+        if (e.kind === 'spider') { e.cool = 0.9; this.hurt(5) }
         else {
-          e.cool = 1.5
+          e.cool = 1.9
           const l = d || 1
-          this.projs.push({ kind: 'ebolt', x: e.x, y: e.y, z: 0.67, vx: ((p.x - e.x) / l) * 5.5, vy: ((p.y - e.y) / l) * 5.5, life: 3 })
+          this.projs.push({ kind: 'ebolt', x: e.x, y: e.y, z: 0.67, vx: ((p.x - e.x) / l) * 4.5, vy: ((p.y - e.y) / l) * 4.5, life: 3 })
           this.events.push('eshoot')
         }
       }
@@ -292,7 +292,7 @@ export class World {
       const nx = q.x + q.vx * dt, ny = q.y + q.vy * dt
       let hit = solidAt(this.level, nx, ny)
       if (q.kind === 'ebolt') {
-        if (Math.hypot(nx - p.x, ny - p.y) < 0.35) { this.hurt(12); q.life = 0; this.fx.push({ kind: 'spark', x: nx, y: ny, z: q.z, t: 0 }); continue }
+        if (Math.hypot(nx - p.x, ny - p.y) < 0.35) { this.hurt(9); q.life = 0; this.fx.push({ kind: 'spark', x: nx, y: ny, z: q.z, t: 0 }); continue }
       } else for (const e of this.enemies) if (e.state !== 'dead' && Math.hypot(e.x - nx, e.y - ny) < STATS[e.kind].radius + 0.1) hit = true
       if (hit || q.life <= 0) {
         q.life = 0

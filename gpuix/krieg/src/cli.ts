@@ -13,7 +13,7 @@ options
   -s, --seed <n>    level seed (default 1337, deterministic)
   -m, --mute        no audio (audio plays through afplay on macOS)
   -g, --god         take no damage
-  -q, --scale <n>   internal resolution divisor 2|3|4 (default 3; r cycles in game)
+  -q, --scale <n>   internal resolution divisor 2|3|4 (default 2; r cycles in game)
   -w, --window      open a native window instead of painting in the terminal
   -h, --help        this help
 
@@ -50,7 +50,7 @@ if (cmd === 'size') {
   const { measure } = await import('./size')
   const { createElement } = await import('react')
   const size = await measure().then((r) => ({ bytes: r.bytes, gzip: r.gzip })).catch(() => undefined)
-  const scale = Math.max(2, Math.min(4, Number(val('-q', '--scale') ?? 3) | 0))
+  const scale = Math.max(2, Math.min(4, Number(val('-q', '--scale') ?? 2) | 0))
   render(createElement(App, { opts: { seed, mute: has('-m', '--mute'), god: has('-g', '--god'), scale, size } }), { terminal, title: 'krieg', width: 1280, height: 800 } as never)
 } else {
   console.error(`krieg: unknown command "${cmd}"\n\n${HELP}`)

@@ -191,13 +191,17 @@ export function generateLevel(seed = 1337): Level {
     else if (rm.kind !== 'exit') pickups.push({ kind: (['health', 'ammo', 'rockets'] as const)[k % 3]!, ...free(rm), room: k })
   })
   const s = rooms[startRoom]!
-  const firstDoorDir = (() => {
-    // Face the first corridor out of the start room.
-    const nbr = adj(edges)[startRoom]![0]!
-    const n = rooms[nbr]!
-    return Math.atan2(n.j - s.j, n.i - s.i)
-  })()
-  const start = { x: (s.x0 + s.x1 + 1) / 2, y: (s.y0 + s.y1 + 1) / 2, angle: firstDoorDir }
+  // Stand in line with the nearest doorway out of the start room and face it, so W walks straight out.
+  const cx0 = (s.x0 + s.x1 + 1) / 2, cy0 = (s.y0 + s.y1 + 1) / 2
+  const own = doors.filter((d) => !d.locked && d.x >= s.x0 - 1 && d.x <= s.x1 + 1 && d.y >= s.y0 - 1 && d.y <= s.y1 + 1 &&
+    ((d.x >= s.x0 && d.x <= s.x1) || (d.y >= s.y0 && d.y <= s.y1)))
+  const dr = (own.length ? own : doors).reduce((a, d) => (Math.hypot(d.x + 0.5 - cx0, d.y + 0.5 - cy0) < Math.hypot(a.x + 0.5 - cx0, a.y + 0.5 - cy0) ? d : a))
+  const ddx = dr.x + 0.5 - cx0, ddy = dr.y + 0.5 - cy0
+  let start = Math.abs(ddx) > Math.abs(ddy)
+    ? { x: Math.floor(cx0) + 0.5, y: dr.y + 0.5, angle: ddx > 0 ? 0 : Math.PI }
+    : { x: dr.x + 0.5, y: Math.floor(cy0) + 0.5, angle: ddy > 0 ? Math.PI / 2 : -Math.PI / 2 }
+  if (cells[Math.floor(start.y) * MW + Math.floor(start.x)] !== EMPTY)
+    start = { x: Math.floor(cx0) + 0.5, y: Math.floor(cy0) + 0.5, angle: Math.atan2(ddy, ddx) }
   const er = rooms[exitRoom]!
   const exit = { x: (er.x0 + er.x1 + 1) / 2, y: (er.y0 + er.y1 + 1) / 2 }
   const lvl: Level = { seed, cells, doorAt, doors, rooms, edges, lights, enemies, pickups, start, exit, lightmap: new Float32Array(0) }

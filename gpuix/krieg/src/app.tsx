@@ -108,7 +108,10 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
     else if (n === 'escape') setMode('title')
     held.current.add(n)
   }
-  const onKeyUp = (e: any) => held.current.delete(keyName(e))
+  const onKeyUp = (e: any) => {
+    if (DEBUG) appendFileSync(DEBUG, `up ${JSON.stringify({ key: e.key, keyChar: e.keyChar })} -> ${keyName(e)}\n`)
+    held.current.delete(keyName(e))
+  }
   const onMouseDown = (e: any) => {
     if (modeRef.current === 'title') { start(); return }
     if (modeRef.current === 'lab') return
