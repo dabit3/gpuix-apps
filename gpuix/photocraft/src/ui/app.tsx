@@ -43,8 +43,8 @@ const SHORT_FILTER: Record<FilterKind, string> = { gaussian: 'Blur', unsharp: 'S
 
 const Icon = ({ name, color = T.dim, size = 16 }: { name: keyof typeof ICONS; color?: string; size?: number }) => <svg source={ICONS[name]} style={{ width: size, height: size, color }} />
 
-const Label = ({ children, color = T.dim, size = 12, weight = 500 }: { children: ReactNode; color?: string; size?: number; weight?: number }) => (
-  <text style={{ color, fontSize: size, fontWeight: weight }}>{children}</text>
+const Label = ({ children, color = T.dim, size = 12, weight = 500, clip }: { children: ReactNode; color?: string; size?: number; weight?: number; clip?: boolean }) => (
+  <text style={{ color, fontSize: size, fontWeight: weight, ...(clip ? { whiteSpace: 'nowrap', textOverflow: 'ellipsis' } : null) }}>{children}</text>
 )
 
 function IconButton({ name, onClick, active, testId, disabled }: { name: keyof typeof ICONS; onClick: () => void; active?: boolean; testId?: string; disabled?: boolean }) {
@@ -194,9 +194,9 @@ function LayerRow({ ed, L, i, version }: { ed: Editor; L: Layer; i: number; vers
           }}
         />
       ) : null}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexGrow: 1, flexShrink: 1, overflow: 'hidden' }}>
-        <Label color={L.visible ? T.fg : T.faint} size={12.5} weight={active ? 600 : 500}>{L.name}</Label>
-        <Label color={T.faint} size={10.5}>{`${BLEND_LABELS[L.blend]} · ${Math.round(L.opacity * 100)}%${active && ed.editMask ? ' · mask' : ''}`}</Label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, overflow: 'hidden' }}>
+        <Label color={L.visible ? T.fg : T.faint} size={12.5} weight={active ? 600 : 500} clip>{L.name}</Label>
+        <Label color={T.faint} size={10.5} clip>{`${BLEND_LABELS[L.blend]} · ${Math.round(L.opacity * 100)}%${active && ed.editMask ? ' · mask' : ''}`}</Label>
       </div>
     </div>
   )
