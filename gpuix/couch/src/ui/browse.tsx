@@ -160,7 +160,7 @@ export function Home({ view, width, height }: { view: View; width: number; heigh
       >
         <motion.div initial={false} animate={{ top: -offset }} transition={{ duration: 0.22, ease: 'easeOut' }} style={{ position: 'absolute', left: 0, width, display: 'flex', flexDirection: 'column' }}>
           {rows.map((row, ri) => {
-            const near = Math.abs(ri - view.row) <= 2
+            const near = ri >= view.row - 1 && ri <= view.row + Math.ceil(areaH / rowH('landscape')) + 1
             const w = row.shape === 'poster' ? sz.posterW : sz.landW
             const h = row.shape === 'poster' ? sz.posterH : sz.landH
             const step = w + sz.gap
@@ -195,7 +195,7 @@ export function Home({ view, width, height }: { view: View; width: number; heigh
                             caption={row.shape === 'landscape' ? (show ? show.title : it.title) : it.title}
                             sub={row.shape === 'landscape' ? (isEp ? `S${it.season} · E${it.episode}  ${it.title}` : `${Math.round((1 - progressOf(ctl.prof, id)) * (it.probe?.duration ?? 0) / 60)} min left`) : undefined}
                             onHover={() => ctl.hoverRow(ri, ci)}
-                            onClick={() => { ctl.hoverRow(ri, ci); ctl.dispatch('ok', 'mouse') }}
+                            onClick={() => { ctl.setPointer(true); ctl.hoverRow(ri, ci); ctl.dispatch('ok', 'mouse') }}
                           />
                         )
                       })}
