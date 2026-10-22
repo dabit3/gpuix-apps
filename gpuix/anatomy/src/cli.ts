@@ -4,9 +4,10 @@ import { basename, dirname, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
 const VERSION = 'anatomy 0.1.0 (gpuix 0.11.0)'
-const HELP = `anatomy: one line of text -> an interactive, animated 3D machine, drawn by GPUIX in your terminal
+const HELP = `anatomy: one line of text (or a codebase) -> an interactive, animated 3D machine, drawn by GPUIX in your terminal
 
 Usage:
+  anatomy <dir>                    the anatomy of a codebase: top modules as geared stations, imports as packets; edits rescan live
   anatomy "<description>"          design a machine from a one-liner ("a V8 engine", "a steam locomotive")
   anatomy <spec.json>              open a machine spec; edits to the file hot-reload
   anatomy gen "<description>" [-o file]   write the designed spec as JSON (stdout by default)
@@ -17,6 +18,7 @@ Options:
   -t, --theme <name>  Ghostty theme to paint with (default: your Ghostty config)
   -x, --explode <0-1> start exploded
   -s, --speed <x>     clock speed 0.1-4 (default 1)
+  -n, --top <n>       codebase mode: how many modules to draw, 3-24 (default 12)
   -o, --out <file>    output file for gen / snap
   -w, --window        open a native window instead of drawing in the terminal
   -h, --help          show this help
@@ -25,7 +27,8 @@ Options:
 Built-in designers: V6/V8/V12, inline-N and boxer engines, mechanical watch, turbofan, steam locomotive, planetary gearset.
 Runs inside Ghostty or kitty (kitty graphics protocol). Ctrl-C quits.
 Mouse: drag orbit · shift/right-drag pan · scroll zoom · click inspect · double-click focus
-Keys:  space play · , . step · [ ] speed · e explode · - = explode · v iso/persp · f effects · i parts · ↑↓ walk · enter focus · r reset · p PNG`
+Keys:  space play · , . step · [ ] speed · e explode · - = explode · v iso/persp · f effects · i parts · ↑↓ walk · enter focus · r reset · p PNG
+       n / b  more / fewer modules (codebase mode)`
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(2),
@@ -34,6 +37,7 @@ const { values, positionals } = parseArgs({
     explode: { type: 'string', short: 'x' },
     speed: { type: 'string', short: 's' },
     out: { type: 'string', short: 'o' },
+    top: { type: 'string', short: 'n' },
     window: { type: 'boolean', short: 'w' },
     help: { type: 'boolean', short: 'h' },
     version: { type: 'boolean', short: 'v' },
@@ -45,7 +49,9 @@ const { values, positionals } = parseArgs({
 if (values.help) { console.log(HELP); process.exit(0) }
 if (values.version) { console.log(VERSION); process.exit(0) }
 
-const { loadSource, readSpec, isSpecPath, SpecError } = await import('./source')
+const { loadSource, loadCodebase, readSpec, SpecError } = await import('./source')
+const clampTop = (n: number) => Math.max(3, Math.min(24, Math.round(n) || 12))
+let top = clampTop(Number(values.top ?? 12))
 const fail = (e: unknown): never => { console.error(e instanceof SpecError ? e.message : `anatomy: ${(e as Error).message}`); process.exit(1) }
 
 const [cmd, ...rest] = positionals
@@ -61,7 +67,7 @@ if (cmd === 'gen') {
   const prompt = rest.join(' ')
   if (!prompt) fail(new Error('gen needs a description, e.g. anatomy gen "a V12 engine"'))
   let spec
-  try { spec = loadSource(prompt).spec } catch (e) { fail(e) }
+  try { spec = loadSource(prompt, { top }).spec } catch (e) { fail(e) }
   const json = `${JSON.stringify({ $schema: '../schema/machine.schema.json', ...spec }, null, 2)}\n`
   if (values.out) {
     if (!existsSync(dirname(values.out))) mkdirSync(dirname(values.out), { recursive: true })
@@ -76,7 +82,7 @@ if (cmd === 'snap') {
   const { encodePng } = await import('./png')
   const { loadGhosttyTheme } = await import('./theme')
   let spec
-  try { spec = loadSource(rest.join(' ') || 'a V8 engine').spec } catch (e) { fail(e) }
+  try { spec = loadSource(rest.join(' ') || 'a V8 engine', { top }).spec } catch (e) { fail(e) }
   const scene = new Scene(spec!), r = new Renderer(), th = loadGhosttyTheme(values.theme)
   r.resize(1600, 1000)
   const pal = paletteOf(th), c = spec!.meta.camera ?? {}
@@ -113,17 +119,61 @@ function paletteOf(th: { bg: string; palette: string[]; accent: string }) {
 }
 
 let src
-try { src = loadSource(arg) } catch (e) { fail(e) }
+try { src = loadSource(arg, { top }) } catch (e) { fail(e) }
 const { loadGhosttyTheme } = await import('./theme')
 const { Viewer } = await import('./ui/viewer')
 const { start } = await import('./ui/app')
 const theme = loadGhosttyTheme(values.theme)
 const file = src!.path ? resolve(src!.path) : undefined
-const v = new Viewer(src!.spec, paletteOf(theme), file ? relative(process.cwd(), file) || basename(file) : `"${arg}"`)
+const label = src!.dir ? relative(process.cwd(), resolve(src!.dir)) || '.' : file ? relative(process.cwd(), file) || basename(file) : `"${arg}"`
+const v = new Viewer(src!.spec, paletteOf(theme), label)
 if (values.speed) v.speed = Math.max(0.1, Math.min(4, Number(values.speed) || 1))
 if (values.explode) { v.explodeTarget = v.explode = Math.max(0, Math.min(1, Number(values.explode) || 0)) }
 
-if (file) {
+if (src!.dir) {
+  // Codebase mode: watch the tree, rescan on source edits, and light up the files that changed for a few seconds.
+  const { isScannedPath } = await import('./code/scan')
+  const dir = resolve(src!.dir)
+  let scan = src!.codebase!
+  const hot = new Map<string, number>()
+  const HOT_MS = 9000
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let cool: ReturnType<typeof setTimeout> | undefined
+  const pending = new Set<string>()
+  const hotSet = () => { const now = Date.now(); for (const [p, at] of hot) if (now - at > HOT_MS) hot.delete(p); return new Set(hot.keys()) }
+  const rebuild = (rescan: boolean, note?: string, reframe = false) => {
+    try {
+      const r = loadCodebase(dir, { top, hot: hotSet() }, rescan ? undefined : scan)
+      scan = r.codebase
+      v.load(r.spec, note, reframe)
+    } catch (e) { v.say(`kept last good scan · ${(e as Error).message.split('\n')[0]}`, 'err') }
+  }
+  v.code = {
+    top,
+    setTop(n) {
+      const t = clampTop(n)
+      if (t === top) return
+      top = v.code!.top = t
+      rebuild(true, `top ${t} modules · ${scan.files.length} files`, true)
+    },
+  }
+  watch(dir, { recursive: true }, (_ev, f) => {
+    if (!f || !isScannedPath(f)) return
+    pending.add(f.split('\\').join('/'))
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      const changed = [...pending].filter((p) => existsSync(resolve(dir, p)))
+      const removed = pending.size - changed.length
+      pending.clear()
+      for (const p of changed) hot.set(p, Date.now())
+      const what = changed.length === 1 ? changed[0] : changed.length ? `${changed.length} files` : `${removed} file${removed === 1 ? '' : 's'} removed`
+      rebuild(true)
+      v.say(`rescanned · ${what} changed · ${scan.files.length} files · ${Math.round(scan.totalLoc / 100) / 10}k lines`, 'ok')
+      clearTimeout(cool)
+      cool = setTimeout(() => rebuild(false), HOT_MS + 200)
+    }, 250)
+  })
+} else if (file) {
   // Watch the directory: editors and `anatomy gen -o` replace the file, which drops a watch on the file itself.
   let timer: ReturnType<typeof setTimeout> | undefined
   const name = basename(file)

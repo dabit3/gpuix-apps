@@ -28,6 +28,8 @@ export class Viewer {
   panel = true
   toast: Toast | null = null
   reloads = 0
+  /** Set in codebase mode: how many modules are drawn, and how to change it (rescans). */
+  code: { top: number; setTop: (n: number) => void } | null = null
   fps = 0
   private dirty = true
   private frames: number[] = []
@@ -48,8 +50,8 @@ export class Viewer {
   say(text: string, kind: Toast['kind'] = 'info') { this.toast = { text, kind, at: Date.now() }; this.emit() }
 
   /** Swap in a new spec (hot reload). Same machine keeps camera, clock and selection; a new machine reframes. */
-  load(spec: MachineSpec, note?: string) {
-    const same = spec.meta.name === this.spec.meta.name
+  load(spec: MachineSpec, note?: string, reframe = false) {
+    const same = spec.meta.name === this.spec.meta.name && !reframe
     const selId = this.selected >= 0 ? this.scene.parts[this.selected]?.part.id : undefined
     this.spec = spec
     this.scene = new Scene(spec)
@@ -176,6 +178,8 @@ export class Viewer {
       case 'pagedown': this.orbit(0, 30); return true
       case 'escape': if (this.selected >= 0) this.select(-1); else this.resetCamera(); return true
       case 'enter': this.focus(this.selected); return true
+      case 'n': if (!this.code) return false; this.code.setTop(this.code.top + 2); return true
+      case 'b': if (!this.code) return false; this.code.setTop(this.code.top - 2); return true
     }
     return false
   }

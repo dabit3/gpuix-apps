@@ -127,7 +127,7 @@ export class Scene {
       else { const d = norm(a.axis).map(Math.abs) as Vec3; m = mul(m, scaling(1 + d[0] * v, 1 + d[1] * v, 1 + d[2] * v)) }
     } else if (a?.type === 'slide' && a.path.length >= 2) {
       const c = this.cycles(a.driver, a.ratio ?? 1, 1 / Math.max(1e-3, a.period ?? 1))
-      const p = samplePath(a.path, ((c % 1) + 1) % 1)
+      const p = samplePath(a.path, ((((c + (a.phase ?? 0)) % 1) + 1) % 1))
       m = mul(translation(p[0], p[1], p[2]), tr.rotation ? euler(tr.rotation) : mat4())
     }
     if (tr.scale) m = mul(m, scaling(tr.scale[0], tr.scale[1], tr.scale[2]))

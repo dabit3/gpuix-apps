@@ -50,7 +50,7 @@ export type Animation =
       mode?: 'rotate' | 'translate' | 'scale'
       wave?: 'sine' | 'cam'
     }
-  | { type: 'slide'; path: Vec3[]; period?: number; driver?: string; ratio?: number }
+  | { type: 'slide'; path: Vec3[]; period?: number; driver?: string; ratio?: number; phase?: number }
   | {
       type: 'crank'
       /** Rotating part that carries the crank pin. */
@@ -86,6 +86,8 @@ export interface Connection {
   radiusFrom?: number
   radiusTo?: number
   color?: string
+  /** Wire only: lift the midpoint by this fraction of the span instead of sagging. */
+  arc?: number
 }
 
 export interface Annotation {

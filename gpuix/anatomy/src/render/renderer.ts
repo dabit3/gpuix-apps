@@ -386,7 +386,7 @@ export class Renderer {
       const A = scene.partCenter(ai), B = scene.partCenter(bi)
       if (c.type === 'shaft') { this.seg3(A, B, 2.2, col, 0.9, 0.3); continue }
       if (c.type === 'wire') {
-        const mid: Vec3 = [(A[0] + B[0]) / 2, Math.min(A[1], B[1]) - len(sub(A, B)) * 0.15, (A[2] + B[2]) / 2]
+        const mid: Vec3 = wireMid(A, B, c.arc)
         let prev = A
         for (let k = 1; k <= 12; k++) {
           const t = k / 12
@@ -535,4 +535,10 @@ export function pulseOf(scene: Scene, pulse: import('../spec/types').Pulse | und
   const deg = ((scene.angle(pulse.driver) * 180) / Math.PI) * pulse.ratio
   const x = (((deg - pulse.phase) % 360) + 360) % 360
   return x < pulse.width ? 1 - x / pulse.width : 0
+}
+
+/** Control point of a wire's quadratic curve: sags by default, or lifts by `arc` × span. */
+export function wireMid(A: Vec3, B: Vec3, arc?: number): Vec3 {
+  const span = len(sub(A, B))
+  return [(A[0] + B[0]) / 2, arc === undefined ? Math.min(A[1], B[1]) - span * 0.15 : Math.max(A[1], B[1]) + span * arc, (A[2] + B[2]) / 2]
 }

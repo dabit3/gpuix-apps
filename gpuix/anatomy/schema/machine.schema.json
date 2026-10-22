@@ -693,6 +693,10 @@
                   },
                   "ratio": {
                     "type": "number"
+                  },
+                  "phase": {
+                    "type": "number",
+                    "description": "Offset along the path as a fraction of one cycle (0-1)."
                   }
                 },
                 "additionalProperties": false
@@ -831,6 +835,10 @@
           "color": {
             "type": "string",
             "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "arc": {
+            "type": "number",
+            "description": "Wire only: lift the curve's midpoint by this fraction of the span (default: sag)."
           }
         }
       }

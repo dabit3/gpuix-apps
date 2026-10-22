@@ -198,8 +198,13 @@ function Toolbar({ v, theme, compact }: { v: Viewer; theme: Theme; compact: bool
       <Button testId="view" label={v.cam.view === 'iso' ? 'iso' : 'persp'} theme={theme} on={v.cam.view === 'perspective'} onClick={() => v.toggleView()} />
       <Button testId="fx" label="fx" theme={theme} on={v.effects} onClick={() => { v.effects = !v.effects; v.emit() }} />
       {!compact && <Button testId="tree" label="parts" theme={theme} on={v.panel} onClick={() => v.key('i')} />}
+      {v.code && <div style={{ width: 8, flexShrink: 0 }} />}
+      {v.code && !compact && <text style={{ color: theme.faint, fontSize: 12, fontFamily: MONO }}>modules</text>}
+      {v.code && <Button testId="fewer" label="−" theme={theme} onClick={() => v.key('b')} />}
+      {v.code && <text testId="top" style={{ color: theme.fg, fontSize: 12, fontFamily: MONO, width: 22 }}>{`${v.code.top}`}</text>}
+      {v.code && <Button testId="more" label="+" theme={theme} onClick={() => v.key('n')} />}
       <div style={{ flexGrow: 1 }} />
-      {!compact && <text style={{ color: theme.faint, fontSize: 11, fontFamily: MONO }}>drag orbit · ⇧drag pan · scroll zoom · dbl-click focus · e explode · v view · space play</text>}
+      {!compact && <text style={{ color: theme.faint, fontSize: 11, fontFamily: MONO }}>{v.code ? 'drag orbit · scroll zoom · dbl-click focus · e expand · n/b modules · space play' : 'drag orbit · ⇧drag pan · scroll zoom · dbl-click focus · e explode · v view · space play'}</text>}
     </div>
   )
 }
