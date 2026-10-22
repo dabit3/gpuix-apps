@@ -5,7 +5,8 @@ import { DevinApp } from './src/App'
 import { DevinClient, type ApiSession, type DevinApi } from './src/api'
 import { reducer, type State } from './src/state'
 import { sessionFromApi } from './src/live'
-import { filterAll, indexState, stateLabel } from './src/more'
+import { buildDuration, filterAll, indexState, stateLabel } from './src/more'
+import { parseLog } from './src/api'
 
 const describeNative = hasNativeTestRenderer ? describe : describe.skip
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -54,6 +55,36 @@ describe('sessions table helpers', () => {
     expect(filterAll(all, 'all', 'busy').map((s) => s.id)).toEqual(['r'])
     expect(indexState({ repo_path: 'o/r', repo_name: 'r', indexing_status: { indexing_enabled: true, latest_completed_wiki_index_job: { id: 1 } } }).text).toBe('Indexed')
     expect(indexState({ repo_path: 'o/r', repo_name: 'r', indexing_status: { indexing_enabled: false } }).text).toBe('Not indexed')
+  })
+})
+
+describe('environment and Devin Review', () => {
+  it('parses JSONL build logs, skipping junk, and formats build durations', () => {
+    const lines = parseLog('{"ts":"2026-10-21T18:23:56Z","stream":"system","msg":"=== start ==="}\nnot json\n\n{"ts":"2026-10-21T18:24:00Z","stream":"stderr","msg":"boom"}\n')
+    expect(lines).toEqual([
+      { ts: '2026-10-21T18:23:56Z', stream: 'system', msg: '=== start ===' },
+      { ts: '2026-10-21T18:24:00Z', stream: 'stderr', msg: 'boom' },
+    ])
+    expect(buildDuration({ build_id: 'b', status: 'succeeded', trigger: 'auto', created_at: 0, started_at: 100, completed_at: 350 })).toBe('4m 10s')
+    expect(buildDuration({ build_id: 'b', status: 'pending', trigger: 'auto', created_at: 0 })).toBe('—')
+  })
+
+  it('fetches the log through its presigned URL and treats a PR with no review as null', async () => {
+    const urls: string[] = []
+    const fake = (async (url: string, init?: RequestInit) => {
+      urls.push(`${init?.method ?? 'GET'} ${url}`)
+      if (url.includes('/logs')) return Response.json({ url: 'https://s3.example/log.jsonl', expires_at: 1 })
+      if (url.startsWith('https://s3.example')) return new Response('{"ts":"t","stream":"system","msg":"hi"}')
+      if (url.includes('/pr-reviews?pr_url=') && url.includes('pull%2F1')) return new Response('missing', { status: 404 })
+      if (url.includes('/pr-reviews')) return Response.json({ status: 'running', repo_path: 'github.com/o/r', pr_number: 2, commit_sha: 'abcdef1234', created_at: '2026-10-21T00:00:00Z' })
+      return new Response('nope', { status: 500 })
+    }) as unknown as typeof fetch
+    const c = new DevinClient({ apiKey: 'tok', orgId: 'org-1', fetch: fake })
+    expect(await c.buildLog('sbj-1')).toEqual([{ ts: 't', stream: 'system', msg: 'hi' }])
+    expect(urls[0]).toBe('GET https://api.devin.ai/v3/organizations/org-1/snapshot-setup/builds/sbj-1/logs')
+    expect(await c.prReview('https://github.com/o/r/pull/1')).toBeNull()
+    expect((await c.runPrReview('https://github.com/o/r/pull/2')).status).toBe('running')
+    expect(urls.at(-1)).toBe('POST https://api.devin.ai/v3/organizations/org-1/pr-reviews')
   })
 })
 

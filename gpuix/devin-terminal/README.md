@@ -88,6 +88,17 @@ Everything in the sidebar, the composer and the session header does something. P
 
 The mic and voice buttons were removed: GPUIX has no audio capture in a terminal app.
 
+### Parity pass 3 (all API-backed)
+
+- **Archived sessions stay hidden.** The session list asks for `is_archived=false` (the API returns archived sessions by default, about half of this org's), and every refresh drops sessions archived elsewhere after launch, except the one you have open.
+- **All sessions** (More → All sessions, or the Sessions ⋯ menu): the web app's sessions table, with search, Active / Waiting on you / With PRs filters, state labels ("PR is ready", "Waiting on you"), repo, PR badges and time. **Archived** lists the 300 most recently archived sessions with **Unarchive** (`POST /sessions/{id}/unarchive`), which puts the session back in the sidebar.
+- **Session tab:** editable **tags** (`PUT /sessions/{id}/tags`) and **Insights** (`GET /sessions/{id}/insights`): category, size, message counts, tools, issues, action items and the suggested prompt, with **Analyze** (`POST …/insights/generate`) when there is no analysis yet.
+- **PR tabs:** Devin Review status for the PR (`GET /pr-reviews?pr_url=`), with **Run review** / **Re-run** (`POST /pr-reviews`) on open PRs.
+- **Usage** (More → Usage): sessions created, sessions with merged PRs, PR created/merged/open/closed, merge rate and where sessions start, for 7 / 30 / 90 days (`/metrics/sessions`, `/metrics/prs`; daily ACUs from `/consumption/daily` when it reports any).
+- **Repositories** (More → Repositories): connected repos with language and DeepWiki/search indexing state; **New session** preselects that repo in the composer.
+- **Environment** (More → Environment): snapshot builds with status, trigger and duration; click one to read the last 80 lines of its build log in the app (JSONL from the presigned log URL, with an Errors filter), plus the org and repo blueprints. **Rebuild** starts a manual build.
+- **Security** now lists code-scan findings (`/code-scans/findings`) by severity; clicking one opens its fix PR or session.
+
 ## Design
 
 Laid out after the current web app: org header with search/notifications, New session (⇧⌘O), Automations, Security, Review, Customize, More, then Sessions with search (⌘K), nested sessions and "Load more…". The home view is the Devin mark with the Agent/Ask toggle over the big composer (+, slash commands, settings, repository, mode, mic, voice, split send button). Sessions get a branch/title/PR-count header with a status chip, the transcript, the status line and the composer. Inter is bundled (`assets/fonts`) and registered with `registerFont()`.

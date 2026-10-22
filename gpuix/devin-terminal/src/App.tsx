@@ -42,7 +42,7 @@ import type { ApiPlaybook, ApiSession } from './api'
 import { ActionMenu, AutomationsView, Btn, copyText, CustomizeView, Field, notificationsFor, NotificationsView, ReviewView, SecurityView, SettingsView, useSticky, WEB, type MenuAction, type View } from './views'
 import { clearQuarantine, originalPath, previewPath, shotsFrom, type PreviewDeps, type Shot } from './computer'
 import { loadPrefs, savePrefs, type Prefs } from './prefs'
-import { ReposView, SessionExtras, SessionsView, UsageView, type SessionsFilter } from './more'
+import { EnvironmentView, PrReview, ReposView, SessionExtras, SessionsView, UsageView, type SessionsFilter } from './more'
 
 export { C }
 
@@ -333,6 +333,7 @@ function Sidebar({
             { id: 'sessions', label: 'All sessions', icon: 'list', run: () => onNav('sessions') },
             { id: 'usage', label: 'Usage', icon: 'zap', run: () => onNav('usage') },
             { id: 'repos', label: 'Repositories', icon: 'folder', run: () => onNav('repos') },
+            { id: 'environment', label: 'Environment', icon: 'laptop', run: () => onNav('environment') },
             { id: 'wiki', label: 'DeepWiki', icon: 'library', run: () => openUrl(`${WEB}/wiki`) },
             { id: 'oncall', label: 'Oncall', icon: 'bell', run: () => openUrl(`${WEB}/oncall`) },
             { id: 'web', label: 'Open app.devin.ai', icon: 'share', run: () => openUrl(WEB) },
@@ -992,6 +993,7 @@ function LivePanel({ session, sessions, tab, onTab, onSelect, client, pollMs, pr
               <Icon name="link" size={13} color={C.secondary} />
               <text style={{ fontFamily: SANS, color: C.text, fontSize: 13 }}>Open on GitHub</text>
             </Button>
+            <PrReview key={pr.url} url={pr.url} client={client} canRun={(pr.state ?? 'open') === 'open'} />
           </div>
         ) : (
           <>
@@ -1759,6 +1761,8 @@ export function DevinApp({
         onOpen={(id) => (setView('home'), select(id))}
         onUnarchived={(s) => (dispatch({ type: 'unhide', id: s.id }), dispatch({ type: 'merge', sessions: [s] }))}
       />
+    ) : view === 'environment' ? (
+      <EnvironmentView api={client} narrow={tiny} />
     ) : view === 'usage' ? (
       <UsageView api={client} narrow={tiny} />
     ) : view === 'repos' ? (

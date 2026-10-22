@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Icon } from './icons'
 import { C } from './theme'
-import { timeAgo, type ApiFinding, type ApiInsights, type ApiPrMetrics, type ApiRepo, type ApiSession, type ApiSessionMetrics, type DevinApi } from './api'
+import { timeAgo, type ApiBlueprint, type ApiBuild, type ApiPrReview, type LogLine, type ApiFinding, type ApiInsights, type ApiPrMetrics, type ApiRepo, type ApiSession, type ApiSessionMetrics, type DevinApi } from './api'
 import { STATUS_COLOR, type Session } from './data'
 import { Btn, Card, Divider, Empty, Field, Notice, openUrl, Page, Pills, row, col, SANS, Stat, T, useApiList, useSticky, WEB } from './views'
 
@@ -354,6 +354,135 @@ export function SessionExtras({ session, client }: { session: Session; client: D
           {!a && ins.analysis_status !== 'started' && !generating && <T size={12} color={C.ghost}>No analysis yet. Analyze asks Devin to review how this session went.</T>}
         </Card>
       )}
+    </div>
+  )
+}
+
+const BUILD_COLOR: Record<ApiBuild['status'], string> = { succeeded: '#26cd4d', failed: '#ff9492', running: '#71b7ff', pending: '#f0b72f', cancelled: '#7a828e' }
+
+export function buildDuration(b: ApiBuild): string {
+  if (!b.started_at) return '—'
+  const s = Math.max(0, (b.completed_at ?? Date.now() / 1000) - b.started_at)
+  return s < 60 ? `${Math.round(s)}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`
+}
+
+/** Environment snapshot builds and blueprints (Settings → Environment in the web app), with in-app build logs. */
+export function EnvironmentView({ api, narrow }: { api: DevinApi | null; narrow?: boolean }) {
+  const builds = useApiList<ApiBuild>(api?.listBuilds?.bind(api), [api])
+  const blueprints = useApiList<ApiBlueprint>(api?.listBlueprints?.bind(api), [api])
+  const [open, setOpen] = useSticky<string | null>('env-open', null)
+  const [log, setLog] = useState<{ id: string; lines: LogLine[] | null; error?: string } | null>(null)
+  const [onlyErrors, setOnlyErrors] = useState(false)
+  const [msg, setMsg] = useState<{ text: string; tone?: 'error' | 'ok' } | null>(null)
+  useEffect(() => {
+    if (!open || !api?.buildLog || log?.id === open) return
+    setLog({ id: open, lines: null })
+    api
+      .buildLog(open)
+      .then((lines) => setLog({ id: open, lines }))
+      .catch((e: Error) => setLog({ id: open, lines: [], error: e.message }))
+  }, [open, api])
+  const rebuild = () => {
+    if (!api?.triggerBuild) return
+    api
+      .triggerBuild()
+      .then((b) => (builds.setItems((l) => [b, ...(l ?? [])]), setMsg({ text: 'Build started', tone: 'ok' })))
+      .catch((e: Error) => setMsg({ text: e.message, tone: 'error' }))
+  }
+  const shown = (log?.lines ?? []).filter((l) => !onlyErrors || l.stream === 'stderr' || /error|fail/i.test(l.msg))
+  return (
+    <Page testId="view-environment" narrow={narrow} title="Environment" subtitle="The machine image every Devin session boots from: snapshot builds and the blueprints behind them." actions={<div style={row({ gap: 8 })}><Btn icon="retry" label="Rebuild" testId="env-rebuild" onClick={rebuild} /><Btn icon="share" label="Edit on web" onClick={() => openUrl(`${WEB}/settings/environment`)} /></div>}>
+      {msg && <Notice text={msg.text} tone={msg.tone} />}
+      <T weight={600}>Builds</T>
+      {builds.error && <Notice text={builds.error} tone="error" />}
+      <div testId="build-list" style={col({ gap: 0 })}>
+        {(builds.items ?? []).map((b) => (
+          <div key={b.build_id} style={col({ gap: 0 })}>
+            <div testId={`build-${b.build_id}`} onClick={() => setOpen(open === b.build_id ? null : b.build_id)} style={{ ...row({ gap: 10 }), height: 38, paddingLeft: 10, paddingRight: 10, borderRadius: 8, cursor: 'pointer', backgroundColor: open === b.build_id ? C.hover : 'rgba(0,0,0,0)', hover: { backgroundColor: C.hover } }}>
+              <Icon name={open === b.build_id ? 'chevronDown' : 'chevronRight'} size={12} color={C.ghost} />
+              <div style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: BUILD_COLOR[b.status] ?? C.ghost, pointerEvents: 'none' }} />
+              <text style={{ fontFamily: SANS, fontSize: 13, color: C.text, width: 84, pointerEvents: 'none' }}>{b.status[0]!.toUpperCase() + b.status.slice(1)}</text>
+              <text style={{ fontFamily: SANS, fontSize: 12.5, color: C.tertiary, width: 64, pointerEvents: 'none' }}>{b.trigger === 'manual' ? 'Manual' : 'Auto'}</text>
+              <text style={{ fontFamily: SANS, fontSize: 12.5, color: C.tertiary, width: 70, pointerEvents: 'none' }}>{buildDuration(b)}</text>
+              {!narrow && <text style={{ fontFamily: 'Menlo', fontSize: 11.5, color: C.ghost, flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', pointerEvents: 'none' }}>{b.build_id}</text>}
+              {narrow && <div style={{ flexGrow: 1 }} />}
+              {b.pinned && <text style={{ fontFamily: SANS, fontSize: 11.5, color: C.accent, pointerEvents: 'none' }}>Pinned</text>}
+              <text style={{ fontFamily: SANS, fontSize: 12, color: C.ghost, width: 92, pointerEvents: 'none' }}>{timeAgo(b.created_at)}</text>
+            </div>
+            {open === b.build_id && (
+              <div testId="build-log" style={{ ...col({ gap: 2 }), marginLeft: 10, marginRight: 10, marginTop: 4, marginBottom: 10, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card }}>
+                <div style={row({ gap: 10, paddingBottom: 6 })}>
+                  <T size={12.5} color={C.tertiary} testId="build-log-count">{log?.lines ? `${log.lines.length} log lines · last ${Math.min(80, shown.length)} shown` : 'Loading log…'}</T>
+                  <div style={{ flexGrow: 1 }} />
+                  <Pills testId="log-filter" value={onlyErrors ? 'errors' : 'all'} onChange={(v) => setOnlyErrors(v === 'errors')} items={[{ value: 'all', label: 'All' }, { value: 'errors', label: 'Errors' }]} />
+                </div>
+                {log?.error && <Notice text={log.error} tone="error" />}
+                {shown.slice(-80).map((l, i) => (
+                  <text key={i} style={{ fontFamily: 'Menlo', fontSize: 11.5, lineHeight: 16, color: l.stream === 'stderr' || /error|fail/i.test(l.msg) ? C.del : l.msg.startsWith('===') ? C.text : C.secondary }}>{`${l.ts.slice(11, 19)}  ${l.msg.slice(0, 240)}`}</text>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+        {builds.items === null && !builds.error && api && <Empty text="Loading builds…" />}
+        {builds.items?.length === 0 && <Empty text={api ? 'No builds yet' : 'Connect a Devin API key to see builds'} />}
+      </div>
+      <Divider />
+      <T weight={600}>{`Blueprints${blueprints.items ? ` · ${blueprints.items.length}` : ''}`}</T>
+      <div testId="blueprint-list" style={row({ gap: 6, flexWrap: 'wrap' })}>
+        {(blueprints.items ?? []).map((b) => (
+          <div key={b.blueprint_id} style={{ ...row({ gap: 6 }), height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 14, borderWidth: 1, borderColor: C.border }}>
+            <Icon name={b.type === 'org' ? 'shapes' : 'folder'} size={12} color={C.tertiary} />
+            <T size={12.5}>{b.type === 'org' ? 'Organization' : (b.repo_name ?? b.blueprint_id)}</T>
+          </div>
+        ))}
+      </div>
+    </Page>
+  )
+}
+
+const REVIEW_LABEL: Record<ApiPrReview['status'], { text: string; color: string }> = {
+  completed: { text: 'Reviewed', color: '#26cd4d' },
+  running: { text: 'Reviewing…', color: '#71b7ff' },
+  pending: { text: 'Queued', color: '#f0b72f' },
+  errored: { text: 'Review errored', color: '#ff9492' },
+  cancelled: { text: 'Cancelled', color: '#7a828e' },
+  skipped: { text: 'Skipped', color: '#7a828e' },
+}
+
+/** Devin Review status for one PR, with a button to (re)run it. */
+export function PrReview({ url, client, canRun = true }: { url: string; client: DevinApi | null; canRun?: boolean }) {
+  const [r, setR] = useState<ApiPrReview | null | undefined>(undefined)
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => {
+    if (!client?.prReview) return
+    let alive = true
+    const load = () => client.prReview!(url).then((v) => alive && (setR(v), setErr(null))).catch((e: Error) => alive && setErr(e.message))
+    load()
+    const t = setInterval(() => (r?.status === 'running' || r?.status === 'pending') && load(), 5000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [client, url, r?.status])
+  if (!client?.prReview) return null
+  const run = () =>
+    client.runPrReview?.(url)
+      .then((v) => setR(v))
+      .catch((e: Error) => setErr(e.message))
+  const st = r ? REVIEW_LABEL[r.status] : null
+  return (
+    <div testId="pr-review" style={col({ gap: 6, paddingTop: 10 })}>
+      <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 12.5 }}>Devin Review</text>
+      <div style={row({ gap: 8 })}>
+        {st && <div style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: st.color }} />}
+        <text testId="pr-review-status" style={{ fontFamily: SANS, color: st ? C.text : C.tertiary, fontSize: 13 }}>
+          {r === undefined ? 'Checking…' : st ? `${st.text} · ${r!.commit_sha.slice(0, 7)} · ${timeAgo(Date.parse(r!.created_at) / 1000)}` : 'Not reviewed yet'}
+        </text>
+        <div style={{ flexGrow: 1 }} />
+        {canRun && client.runPrReview && r !== undefined && r?.status !== 'running' && r?.status !== 'pending' && <Btn small icon="retry" label={r ? 'Re-run' : 'Run review'} testId="pr-review-run" onClick={run} />}
+      </div>
+      {err && <Notice text={err} tone="error" />}
     </div>
   )
 }

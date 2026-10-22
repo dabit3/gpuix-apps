@@ -21,7 +21,7 @@ export function useSticky<S>(key: string, initial: S): [S, (v: S | ((s: S) => S)
   return [v, set]
 }
 
-export type View = 'home' | 'automations' | 'security' | 'review' | 'customize' | 'settings' | 'notifications' | 'sessions' | 'usage' | 'repos'
+export type View = 'home' | 'automations' | 'security' | 'review' | 'customize' | 'settings' | 'notifications' | 'sessions' | 'usage' | 'repos' | 'environment'
 
 export const SANS = 'Inter'
 const MONO = 'Menlo'
@@ -414,7 +414,7 @@ export function SecurityView({ api, sessions, narrow }: { api: DevinApi | null; 
   const secrets = useApiList<ApiSecret>(api?.listSecrets?.bind(api), [api])
   const s = prStats(sessions)
   return (
-    <Page testId="view-security" narrow={narrow} title="Security" subtitle="Pull requests Devin opened, and the secrets it can use." actions={<Btn icon="share" label="Open scans on web" onClick={() => openUrl(`${WEB}/security`)} />}>
+    <Page testId="view-security" narrow={narrow} title="Security" subtitle="Pull requests Devin opened, code scan findings, and the secrets it can use." actions={<Btn icon="share" label="Open scans on web" onClick={() => openUrl(`${WEB}/security`)} />}>
       <div style={row({ gap: 10, flexWrap: 'wrap' })}>
         <Stat testId="stat-total" label="Pull requests" value={s.total} />
         <Stat testId="stat-open" label="Open" value={s.open} />

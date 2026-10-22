@@ -71,6 +71,23 @@ export type ApiRepo = {
   indexing_status?: { indexing_enabled: boolean; latest_completed_search_index_job?: unknown; latest_completed_wiki_index_job?: unknown } | null
 }
 export type ApiFinding = { finding_id: string; title: string; severity?: string | null; status?: string | null; repo_name?: string | null; pr_url?: string | null; session_id?: string | null }
+export type ApiBuild = { build_id: string; status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled'; trigger: 'manual' | 'auto'; pinned?: boolean; started_at?: number | null; completed_at?: number | null; created_at: number }
+export type ApiBlueprint = { blueprint_id: string; type: 'org' | 'repo' | string; repo_name: string | null; updated_at: number }
+export type ApiPrReview = { status: 'pending' | 'running' | 'completed' | 'errored' | 'cancelled' | 'skipped'; repo_path: string; pr_number: number; commit_sha: string; created_at: string }
+export type LogLine = { ts: string; stream: string; msg: string }
+
+/** Build logs are JSONL ({ts, stream, msg}); bad lines are skipped. */
+export function parseLog(text: string): LogLine[] {
+  const out: LogLine[] = []
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue
+    try {
+      const j = JSON.parse(line)
+      if (typeof j.msg === 'string' && j.msg.trim()) out.push({ ts: String(j.ts ?? ''), stream: String(j.stream ?? ''), msg: j.msg })
+    } catch {}
+  }
+  return out
+}
 export type CreateSessionOpts = { mode?: string; repos?: string[]; tags?: string[]; playbookId?: string; title?: string; sessionLinks?: string[] }
 
 type Page<T> = { items: T[]; end_cursor?: string | null; has_next_page?: boolean }
@@ -109,6 +126,12 @@ export interface DevinApi {
   prMetrics?(after: number, before: number): Promise<ApiPrMetrics>
   listRepositories?(filter?: string): Promise<ApiRepo[]>
   listFindings?(): Promise<ApiFinding[]>
+  listBuilds?(): Promise<ApiBuild[]>
+  listBlueprints?(): Promise<ApiBlueprint[]>
+  buildLog?(id: string): Promise<LogLine[]>
+  triggerBuild?(): Promise<ApiBuild>
+  prReview?(prUrl: string): Promise<ApiPrReview | null>
+  runPrReview?(prUrl: string): Promise<ApiPrReview>
 }
 
 export class DevinClient implements DevinApi {
@@ -298,6 +321,40 @@ export class DevinClient implements DevinApi {
 
   listFindings() {
     return this.all<ApiFinding>('/code-scans/findings', 1)
+  }
+
+  async listBuilds() {
+    return (await this.req<Page<ApiBuild>>('/snapshot-setup/builds?first=25')).items
+  }
+
+  async listBlueprints() {
+    const r = await this.req<{ data?: ApiBlueprint[]; items?: ApiBlueprint[] }>('/snapshot-setup/blueprints?first=100')
+    return r.data ?? r.items ?? []
+  }
+
+  /** The log endpoint answers with a short-lived S3 URL; fetch it and parse the JSONL. */
+  async buildLog(id: string) {
+    const { url } = await this.req<{ url: string }>(`/snapshot-setup/builds/${id}/logs`)
+    const res = await this.f(url)
+    if (!res.ok) throw new Error(`Build log ${res.status}`)
+    return parseLog(await res.text())
+  }
+
+  triggerBuild() {
+    return this.req<ApiBuild>('/snapshot-setup/builds', { method: 'POST', body: {} })
+  }
+
+  async prReview(prUrl: string) {
+    try {
+      return await this.req<ApiPrReview>(`/pr-reviews?pr_url=${encodeURIComponent(prUrl)}`)
+    } catch (e) {
+      if (String((e as Error).message).includes(' 404 ')) return null
+      throw e
+    }
+  }
+
+  runPrReview(prUrl: string) {
+    return this.req<ApiPrReview>('/pr-reviews', { method: 'POST', body: { pr_url: prUrl } })
   }
 
   sendMessage(id: string, message: string): Promise<ApiSession> {
