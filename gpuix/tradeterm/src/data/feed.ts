@@ -6,7 +6,8 @@ import { TF_SECONDS, type Bar, type Timeframe } from '../types'
 export type Source = 'binance' | 'coinbase' | 'cache' | 'sample'
 export type Loaded = { bars: Bar[]; source: Source; note?: string }
 
-export const HOME = process.env.TRADETERM_HOME ?? join(homedir(), '.tradeterm')
+/** Read on every call so tests (and TRADETERM_HOME set after import) never touch ~/.tradeterm. */
+export const home = () => process.env.TRADETERM_HOME ?? join(homedir(), '.tradeterm')
 
 const BINANCE = process.env.TRADETERM_BINANCE ?? 'https://data-api.binance.vision'
 const BINANCE_WS = process.env.TRADETERM_BINANCE_WS ?? 'wss://data-stream.binance.vision'
@@ -69,7 +70,7 @@ export function dedupe(bars: Bar[]): Bar[] {
 }
 
 function cachePath(sym: string, tf: Timeframe) {
-  return join(HOME, 'cache', `${sym}-${tf}.json`)
+  return join(home(), 'cache', `${sym}-${tf}.json`)
 }
 
 export async function loadBars(sym: string, tf: Timeframe, count = 3000, opts: { offline?: boolean } = {}): Promise<Loaded> {
@@ -83,7 +84,7 @@ export async function loadBars(sym: string, tf: Timeframe, count = 3000, opts: {
       const bars = await fn(sym, tf, count)
       if (bars.length > 10) {
         try {
-          mkdirSync(join(HOME, 'cache'), { recursive: true })
+          mkdirSync(join(home(), 'cache'), { recursive: true })
           writeFileSync(cachePath(sym, tf), JSON.stringify(bars))
         } catch {}
         return { bars, source }

@@ -227,8 +227,8 @@ export function drawMain(cv: Canvas, spec: MainSpec, f: Frame, priceTicks: numbe
   let vmax = 0
   for (let i = a; i <= b; i++) vmax = Math.max(vmax, bars[i]!.v)
   const vh = f.h * 0.16
-  const upV = rgba(T.green, 0.22)
-  const dnV = rgba(T.red, 0.22)
+  const upV = rgba(T.green, 0.18)
+  const dnV = rgba(T.red, 0.18)
   forColumns(bars, a, b, f, pxPerBar, (x0, x1, o, h, l, c, v) => {
     const hh = vmax > 0 ? (v / vmax) * vh : 0
     cv.fillRect(x0, f.h - hh, Math.max(1, x1 - x0), hh, c >= o ? upV : dnV)
@@ -274,6 +274,10 @@ export function drawMain(cv: Canvas, spec: MainSpec, f: Frame, priceTicks: numbe
     })
   }
 
+  // Last price: a quiet dashed line across the pane.
+  const lastBar = bars[bars.length - 1]!
+  cv.hline(yOf(f, lastBar.c), rgba(lastBar.c >= lastBar.o ? T.green : T.red, 0.5), 3)
+
   for (const s of spec.overlays) {
     if (s.style === 'band-upper' || s.style === 'band-lower') cv.polyline(xs, ys(s.values), xs.length, rgba(s.color, 0.85), 1)
     else cv.polyline(xs, ys(s.values), xs.length, rgba(s.color), s.width ?? 1.4)
@@ -291,7 +295,7 @@ export function drawMain(cv: Canvas, spec: MainSpec, f: Frame, priceTicks: numbe
       cv.line(xe, yOf(f, tr.entryPrice), xx, yOf(f, tr.exitPrice), col, hl ? 1.6 : 1)
       const s = pxPerBar < 3 ? 4 : 6
       cv.triangle(xe, yOf(f, bars[tr.entryIndex]!.l) + 5, s, true, rgba(T.green))
-      cv.triangle(xx, yOf(f, bars[tr.exitIndex]!.h) - 5, s, false, rgba(T.orange))
+      cv.triangle(xx, yOf(f, bars[tr.exitIndex]!.h) - 5, s, false, rgba(T.fg, 0.85))
     })
   }
 
@@ -325,18 +329,16 @@ function drawDrawing(cv: Canvas, bars: Bar[], f: Frame, d: Drawing) {
   } else if (d.kind === 'fib') {
     const xa = Math.min(x0, x1)
     const xb = Math.max(f.w, Math.max(x0, x1))
-    const colors = [T.dim, T.redSoft, T.orange, T.yellow, T.green, T.cyan, T.dim]
-    FIB_LEVELS.forEach((lv, k) => {
-      const p = d.b.p + (d.a.p - d.b.p) * lv
-      const y = yOf(f, p)
-      if (k > 0) {
-        const pp = d.b.p + (d.a.p - d.b.p) * FIB_LEVELS[k - 1]!
-        const yp = yOf(f, pp)
-        cv.fillRect(xa, Math.min(y, yp), xb - xa, Math.abs(y - yp), rgba(colors[k]!, 0.06))
-      }
-      cv.hline(y, rgba(colors[k]!, 0.9), 0, xa, xb)
+    // One accent: the golden pocket (0.5–0.618) is tinted, the other levels are hairlines.
+    const yAt = (lv: number) => yOf(f, d.b.p + (d.a.p - d.b.p) * lv)
+    const g0 = yAt(0.5)
+    const g1 = yAt(0.618)
+    cv.fillRect(xa, Math.min(g0, g1), xb - xa, Math.abs(g1 - g0), rgba(T.blue, 0.09))
+    FIB_LEVELS.forEach((lv) => {
+      const golden = lv === 0.5 || lv === 0.618
+      cv.hline(yAt(lv), golden ? rgba(T.blue, 0.9) : rgba(T.dim, lv === 0 || lv === 1 ? 0.7 : 0.38), 0, xa, xb)
     })
-    cv.line(x0, y0, x1, y1, rgba(T.dim, 0.6), 1)
+    cv.line(x0, y0, x1, y1, rgba(T.dim, 0.45), 1)
   }
 }
 
@@ -457,7 +459,7 @@ export function drawOsc(cv: Canvas, spec: OscSpec, f: Frame, xTicks: { x: number
 // ---------------------------------------------------------------------------------------------
 // Equity curve + drawdown for the backtest panel.
 
-export function drawEquity(cv: Canvas, bars: Bar[], r: BacktestResult, capital: number, highlight?: { a: number; b: number } | null) {
+export function drawEquity(cv: Canvas, bars: Bar[], r: BacktestResult, capital: number, highlight?: { a: number; b: number } | null, progress = 1) {
   cv.clear(rgba(T.panel))
   const n = r.equity.length
   if (n < 2) return
@@ -493,10 +495,19 @@ export function drawEquity(cv: Canvas, bars: Bar[], r: BacktestResult, capital: 
   const base = 2 + (1 - (capital - lo) / (hi - lo)) * (eqH - 4)
   cv.hline(base, rgba(T.borderHi), 3)
   if (highlight) cv.fillRect((highlight.a / (n - 1)) * w, 0, Math.max(2, ((highlight.b - highlight.a) / (n - 1)) * w), h, rgba(T.blue, 0.12))
-  cv.polyline(xs, yh, m, rgba(T.dim, 0.45), 1)
+  const mm = Math.max(2, Math.min(m, Math.round(m * progress)))
+  cv.polyline(xs, yh, m, rgba(T.dim, 0.4), 1)
   const final = r.equity[n - 1]! >= capital
-  cv.area(xs, ye, m, eqH, rgba(final ? T.green : T.red), 0.22, 0.0)
-  cv.polyline(xs, ye, m, rgba(final ? T.green : T.red), 1.5)
+  cv.area(xs, ye, mm, eqH, rgba(final ? T.green : T.red), 0.2, 0.0)
+  cv.polyline(xs, ye, mm, rgba(final ? T.green : T.red), 1.6)
   cv.hline(eqH + 4, rgba(T.border))
-  cv.area(xs, yd, m, eqH + 4, rgba(T.red), 0.4, 0.15)
+  cv.area(xs, yd, mm, eqH + 4, rgba(T.red), 0.45, 0.12)
+  if (mm < m) return
+  // End-of-curve dot.
+  const ex = xs[m - 1]!
+  const ey = ye[m - 1]!
+  for (let yy = -3; yy <= 3; yy++) for (let xx = -3; xx <= 3; xx++) {
+    const d = Math.hypot(xx, yy)
+    if (d < 3.2) cv.px(Math.round(ex) + xx, Math.round(ey) + yy, rgba(final ? T.green : T.red), Math.min(1, 3.2 - d))
+  }
 }

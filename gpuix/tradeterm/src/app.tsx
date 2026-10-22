@@ -1,8 +1,8 @@
-import { useGpuixRequired, type EventPayload, type ImgInstance, type PublicInstance } from '@gpuix/react'
+import { useGpuixRequired, type EventPayload, type PublicInstance } from '@gpuix/react'
+import { readFileSync } from 'node:fs'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { runBacktest, STRATEGIES, sweepSma, walkForward, type BacktestResult, type Sweep } from './backtest'
 import {
-  drawEquity,
   drawMain,
   drawOsc,
   FIB_LEVELS,
@@ -29,17 +29,38 @@ import { loadBars, loadTickers, streamKlines, type Loaded } from './data/feed'
 import { findIndicator, INDICATORS, type Series } from './indicators'
 import { Canvas } from './raster'
 import { loadState, saveState, type Drawing, type DrawingKind, type State } from './store'
-import { TIMEFRAMES, type Bar, type Timeframe } from './types'
+import { normalizeSymbol, parseTimeframe, TF_SECONDS, TIMEFRAMES, type Bar, type Timeframe } from './types'
+import {
+  Button,
+  CAPITAL,
+  ChangePill,
+  FEE_BPS,
+  fmtDur,
+  HelpSheet,
+  Icon,
+  Inspector,
+  Menu,
+  MONO,
+  MONO_FILES,
+  NAMES,
+  nameOf,
+  Palette,
+  pct,
+  Raster,
+  Segmented,
+  Sep,
+  SLIP_BPS,
+  STRATEGY_SHORT,
+  SweepSheet,
+  type Cmd,
+  type MenuEntry,
+} from './ui'
+import type { IconName } from './icons'
 
-const MONO = 'Menlo'
 const NO_DRAWINGS: Drawing[] = []
 const AXIS_W = 84
-const TIME_H = 24
+const TIME_H = 26
 const DIVIDER = 6
-const SIDEBAR_W = 340
-const FEE_BPS = 10
-const SLIP_BPS = 5
-const CAPITAL = 10_000
 
 const CHART_TYPES: { id: State['chart']; label: string }[] = [
   { id: 'candles', label: 'Candles' },
@@ -47,14 +68,30 @@ const CHART_TYPES: { id: State['chart']; label: string }[] = [
   { id: 'line', label: 'Line' },
   { id: 'area', label: 'Area' },
 ]
-const TOOLS: { id: DrawingKind; label: string; key: string }[] = [
-  { id: 'trend', label: 'Trend', key: 't' },
-  { id: 'hline', label: 'Level', key: 'h' },
-  { id: 'rect', label: 'Box', key: 'g' },
-  { id: 'fib', label: 'Fib', key: 'f' },
+const TOOLS: { id: DrawingKind; label: string; key: string; icon: IconName }[] = [
+  { id: 'trend', label: 'Trend line', key: 't', icon: 'trend' },
+  { id: 'hline', label: 'Price level', key: 'h', icon: 'hline' },
+  { id: 'rect', label: 'Box', key: 'g', icon: 'rect' },
+  { id: 'fib', label: 'Fibonacci retracement', key: 'f', icon: 'fib' },
 ]
 const IND_KEYS: Record<string, string> = { e: 'ema', s: 'sma', b: 'bb', v: 'vwap', u: 'st', d: 'donchian', r: 'rsi', m: 'macd', k: 'stoch', a: 'atr', o: 'obv' }
+const KEY_OF_IND = Object.fromEntries(Object.entries(IND_KEYS).map(([k, v]) => [v, k]))
 const IND_ORDER = ['ema', 'sma', 'bb', 'vwap', 'st', 'donchian', 'rsi', 'macd', 'stoch', 'atr', 'obv']
+const IND_NAMES: Record<string, string> = {
+  ema: 'EMA 21 · exponential moving average',
+  sma: 'SMA 50 · simple moving average',
+  bb: 'Bollinger Bands',
+  vwap: 'VWAP · volume-weighted average price',
+  st: 'SuperTrend',
+  donchian: 'Donchian Channel',
+  rsi: 'RSI · relative strength',
+  macd: 'MACD',
+  stoch: 'Stochastic',
+  atr: 'ATR · average true range',
+  obv: 'OBV · on-balance volume',
+}
+const TF_ADJ: Record<Timeframe, string> = { '1m': '1-minute', '5m': '5-minute', '15m': '15-minute', '1h': '1-hour', '4h': '4-hour', '1D': 'daily', '1W': 'weekly' }
+const TF_LABEL: Record<Timeframe, string> = { '1m': '1 minute', '5m': '5 minutes', '15m': '15 minutes', '1h': '1 hour', '4h': '4 hours', '1D': '1 day', '1W': '1 week' }
 
 export type AppProps = {
   symbol: string
@@ -68,6 +105,7 @@ export type AppProps = {
 }
 
 type Hover = { pane: string; x: number; y: number } | null
+type Box = { x: number; y: number; w: number; h: number }
 
 /** Letters can arrive as key "space" with the real character in keyChar in terminal mode. */
 function keyOf(e: EventPayload) {
@@ -77,15 +115,12 @@ function keyOf(e: EventPayload) {
   return k
 }
 
-const pct = (v: number, d = 2) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(d)}%`
-
 function clampView(v: View, n: number): View {
-  let w = Math.min(Math.max(12, v.end - v.start), Math.max(40, n * 1.15 + 20))
-  let end = v.end
-  end = Math.min(end, n + w * 0.6)
-  end = Math.max(end, Math.min(n, w * 0.4))
-  w = Math.max(12, w)
-  return { start: end - w, end }
+  const w = Math.max(8, Math.min(Math.max(n * 1.2, 20), v.end - v.start))
+  let start = v.start
+  if (start + w < Math.min(10, n)) start = Math.min(10, n) - w
+  if (start > n - 6) start = n - 6
+  return { start, end: start + w }
 }
 
 export function App(props: AppProps) {
@@ -111,11 +146,15 @@ export function App(props: AppProps) {
   const [sweepOpen, setSweepOpen] = useState(false)
   const [panel, setPanel] = useState<boolean | null>(null)
   const [help, setHelp] = useState(false)
+  const [menu, setMenu] = useState<'chart' | 'ind' | null>(null)
+  const [pal, setPal] = useState<{ q: string; i: number } | null>(null)
+  const [flash, setFlash] = useState<'up' | 'down' | null>(null)
   const [params, setParams] = useState<Record<string, Record<string, number>>>({})
   const [tickers, setTickers] = useState<Record<string, { last: number; change: number }>>({})
-  const drawMs = useRef(0)
   const drag = useRef<{ kind: 'zoom' | 'pan' | 'draw' | 'split'; x: number; y: number; view: View; pane?: string; size?: number } | null>(null)
   const followRef = useRef(true)
+  const triggers = useRef<Record<string, Box>>({})
+  const animate = !props.preload
 
   const bars: Bar[] = data?.bars ?? []
   const n = bars.length
@@ -127,6 +166,13 @@ export function App(props: AppProps) {
       saveState(next)
       return next
     })
+
+  useEffect(() => {
+    for (const f of MONO_FILES)
+      try {
+        renderer.registerFont?.(readFileSync(f))
+      } catch {}
+  }, [renderer])
 
   const focusRoot = () => rootRef.current && renderer.focusElement?.(rootRef.current.id)
   useEffect(() => {
@@ -185,14 +231,52 @@ export function App(props: AppProps) {
     }
   }, [])
 
+  // View animation: zoom, reset and trade jumps ease out over ~280 ms instead of snapping.
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const anim = useRef<{ from: View; to: View; t0: number; dur: number } | null>(null)
+  const animTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(
+    () => () => {
+      if (animTimer.current) clearInterval(animTimer.current)
+    },
+    [],
+  )
+  const setViewNow = (v: View | ((v: View) => View)) => {
+    anim.current = null
+    setView(v)
+  }
+  const animateView = (to: View, dur = 280) => {
+    if (!animate) return setViewNow(to)
+    anim.current = { from: viewRef.current, to, t0: performance.now(), dur }
+    if (animTimer.current) return
+    animTimer.current = setInterval(() => {
+      const a = anim.current
+      if (!a) {
+        clearInterval(animTimer.current!)
+        animTimer.current = null
+        return
+      }
+      const k = Math.min(1, (performance.now() - a.t0) / a.dur)
+      const e = 1 - Math.pow(1 - k, 3)
+      setView({ start: a.from.start + (a.to.start - a.from.start) * e, end: a.from.end + (a.to.end - a.from.end) * e })
+      if (k >= 1) anim.current = null
+    }, 16)
+  }
+  const targetView = () => anim.current?.to ?? viewRef.current
+
   // Reset the view when a new series loads; follow the right edge as live bars arrive.
   const loadedKey = `${sym}:${tf}:${data?.source}:${data?.bars[0]?.t}`
   const prevN = useRef(0)
   const chartW = Math.max(100, colBox.w - AXIS_W)
-  const resetView = () => {
+  const homeView = () => {
     const visible = Math.min(n, Math.round(chartW / 7.5))
-    setView(clampView({ start: n + 6 - visible, end: n + 6 }, n))
+    return clampView({ start: n + 6 - visible, end: n + 6 }, n)
+  }
+  const resetView = (smooth = false) => {
     followRef.current = true
+    if (smooth) animateView(homeView(), 340)
+    else setViewNow(homeView())
   }
   useLayoutEffect(() => {
     if (!n) return
@@ -206,7 +290,9 @@ export function App(props: AppProps) {
   useLayoutEffect(() => {
     if (n > prevN.current && prevN.current > 0) {
       const d = n - prevN.current
-      setView((v) => (v.end >= prevN.current - 1 ? { start: v.start + d, end: v.end + d } : v))
+      const shift = (v: View) => (v.end >= prevN.current - 1 ? { start: v.start + d, end: v.end + d } : v)
+      if (anim.current) anim.current.to = shift(anim.current.to)
+      setView(shift)
     }
     prevN.current = n
   }, [n])
@@ -233,8 +319,6 @@ export function App(props: AppProps) {
   const wide = size.w >= 1000
   const showPanel = panel ?? wide
   const compact = size.w < 760
-  // Below this the header and toolbar wrap onto a second row instead of clipping controls.
-  const roomy = size.w >= 1250
   const chartH = Math.max(120, colBox.h - TIME_H)
   const oscHeights = own.map(({ def }) => st.paneSizes[def.id] ?? Math.round(Math.min(130, Math.max(70, chartH * 0.17))))
   let oscTotal = oscHeights.reduce((a, b) => a + b + DIVIDER, 0)
@@ -258,23 +342,32 @@ export function App(props: AppProps) {
   const legendIdx = hoverIdx ?? n - 1
   const legendBar = bars[legendIdx]
 
-  const zoomAt = (factor: number, frac: number) =>
-    setView((v) => {
-      const w = v.end - v.start
-      const nw = w * factor
-      const anchor = v.start + w * frac
-      followRef.current = false
-      return clampView({ start: anchor - nw * frac, end: anchor + nw * (1 - frac) }, n)
-    })
-  const pan = (d: number) => setView((v) => clampView({ start: v.start + d, end: v.end + d }, n))
+  const zoomAt = (factor: number, frac: number, smooth = false) => {
+    const v = smooth ? targetView() : viewRef.current
+    const w = v.end - v.start
+    const nw = w * factor
+    const anchor = v.start + w * frac
+    followRef.current = false
+    const next = clampView({ start: anchor - nw * frac, end: anchor + nw * (1 - frac) }, n)
+    if (smooth) animateView(next, 200)
+    else setViewNow(next)
+  }
+  const pan = (d: number, smooth = false) => {
+    followRef.current = false
+    if (smooth) {
+      const v = targetView()
+      animateView(clampView({ start: v.start + d, end: v.end + d }, n), 200)
+    } else setViewNow((v) => clampView({ start: v.start + d, end: v.end + d }, n))
+  }
   const zoomTo = (x0: number, x1: number) => {
     const a = iOf(mf, Math.min(x0, x1))
     const b = iOf(mf, Math.max(x0, x1))
     if (b - a < 6) return
-    setView(clampView({ start: a, end: b + 1 }, n))
+    animateView(clampView({ start: a, end: b + 1 }, n), 320)
   }
 
   const toggleIndicator = (id: string) => update((s) => ({ ...s, indicators: s.indicators.includes(id) ? s.indicators.filter((x) => x !== id) : [...s.indicators, id] }))
+  const setChart = (c: State['chart']) => update((s) => ({ ...s, chart: c }))
   const setStrategy = (id: string) => {
     setHlTrade(null)
     update((s) => ({ ...s, strategy: id }))
@@ -289,13 +382,14 @@ export function App(props: AppProps) {
     const span = Math.max(40, (tr.exitIndex - tr.entryIndex) * 3)
     const mid = (tr.entryIndex + tr.exitIndex) / 2
     followRef.current = false
-    setView(clampView({ start: mid - span / 2, end: mid + span / 2 }, n))
+    animateView(clampView({ start: mid - span / 2, end: mid + span / 2 }, n), 380)
   }
   const cycleSymbol = (d: number) => {
     const wl = st.watchlist
     const i = wl.indexOf(sym)
     setSym(wl[(i + d + wl.length) % wl.length]!)
   }
+  const pickTool = (t: DrawingKind) => setTool((cur) => (cur === t ? null : t))
 
   /** Snap to the nearest OHLC value of the bar under the cursor when within 8 px. */
   const pointAt = (x: number, y: number) => {
@@ -315,29 +409,123 @@ export function App(props: AppProps) {
     return { t: timeOfIndex(bars, Math.round(iOf(mf, x))), p }
   }
 
+  // Price tick flash.
+  const last = bars[n - 1]
+  const prevLast = useRef<{ key: string; c: number } | null>(null)
+  useEffect(() => {
+    if (!last) return
+    const key = `${sym}:${tf}`
+    const p = prevLast.current
+    prevLast.current = { key, c: last.c }
+    if (!p || p.key !== key || p.c === last.c) return
+    setFlash(last.c > p.c ? 'up' : 'down')
+    const t = setTimeout(() => setFlash(null), 450)
+    return () => clearTimeout(t)
+  }, [last?.c, sym, tf])
+
+  // Command palette.
+  const commands = useMemo<Cmd[]>(() => {
+    const out: Cmd[] = []
+    const syms = [...new Set([...st.watchlist, ...Object.keys(NAMES).map((b) => `${b}-USD`)])]
+    for (const s of syms)
+      out.push({ id: `sym-${s}`, title: s, sub: `${nameOf(s)}${st.watchlist.includes(s) ? ' · Watchlist' : ''}`, icon: 'candles', keywords: `${s} ${s.split('-')[0]} ${nameOf(s)} symbol`, run: () => setSym(s), rank: st.watchlist.includes(s) ? 1 : 0 })
+    TIMEFRAMES.forEach((t, i) => out.push({ id: `tf-${t}`, title: TF_LABEL[t], sub: `Timeframe · ${t}`, icon: 'candles', hint: String(i + 1), keywords: `${t} ${TF_LABEL[t]} timeframe interval`, run: () => setTf(t) }))
+    for (const id of IND_ORDER) {
+      const on = st.indicators.includes(id)
+      const def = findIndicator(id)!
+      out.push({ id: `ind-${id}`, title: `${on ? 'Hide' : 'Show'} ${IND_NAMES[id]}`, sub: def.pane === 'own' ? 'Indicator pane' : 'Chart overlay', icon: 'wave', hint: KEY_OF_IND[id], keywords: `${def.label} ${IND_NAMES[id]} indicator ${on ? 'hide' : 'show'}`, run: () => toggleIndicator(id) })
+    }
+    for (const c of CHART_TYPES) out.push({ id: `chart-${c.id}`, title: c.label, sub: `Chart style${st.chart === c.id ? ' · current' : ''}`, icon: 'candles', hint: 'c', keywords: `${c.label} chart style`, run: () => setChart(c.id) })
+    out.push({ id: 'log', title: st.log ? 'Linear scale' : 'Log scale', sub: 'Price axis', icon: 'wave', hint: 'l', keywords: 'log linear scale axis', run: () => update((s) => ({ ...s, log: !s.log })) })
+    for (const t of TOOLS) out.push({ id: `tool-${t.id}`, title: t.label, sub: 'Drawing tool', icon: t.icon, hint: t.key, keywords: `${t.label} ${t.id} draw drawing`, run: () => setTool(t.id) })
+    for (const s of STRATEGIES) out.push({ id: `strat-${s.id}`, title: `Backtest ${s.label}`, sub: `Strategy · ${STRATEGY_SHORT[s.id] ?? s.label}`, icon: 'play', hint: 'n', keywords: `${s.label} ${s.id} strategy backtest`, run: () => (setStrategy(s.id), setPanel(true)) })
+    out.push({ id: 'sweep', title: 'Parameter sweep', sub: 'SMA cross · walk-forward check', icon: 'grid', hint: 'w', keywords: 'sweep parameter optimize walk forward heatmap', run: () => setSweepOpen(true) })
+    out.push({ id: 'panel', title: showPanel ? 'Hide inspector' : 'Show inspector', sub: 'Watchlist and backtest', icon: 'sidebar', hint: 'p', keywords: 'inspector sidebar panel watchlist backtest', run: () => setPanel(!showPanel) })
+    out.push({ id: 'reset', title: 'Reset view', sub: 'Jump to the latest bars', icon: 'candles', hint: '0', keywords: 'reset view latest home', run: () => resetView(true) })
+    out.push({ id: 'del', title: 'Delete last drawing', sub: `${drawings.length} on ${sym}`, icon: 'rect', hint: 'x', keywords: 'delete undo drawing remove', run: deleteLast })
+    out.push({ id: 'keys', title: 'Keyboard shortcuts', sub: 'Help', icon: 'key', hint: '?', keywords: 'help keys shortcuts keyboard', run: () => setHelp(true) })
+    out.push({ id: 'quit', title: 'Quit tradeterm', sub: 'Restore the terminal', icon: 'enter', hint: 'q', keywords: 'quit exit close', run: () => props.onQuit?.() })
+    return out
+  }, [st, showPanel, drawings.length, sym])
+
+  const palItems = useMemo<Cmd[]>(() => {
+    if (!pal) return []
+    const q = pal.q.trim().toLowerCase()
+    if (!q) return commands.filter((c) => c.id.startsWith('sym-') && c.rank).concat(commands.filter((c) => ['sweep', 'keys'].includes(c.id)))
+    const tokens = q.split(/\s+/)
+    const tfTok = tokens.map((t) => parseTimeframe(t)).find(Boolean) ?? null
+    const rest = tokens.filter((t) => !parseTimeframe(t))
+    const score = (c: Cmd, toks: string[]) => {
+      const kw = c.keywords.toLowerCase()
+      if (!toks.every((t) => kw.includes(t))) return -1
+      const words = kw.split(/[\s·-]+/)
+      let sc = c.rank ?? 0
+      for (const t of toks) if (words.some((w) => w.startsWith(t))) sc += 3
+      if (c.title.toLowerCase().startsWith(toks[0] ?? '')) sc += 4
+      if (c.id.startsWith('sym-') && words.includes(toks[0] ?? '')) sc += 6
+      return sc
+    }
+    const out: Cmd[] = []
+    if (tfTok && rest.length) {
+      const symHit = commands.filter((c) => c.id.startsWith('sym-')).map((c) => ({ c, s: score(c, rest) })).filter((x) => x.s >= 0).sort((a, b) => b.s - a.s)[0]
+      const s = symHit ? symHit.c.title : /^[a-z0-9]{2,10}(-usd)?$/.test(rest.join('')) ? normalizeSymbol(rest.join('')) : null
+      if (s) out.push({ id: `go-${s}-${tfTok}`, title: `${s} · ${tfTok}`, sub: `Open ${nameOf(s)} on the ${TF_ADJ[tfTok]} chart`, icon: 'candles', keywords: '', run: () => (setSym(s), setTf(tfTok)) })
+    }
+    const ranked = commands.map((c) => ({ c, s: score(c, tokens) })).filter((x) => x.s >= 0).sort((a, b) => b.s - a.s).map((x) => x.c)
+    out.push(...ranked)
+    if (!out.length && /^[a-z0-9]{2,10}(-usd)?$/.test(q)) {
+      const s = normalizeSymbol(q)
+      out.push({ id: `go-${s}`, title: s, sub: 'Open from Binance public market data', icon: 'candles', keywords: '', run: () => setSym(s) })
+    }
+    return out.slice(0, 8)
+  }, [pal?.q, commands])
+  const runCmd = (c: Cmd) => {
+    setPal(null)
+    c.run()
+  }
+
   const onKey = (e: EventPayload) => {
     if (e.modifiers?.cmd) return
     const k = keyOf(e)
-    if (e.modifiers?.ctrl) {
-      if (k === 'q') props.onQuit?.()
+    if (pal) {
+      if (k === 'escape') setPal(null)
+      else if (k === 'enter' || k === 'return') {
+        const c = palItems[Math.min(pal.i, palItems.length - 1)]
+        if (c) runCmd(c)
+      } else if (k === 'down' || (e.modifiers?.ctrl && k === 'n')) setPal({ ...pal, i: Math.min(palItems.length - 1, pal.i + 1) })
+      else if (k === 'up' || (e.modifiers?.ctrl && k === 'p')) setPal({ ...pal, i: Math.max(0, pal.i - 1) })
+      else if (k === 'backspace') setPal({ q: pal.q.slice(0, -1), i: 0 })
+      else if (e.modifiers?.ctrl && k === 'u') setPal({ q: '', i: 0 })
+      else if (k === 'space') setPal({ q: `${pal.q} `, i: 0 })
+      else if (k.length === 1 && !e.modifiers?.ctrl && pal.q.length < 40) setPal({ q: pal.q + k, i: 0 })
       return
     }
-    if (help && k !== '?') setHelp(false)
-    if (/^[1-7]$/.test(k)) setTf(TIMEFRAMES[Number(k) - 1]!)
+    if (e.modifiers?.ctrl) {
+      if (k === 'q') props.onQuit?.()
+      else if (k === 'k') setPal({ q: '', i: 0 })
+      return
+    }
+    if (menu) {
+      setMenu(null)
+      if (k === 'escape') return
+    }
+    if (help) {
+      setHelp(false)
+      if (k === '?' || k === 'escape') return
+    }
+    if (k === '/') setPal({ q: '', i: 0 })
+    else if (/^[1-7]$/.test(k)) setTf(TIMEFRAMES[Number(k) - 1]!)
     else if (IND_KEYS[k]) toggleIndicator(IND_KEYS[k]!)
-    else if (k === 'c') update((s) => ({ ...s, chart: CHART_TYPES[(CHART_TYPES.findIndex((c) => c.id === s.chart) + 1) % CHART_TYPES.length]!.id }))
+    else if (k === 'c') setChart(CHART_TYPES[(CHART_TYPES.findIndex((c) => c.id === st.chart) + 1) % CHART_TYPES.length]!.id)
     else if (k === 'l') update((s) => ({ ...s, log: !s.log }))
-    else if (TOOLS.some((t) => t.key === k)) {
-      const t = TOOLS.find((t) => t.key === k)!.id
-      setTool((cur) => (cur === t ? null : t))
-    } else if (k === 'escape') {
+    else if (TOOLS.some((t) => t.key === k)) pickTool(TOOLS.find((t) => t.key === k)!.id)
+    else if (k === 'escape') {
       if (sweepOpen) setSweepOpen(false)
       else if (tool || pending) {
         setTool(null)
         setPending(null)
-      }
-      else if (hlTrade != null) setHlTrade(null)
-      else resetView()
+      } else if (hlTrade != null) setHlTrade(null)
+      else resetView(true)
     } else if (k === 'backspace' || k === 'delete' || k === 'x') deleteLast()
     else if (k === 'n') setStrategy(STRATEGIES[(STRATEGIES.indexOf(strategy) + 1) % STRATEGIES.length]!.id)
     else if (k === 'w') setSweepOpen((o) => !o)
@@ -346,12 +534,12 @@ export function App(props: AppProps) {
     else if (k === ']') cycleSymbol(1)
     else if (k === '.' || k === '>') jumpToTrade(hlTrade == null ? (bt?.trades.length ?? 1) - 1 : Math.min((bt?.trades.length ?? 1) - 1, hlTrade + 1))
     else if (k === ',' || k === '<') jumpToTrade(hlTrade == null ? (bt?.trades.length ?? 1) - 1 : Math.max(0, hlTrade - 1))
-    else if (k === 'left') pan(-(view.end - view.start) * 0.15)
-    else if (k === 'right') pan((view.end - view.start) * 0.15)
-    else if (k === 'up' || k === '+' || k === '=') zoomAt(0.75, 0.85)
-    else if (k === 'down' || k === '-') zoomAt(1 / 0.75, 0.85)
-    else if (k === '0') resetView()
-    else if (k === '?') setHelp((h) => !h)
+    else if (k === 'left') pan(-(view.end - view.start) * 0.2, true)
+    else if (k === 'right') pan((view.end - view.start) * 0.2, true)
+    else if (k === 'up' || k === '+' || k === '=') zoomAt(0.7, 0.85, true)
+    else if (k === 'down' || k === '-') zoomAt(1 / 0.7, 0.85, true)
+    else if (k === '0') resetView(true)
+    else if (k === '?') setHelp(true)
     else if (k === 'q') props.onQuit?.()
   }
 
@@ -364,7 +552,7 @@ export function App(props: AppProps) {
         const p = local(e)
         if ((e.clickCount ?? 1) >= 2 && !tool) {
           drag.current = null
-          resetView()
+          resetView(true)
           return
         }
         if (isMain && tool && e.button !== 2) {
@@ -379,6 +567,7 @@ export function App(props: AppProps) {
           return
         }
         const panMode = e.modifiers?.shift || e.modifiers?.alt || e.button === 2
+        anim.current = null
         drag.current = { kind: panMode ? 'pan' : 'zoom', x: p.x, y: p.y, view }
       },
       onMouseMove: (e: EventPayload) => {
@@ -390,7 +579,7 @@ export function App(props: AppProps) {
         else if (d.kind === 'pan') {
           const bpp = (d.view.end - d.view.start) / chartW
           followRef.current = false
-          setView(clampView({ start: d.view.start - (p.x - d.x) * bpp, end: d.view.end - (p.x - d.x) * bpp }, n))
+          setViewNow(clampView({ start: d.view.start - (p.x - d.x) * bpp, end: d.view.end - (p.x - d.x) * bpp }, n))
         } else if (d.kind === 'zoom' && Math.abs(p.x - d.x) > 3) setSel({ a: d.x, b: Math.max(0, Math.min(chartW, p.x)) })
       },
       onMouseUp: (e: EventPayload) => {
@@ -426,27 +615,37 @@ export function App(props: AppProps) {
         }
         const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy
         if (!delta) return
-        followRef.current = false
         const bpp = (view.end - view.start) / chartW
         pan(-delta * bpp * (e.precise ? 1 : 24))
       },
     }
   }
 
-  const srcBadge =
-    data?.source === 'binance'
-      ? { text: 'LIVE  Binance', color: T.green }
-      : data?.source === 'coinbase'
-        ? { text: 'Coinbase', color: T.green }
-        : data?.source === 'cache'
-          ? { text: 'CACHED', color: T.yellow }
-          : data
-            ? { text: 'SAMPLE DATA', color: T.yellow }
-            : { text: 'loading', color: T.faint }
+  const live = data?.source === 'binance' || data?.source === 'coinbase'
+  const srcText = data?.source === 'binance' ? 'Binance · live' : data?.source === 'coinbase' ? 'Coinbase · live' : data?.source === 'cache' ? 'Cached · offline' : data ? 'Sample data' : 'Connecting…'
 
-  const last = bars[n - 1]
   const dayAgo = last ? bars[Math.max(0, Math.round(indexOfTime(bars, last.t - 86400)))] : undefined
-  const dayChange = last && dayAgo ? last.c / dayAgo.c - 1 : 0
+  const dayChange = last && dayAgo ? last.c / dayAgo.c - 1 : NaN
+  const visibleBars = Math.max(0, Math.round(view.end - view.start))
+
+  // Drag-to-zoom measure readout.
+  const measure = (() => {
+    if (!sel || !n) return null
+    const i0 = Math.max(0, Math.min(n - 1, Math.round(iOf(mf, Math.min(sel.a, sel.b)))))
+    const i1 = Math.max(0, Math.min(n - 1, Math.round(iOf(mf, Math.max(sel.a, sel.b)))))
+    const a = bars[i0]!
+    const b = bars[i1]!
+    return { change: b.c / a.c - 1, count: i1 - i0 + 1, dur: b.t - a.t + TF_SECONDS[tf] }
+  })()
+
+  const measureTrigger = (id: string) => (e: EventPayload) => {
+    triggers.current[id] = { x: e.x ?? 0, y: e.y ?? 0, w: e.width ?? 0, h: e.height ?? 0 }
+  }
+  const menuAt = (id: string, w: number) => {
+    const b = triggers.current[id] ?? { x: 12, y: 80, w: 0, h: 28 }
+    return { x: Math.max(8, Math.min(size.w - w - 8, b.x)), y: b.y + b.h + 6 }
+  }
+  const chartLabel = CHART_TYPES.find((c) => c.id === st.chart)!.label
 
   return (
     <div
@@ -462,57 +661,38 @@ export function App(props: AppProps) {
       }}
       style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: T.bg, userSelect: 'none' }}
     >
-      {/* Header */}
-      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minHeight: 44, paddingTop: 6, paddingBottom: 6, paddingLeft: 16, paddingRight: 12, columnGap: 14, rowGap: 6, flexShrink: 0, borderBottomWidth: 1, borderColor: T.border }}>
-        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: 10, flexShrink: 0 }}>
-          <text testId="symbol" style={{ color: T.fg, fontSize: 17, fontWeight: 'bold' }}>
-            {sym}
-          </text>
-          <text testId="tf" style={{ color: T.dim, fontSize: 13, fontFamily: MONO }}>
-            {tf}
-          </text>
-          <text testId="last" style={{ color: dayChange >= 0 ? T.green : T.red, fontSize: 17, fontFamily: MONO, fontWeight: 'bold' }}>
+      {/* Title bar: symbol, price, change, source, timeframe. */}
+      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minHeight: 56, paddingTop: 8, paddingBottom: 8, paddingLeft: 18, paddingRight: 14, columnGap: 18, rowGap: 8, flexShrink: 0 }}>
+        <SymbolButton sym={sym} tf={tf} onClick={() => setPal({ q: '', i: 0 })} />
+        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <text testId="last" style={{ color: flash === 'up' ? T.green : flash === 'down' ? T.red : T.fg, fontSize: 24, fontFamily: MONO, fontWeight: 600 }}>
             {last ? fmtPrice(last.c) : '—'}
           </text>
-          {!compact ? <text style={{ color: dayChange >= 0 ? T.green : T.red, fontSize: 13, fontFamily: MONO }}>{`${pct(dayChange)} 24h`}</text> : null}
+          <ChangePill v={dayChange} testId="change" size={12} />
+          {!compact ? <text style={{ color: T.faint, fontSize: 11 }}>24h</text> : null}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 8, paddingRight: 8, height: 22, borderRadius: 11, backgroundColor: T.raised, flexShrink: 0 }}>
-          <div style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: srcBadge.color }} />
-          <text testId="source" style={{ color: srcBadge.color, fontSize: 11, fontWeight: 'bold' }}>
-            {srcBadge.text}
+        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0, paddingLeft: live ? 0 : 8, paddingRight: live ? 0 : 8, height: 22, borderRadius: 6, backgroundColor: live ? 'transparent' : '#f0b72f1f' }}>
+          {live ? <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: T.faint }} /> : null}
+          <text testId="source" style={{ color: live ? T.faint : data ? T.yellow : T.faint, fontSize: 12 }}>
+            {srcText}
           </text>
         </div>
         <div style={{ flexGrow: 1 }} />
-        <div style={{ display: 'flex', flexDirection: 'row', gap: 2, padding: 2, borderRadius: 7, backgroundColor: T.panel, borderWidth: 1, borderColor: T.border, flexShrink: 0 }}>
-          {TIMEFRAMES.map((t) => (
-            <Pill key={t} testId={`tf-${t}`} label={t} active={t === tf} onClick={() => setTf(t)} mono />
-          ))}
-        </div>
+        <Segmented mono items={TIMEFRAMES.map((t) => ({ id: t, label: t, testId: `tf-${t}` }))} value={tf} onChange={(t) => setTf(t)} />
       </div>
 
       {/* Toolbar */}
-      <div testId="toolbar" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minHeight: 36, paddingTop: 4, paddingBottom: 4, paddingLeft: 12, paddingRight: 12, columnGap: 10, rowGap: 4, flexShrink: 0, borderBottomWidth: 1, borderColor: T.border }}>
-        <Group>
-          {CHART_TYPES.map((c) => (
-            <Pill key={c.id} testId={`chart-${c.id}`} label={!roomy && c.id === 'heikin' ? 'HA' : c.label} active={st.chart === c.id} onClick={() => update((s) => ({ ...s, chart: c.id }))} />
-          ))}
-          <Pill testId="log" label="Log" active={st.log} onClick={() => update((s) => ({ ...s, log: !s.log }))} />
-        </Group>
-        <Group>
-          {IND_ORDER.map((id) => findIndicator(id))
-            .filter((d) => d && (roomy || ['ema', 'sma', 'bb', 'rsi', 'macd', 'stoch'].includes(d.id)))
-            .map((d) => (
-              <Pill key={d!.id} testId={`ind-${d!.id}`} label={d!.label} active={st.indicators.includes(d!.id)} onClick={() => toggleIndicator(d!.id)} />
-            ))}
-        </Group>
-        <Group>
-          {TOOLS.map((t) => (
-            <Pill key={t.id} testId={`tool-${t.id}`} label={t.label} active={tool === t.id} accent={T.blue} onClick={() => setTool((c) => (c === t.id ? null : t.id))} />
-          ))}
-        </Group>
+      <div testId="toolbar" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minHeight: 40, paddingTop: 4, paddingBottom: 4, paddingLeft: 12, paddingRight: 12, columnGap: 4, rowGap: 4, flexShrink: 0, borderTopWidth: 1, borderBottomWidth: 1, borderColor: T.border }}>
+        <Button testId="menu-chart" icon="candles" label={compact && st.chart === 'heikin' ? 'HA' : chartLabel} chevron active={menu === 'chart'} onClick={() => setMenu(menu === 'chart' ? null : 'chart')} onLayout={measureTrigger('chart')} />
+        <Button testId="menu-ind" icon="wave" label="Indicators" badge={String(enabled.length)} chevron active={menu === 'ind'} onClick={() => setMenu(menu === 'ind' ? null : 'ind')} onLayout={measureTrigger('ind')} />
+        <Sep />
+        {TOOLS.map((t) => (
+          <Button key={t.id} testId={`tool-${t.id}`} icon={t.icon} active={tool === t.id} onClick={() => pickTool(t.id)} />
+        ))}
         <div style={{ flexGrow: 1 }} />
-        <Pill testId="sweep" label="Sweep" active={sweepOpen} onClick={() => setSweepOpen((o) => !o)} />
-        <Pill testId="panel" label="Backtest" active={showPanel} onClick={() => setPanel(!showPanel)} />
+        <SearchButton compact={compact} onClick={() => setPal({ q: '', i: 0 })} />
+        <Button testId="sweep" icon="grid" label={compact ? undefined : 'Sweep'} active={sweepOpen} onClick={() => setSweepOpen((o) => !o)} />
+        <Button testId="panel" icon="sidebar" active={showPanel} onClick={() => setPanel(!showPanel)} />
       </div>
 
       {/* Body */}
@@ -525,19 +705,12 @@ export function App(props: AppProps) {
             if (b.w && b.h && (b.w !== colBox.w || b.h !== colBox.h || b.x !== colBox.x || b.y !== colBox.y)) setColBox(b)
           }}
         >
-          {/* Main pane */}
           <PaneRow
             id="main"
             w={chartW}
             h={mainH}
-            box={{ x: colBox.x, y: colBox.y }}
             handlers={paneHandlers('main', { x: colBox.x, y: colBox.y }, true)}
-            cursor={tool ? 'crosshair' : 'crosshair'}
-            draw={(cv) => {
-              const t0 = performance.now()
-              drawMain(cv, mainSpec, mf, priceTicks, xTicks)
-              drawMs.current = drawMs.current * 0.8 + (performance.now() - t0) * 0.2
-            }}
+            draw={(cv) => drawMain(cv, mainSpec, mf, priceTicks, xTicks)}
             drawKey={[mainSpec, chartW, mainH, priceTicks.join(), xTicks.length]}
             axis={
               <>
@@ -546,20 +719,19 @@ export function App(props: AppProps) {
                   if (y < 8 || y > mainH - 8) return null
                   return <AxisLabel key={p} y={y} text={fmtPrice(p, mf.yMax)} />
                 })}
-                {last ? <AxisTag y={yOf(mf, last.c)} text={fmtPrice(last.c)} color={last.c >= last.o ? T.green : T.red} testId="last-tag" /> : null}
                 {drawings
                   .filter((d) => d.kind === 'hline')
                   .map((d) => (
                     <AxisTag key={d.id} y={yOf(mf, d.a.p)} text={fmtPrice(d.a.p)} color={T.yellow} />
                   ))}
-                {hover?.pane === 'main' ? <AxisTag y={hover.y} text={fmtPrice(pOf(mf, hover.y))} color={T.borderHi} fg={T.fg} /> : null}
+                {last ? <AxisTag y={yOf(mf, last.c)} text={fmtPrice(last.c)} color={last.c >= last.o ? T.green : T.red} testId="last-tag" /> : null}
+                {hover?.pane === 'main' ? <AxisTag y={hover.y} text={fmtPrice(pOf(mf, hover.y))} color={T.fg} /> : null}
               </>
             }
           >
-            {/* Legend */}
-            <div style={{ position: 'absolute', left: 10, top: 6, display: 'flex', flexDirection: 'column', gap: 3, pointerEvents: 'none' }}>
+            <div style={{ position: 'absolute', left: 14, top: 10, display: 'flex', flexDirection: 'column', gap: 5, pointerEvents: 'none' }}>
               {legendBar ? (
-                <div testId="ohlc" style={{ display: 'flex', flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+                <div testId="ohlc" style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'center' }}>
                   {(
                     [
                       ['O', legendBar.o],
@@ -568,27 +740,28 @@ export function App(props: AppProps) {
                       ['C', legendBar.c],
                     ] as const
                   ).map(([k, v]) => (
-                    <div key={k} style={{ display: 'flex', flexDirection: 'row', gap: 4 }}>
+                    <div key={k} style={{ display: 'flex', flexDirection: 'row', gap: 5 }}>
                       <text style={{ color: T.faint, fontSize: 12, fontFamily: MONO }}>{k}</text>
-                      <text style={{ color: legendBar.c >= legendBar.o ? T.green : T.red, fontSize: 12, fontFamily: MONO }}>{fmtPrice(v)}</text>
+                      <text style={{ color: T.fg, fontSize: 12, fontFamily: MONO }}>{fmtPrice(v)}</text>
                     </div>
                   ))}
                   <text style={{ color: legendBar.c >= legendBar.o ? T.green : T.red, fontSize: 12, fontFamily: MONO }}>{pct(legendBar.c / legendBar.o - 1)}</text>
                   {!compact ? <text style={{ color: T.faint, fontSize: 12, fontFamily: MONO }}>{`Vol ${fmtCompact(legendBar.v)}`}</text> : null}
+                  {hoverIdx != null && !compact ? <text style={{ color: T.faint, fontSize: 12, fontFamily: MONO }}>{fmtTime(legendBar.t)}</text> : null}
                 </div>
               ) : null}
-              <div style={{ display: 'flex', flexDirection: 'row', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 3 }}>
                 {overlays
                   .filter((s) => s.style !== 'band-lower')
                   .map((s) => (
-                    <div key={s.name} style={{ display: 'flex', flexDirection: 'row', gap: 5 }}>
-                      <text style={{ color: s.color.slice(0, 7), fontSize: 11, fontFamily: MONO }}>{s.name}</text>
-                      <text style={{ color: T.dim, fontSize: 11, fontFamily: MONO }}>{fmtPrice(s.values[legendIdx] ?? NaN, last?.c)}</text>
+                    <div key={s.name} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 8, height: 2, borderRadius: 1, backgroundColor: s.color.slice(0, 7) }} />
+                      <text style={{ color: T.dim, fontSize: 11 }}>{s.name}</text>
+                      <text style={{ color: T.fg, fontSize: 11, fontFamily: MONO }}>{fmtPrice(s.values[legendIdx] ?? NaN, last?.c)}</text>
                     </div>
                   ))}
               </div>
             </div>
-            {/* Fib labels */}
             {drawings
               .filter((d) => d.kind === 'fib')
               .flatMap((d) =>
@@ -596,24 +769,44 @@ export function App(props: AppProps) {
                   const p = d.b.p + (d.a.p - d.b.p) * lv
                   const y = yOf(mf, p)
                   const x = Math.min(xOf(mf, indexOfTime(bars, d.a.t)), xOf(mf, indexOfTime(bars, d.b.t)))
-                  if (y < 0 || y > mainH) return null
+                  // Keep clear of the OHLC legend in the top-left corner.
+                  if (y < 0 || y > mainH || (y < 64 && x < 560)) return null
+                  const golden = lv === 0.5 || lv === 0.618
                   return (
-                    <text key={`${d.id}-${lv}`} style={{ position: 'absolute', left: Math.max(4, x + 4), top: y - 15, color: T.dim, fontSize: 10, fontFamily: MONO, pointerEvents: 'none' }}>
-                      {`${lv.toFixed(3)}  ${fmtPrice(p)}`}
-                    </text>
+                    <div key={`${d.id}-${lv}`} style={{ position: 'absolute', left: Math.max(4, x + 6), top: y - 17, display: 'flex', flexDirection: 'row', gap: 6, paddingLeft: 5, paddingRight: 5, height: 15, alignItems: 'center', borderRadius: 3, backgroundColor: '#0a0c10cc', pointerEvents: 'none' }}>
+                      <text style={{ color: golden ? T.blue : T.dim, fontSize: 10, fontFamily: MONO }}>{lv.toFixed(3)}</text>
+                      <text style={{ color: golden ? T.blue : T.faint, fontSize: 10, fontFamily: MONO }}>{fmtPrice(p)}</text>
+                    </div>
                   )
                 }),
               )}
             {sel ? (
-              <div testId="zoom-sel" style={{ position: 'absolute', top: 0, left: Math.min(sel.a, sel.b), width: Math.abs(sel.b - sel.a), height: '100%', backgroundColor: '#71b7ff1a', borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#71b7ffaa', pointerEvents: 'none' }} />
+              <div testId="zoom-sel" style={{ position: 'absolute', top: 0, left: Math.min(sel.a, sel.b), width: Math.abs(sel.b - sel.a), height: '100%', backgroundColor: '#71b7ff14', borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#71b7ff99', pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {measure && Math.abs(sel.b - sel.a) > 60 ? (
+                  <div testId="measure" style={{ marginTop: 52, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, paddingTop: 6, paddingBottom: 6, paddingLeft: 10, paddingRight: 10, borderRadius: 8, backgroundColor: T.raised, borderWidth: 1, borderColor: T.borderHi }}>
+                    <text style={{ color: measure.change >= 0 ? T.green : T.red, fontSize: 15, fontFamily: MONO, fontWeight: 600 }}>{pct(measure.change)}</text>
+                    <text style={{ color: T.dim, fontSize: 11, fontFamily: MONO }}>{`${measure.count} bars · ${fmtDur(measure.dur)}`}</text>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
             {tool ? (
-              <div style={{ position: 'absolute', right: 10, top: 8, paddingLeft: 8, paddingRight: 8, paddingTop: 3, paddingBottom: 3, borderRadius: 5, backgroundColor: '#71b7ff22', pointerEvents: 'none' }}>
-                <text testId="tool-hint" style={{ color: T.blue, fontSize: 11 }}>{tool === 'hline' ? 'Click to place a level · Esc cancels' : 'Drag to draw · snaps to OHLC · Esc cancels'}</text>
+              <div style={{ position: 'absolute', left: 0, bottom: 14, width: '100%', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+                <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, height: 32, paddingLeft: 12, paddingRight: 12, borderRadius: 16, backgroundColor: T.raised, borderWidth: 1, borderColor: T.borderHi }}>
+                  <Icon name={TOOLS.find((t) => t.id === tool)!.icon} color={T.blue} />
+                  <text style={{ color: T.fg, fontSize: 12.5, fontWeight: 600 }}>{TOOLS.find((t) => t.id === tool)!.label}</text>
+                  <text testId="tool-hint" style={{ color: T.dim, fontSize: 12 }}>
+                    {tool === 'hline' ? 'Click to place a level · Esc cancels' : 'Drag to draw · snaps to OHLC · Esc cancels'}
+                  </text>
+                </div>
               </div>
             ) : null}
             <Crosshair hover={hover} pane="main" f={mf} idx={hoverIdx} h={mainH} />
-            {loading ? <Center text={`Loading ${sym} ${tf}…`} /> : null}
+            {loading ? (
+              <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: n ? '#0a0c10b3' : 'transparent', pointerEvents: 'none' }}>
+                <text testId="loading" style={{ color: T.dim, fontSize: 14 }}>{`Loading ${sym} · ${tf}`}</text>
+              </div>
+            ) : null}
           </PaneRow>
 
           {own.map(({ def, series }, k) => {
@@ -644,9 +837,7 @@ export function App(props: AppProps) {
                   id={def.id}
                   w={chartW}
                   h={h}
-                  box={box}
                   handlers={paneHandlers(def.id, box, false)}
-                  cursor="crosshair"
                   draw={(cv) => drawOsc(cv, spec, f, xTicks)}
                   drawKey={[series, view, chartW, h, xTicks.length]}
                   axis={
@@ -656,16 +847,18 @@ export function App(props: AppProps) {
                         if (y < 6 || y > h - 6) return null
                         return <AxisLabel key={v} y={y} text={Math.abs(v) >= 1000 ? fmtCompact(v) : v.toFixed(Math.abs(v) < 10 && !def.range ? 2 : 0)} />
                       })}
-                      {hover?.pane === def.id ? <AxisTag y={hover.y} text={fmtCompact(pOf(f, hover.y))} color={T.borderHi} fg={T.fg} /> : null}
+                      {hover?.pane === def.id ? <AxisTag y={hover.y} text={fmtCompact(pOf(f, hover.y))} color={T.fg} /> : null}
                     </>
                   }
                 >
-                  <div style={{ position: 'absolute', left: 10, top: 5, display: 'flex', flexDirection: 'row', gap: 10, pointerEvents: 'none' }}>
-                    <text style={{ color: T.dim, fontSize: 11, fontWeight: 'bold' }}>{def.label}</text>
+                  <div style={{ position: 'absolute', left: 14, top: 6, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12, pointerEvents: 'none' }}>
+                    <text style={{ color: T.fg, fontSize: 11, fontWeight: 600 }}>{def.label}</text>
                     {series.map((s) => (
-                      <text key={s.name} style={{ color: s.style === 'histogram' ? T.dim : s.color, fontSize: 11, fontFamily: MONO }}>
-                        {`${s.name} ${fmtNum(s.values[legendIdx] ?? NaN)}`}
-                      </text>
+                      <div key={s.name} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        {s.style !== 'histogram' ? <div style={{ width: 8, height: 2, borderRadius: 1, backgroundColor: s.color.slice(0, 7) }} /> : null}
+                        <text style={{ color: T.dim, fontSize: 11 }}>{s.name}</text>
+                        <text style={{ color: T.fg, fontSize: 11, fontFamily: MONO }}>{fmtNum(s.values[legendIdx] ?? NaN)}</text>
+                      </div>
                     ))}
                   </div>
                   <Crosshair hover={hover} pane={def.id} f={f} idx={hoverIdx} h={h} />
@@ -677,27 +870,23 @@ export function App(props: AppProps) {
           {/* Time axis */}
           <div style={{ position: 'relative', height: TIME_H, flexShrink: 0, borderTopWidth: 1, borderColor: T.border }}>
             {xTicks.map((t) => (
-              <text key={`${t.x}`} style={{ position: 'absolute', left: Math.max(0, t.x - 30), top: 4, width: 60, textAlign: 'center', color: t.major ? T.dim : T.faint, fontSize: 11, fontFamily: MONO }}>
+              <text key={`${t.x}`} style={{ position: 'absolute', left: Math.max(0, t.x - 30), top: 5, width: 60, textAlign: 'center', color: t.major ? T.dim : T.faint, fontSize: 11, fontFamily: MONO }}>
                 {t.label}
               </text>
             ))}
             {hoverIdx != null && bars[hoverIdx] ? (
-              <div style={{ position: 'absolute', left: Math.max(0, Math.min(chartW - 136, xOf(mf, hoverIdx) - 68)), top: 2, width: 136, height: 19, borderRadius: 4, backgroundColor: T.borderHi, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <text style={{ color: T.fg, fontSize: 11, fontFamily: MONO }}>{fmtTime(bars[hoverIdx]!.t)}</text>
+              <div style={{ position: 'absolute', left: Math.max(0, Math.min(chartW - 140, xOf(mf, hoverIdx) - 70)), top: 3, width: 140, height: 20, borderRadius: 5, backgroundColor: T.fg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <text style={{ color: T.bg, fontSize: 11, fontFamily: MONO, fontWeight: 600 }}>{fmtTime(bars[hoverIdx]!.t)}</text>
               </div>
             ) : null}
+            <div style={{ position: 'absolute', left: chartW, top: 0, width: AXIS_W, height: TIME_H, display: 'flex', alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderColor: T.border }}>
+              <text testId="range" style={{ color: T.faint, fontSize: 10.5, fontFamily: MONO }}>{`${visibleBars.toLocaleString('en-US')} bars`}</text>
+            </div>
           </div>
-
-          {sweepOpen ? <SweepView data={sweep} onPick={(c) => {
-            setParams((p) => ({ ...p, sma: { fast: c.fast, slow: c.slow } }))
-            setStrategy('sma')
-            setSweepOpen(false)
-          }} onClose={() => setSweepOpen(false)} /> : null}
-          {help ? <Help /> : null}
         </div>
 
         {showPanel ? (
-          <Sidebar
+          <Inspector
             sym={sym}
             watchlist={st.watchlist}
             tickers={tickers}
@@ -705,24 +894,57 @@ export function App(props: AppProps) {
             onPick={setSym}
             bt={bt}
             bars={closedBars}
+            strategies={STRATEGIES}
             strategyId={strategy.id}
             params={sp}
             onStrategy={setStrategy}
             hlTrade={hlTrade}
             onTrade={jumpToTrade}
-            narrow={!wide}
+            animate={animate}
+            revealKey={`${sym}:${tf}:${strategy.id}:${JSON.stringify(sp)}:${data?.source}`}
           />
         ) : null}
       </div>
 
-      {/* Status line */}
-      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', height: 24, paddingLeft: 14, paddingRight: 14, gap: 16, flexShrink: 0, borderTopWidth: 1, borderColor: T.border, overflow: 'hidden' }}>
-        <text testId="status" style={{ color: T.faint, fontSize: 11, fontFamily: MONO }}>
-          {`${n.toLocaleString('en-US')} bars · ${Math.max(0, Math.round(view.end - view.start))} visible · draw ${drawMs.current.toFixed(1)} ms${data?.note && data.source !== 'binance' ? ` · ${data.note.slice(0, 80)}` : ''}`}
-        </text>
-        <div style={{ flexGrow: 1 }} />
-        {!compact ? <text style={{ color: T.faint, fontSize: 11 }}>drag zoom · scroll pan · ⌃scroll zoom · t/h/g/f draw · w sweep · , . trades · ? keys</text> : <text style={{ color: T.faint, fontSize: 11 }}>? keys</text>}
-      </div>
+      {menu === 'chart' ? (
+        <Menu
+          {...menuAt('chart', 220)}
+          width={220}
+          onClose={() => setMenu(null)}
+          entries={[
+            ...CHART_TYPES.map<MenuEntry>((c) => ({ id: c.id, testId: `chart-${c.id}`, label: c.label, checked: st.chart === c.id, onSelect: () => (setChart(c.id), setMenu(null)) })),
+            { divider: true },
+            { id: 'log', testId: 'log', label: 'Log scale', hint: 'l', checked: st.log, onSelect: () => update((s) => ({ ...s, log: !s.log })) },
+          ]}
+        />
+      ) : null}
+      {menu === 'ind' ? (
+        <Menu
+          {...menuAt('ind', 300)}
+          width={300}
+          onClose={() => setMenu(null)}
+          entries={[
+            { section: 'Overlays' },
+            ...IND_ORDER.filter((id) => findIndicator(id)!.pane === 'overlay').map<MenuEntry>((id) => ({ id, testId: `ind-${id}`, label: IND_NAMES[id]!, hint: KEY_OF_IND[id], checked: st.indicators.includes(id), onSelect: () => toggleIndicator(id) })),
+            { section: 'Panes' },
+            ...IND_ORDER.filter((id) => findIndicator(id)!.pane === 'own').map<MenuEntry>((id) => ({ id, testId: `ind-${id}`, label: IND_NAMES[id]!, hint: KEY_OF_IND[id], checked: st.indicators.includes(id), onSelect: () => toggleIndicator(id) })),
+          ]}
+        />
+      ) : null}
+      {sweepOpen ? (
+        <SweepSheet
+          data={sweep}
+          onPick={(c) => {
+            setParams((p) => ({ ...p, sma: { fast: c.fast, slow: c.slow } }))
+            setStrategy('sma')
+            setPanel(true)
+            setSweepOpen(false)
+          }}
+          onClose={() => setSweepOpen(false)}
+        />
+      ) : null}
+      {help ? <HelpSheet onClose={() => setHelp(false)} /> : null}
+      {pal ? <Palette query={pal.q} items={palItems} selected={Math.min(pal.i, Math.max(0, palItems.length - 1))} width={size.w} onPick={runCmd} onHover={(i) => pal.i !== i && setPal({ ...pal, i })} onClose={() => setPal(null)} /> : null}
     </div>
   )
 }
@@ -743,7 +965,41 @@ type Handlers = {
   onScroll: (e: EventPayload) => void
 }
 
-function PaneRow(props: { id: string; w: number; h: number; box: { x: number; y: number }; handlers: Handlers; cursor: string; draw: (cv: Canvas) => void; drawKey: unknown[]; axis: React.ReactNode; children?: React.ReactNode }) {
+function SymbolButton({ sym, tf, onClick }: { sym: string; tf: string; onClick: () => void }) {
+  const [hot, setHot] = useState(false)
+  return (
+    <div testId="symbol-btn" onClick={onClick} onMouseEnter={() => setHot(true)} onMouseLeave={() => setHot(false)} style={{ display: 'flex', flexDirection: 'column', gap: 1, paddingLeft: 8, paddingRight: 8, paddingTop: 3, paddingBottom: 3, marginLeft: -8, borderRadius: 8, backgroundColor: hot ? T.raised : 'transparent', cursor: 'pointer', flexShrink: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <text testId="symbol" style={{ color: T.fg, fontSize: 17, fontWeight: 700 }}>
+          {sym}
+        </text>
+        <Icon name="chevron" size={12} color={hot ? T.fg : T.faint} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'row', gap: 5 }}>
+        <text style={{ color: T.faint, fontSize: 11.5 }}>{nameOf(sym)}</text>
+        <text style={{ color: T.faint, fontSize: 11.5 }}>·</text>
+        <text testId="tf" style={{ color: T.faint, fontSize: 11.5 }}>
+          {tf}
+        </text>
+      </div>
+    </div>
+  )
+}
+
+function SearchButton({ compact, onClick }: { compact: boolean; onClick: () => void }) {
+  const [hot, setHot] = useState(false)
+  return (
+    <div testId="search" onClick={onClick} onMouseEnter={() => setHot(true)} onMouseLeave={() => setHot(false)} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, height: 28, paddingLeft: 9, paddingRight: 6, marginRight: 4, borderRadius: 7, backgroundColor: hot ? T.raised : T.panel, borderWidth: 1, borderColor: T.border, cursor: 'pointer', flexShrink: 0, width: compact ? undefined : 190 }}>
+      <Icon name="search" size={14} color={T.dim} />
+      {!compact ? <text style={{ color: T.faint, fontSize: 12.5, flexGrow: 1 }}>Search</text> : null}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 4, backgroundColor: T.raised, borderWidth: 1, borderColor: T.border }}>
+        <text style={{ color: T.dim, fontSize: 10, fontFamily: MONO }}>/</text>
+      </div>
+    </div>
+  )
+}
+
+function PaneRow(props: { id: string; w: number; h: number; handlers: Handlers; draw: (cv: Canvas) => void; drawKey: unknown[]; axis: React.ReactNode; children?: React.ReactNode }) {
   const { w, h } = props
   return (
     <div style={{ display: 'flex', flexDirection: 'row', height: h, flexShrink: 0 }}>
@@ -756,36 +1012,25 @@ function PaneRow(props: { id: string; w: number; h: number; box: { x: number; y:
   )
 }
 
-function Raster({ w, h, draw, drawKey, testId }: { w: number; h: number; draw: (cv: Canvas) => void; drawKey: unknown[]; testId: string }) {
-  const img = useRef<ImgInstance>(null)
-  const cv = useRef(new Canvas())
-  useLayoutEffect(() => {
-    cv.current.resize(w, h)
-    draw(cv.current)
-    img.current?.setImagePixels(cv.current.w, cv.current.h, cv.current.buf, { format: 'bgra' })
-  }, drawKey)
-  return <img ref={img} testId={testId} objectFit="fill" style={{ position: 'absolute', left: 0, top: 0, width: w, height: h }} />
-}
-
 function Crosshair({ hover, pane, f, idx, h }: { hover: Hover; pane: string; f: Frame; idx: number | null; h: number }) {
   if (!hover || idx == null) return null
   const x = Math.round(xOf(f, idx))
   return (
     <>
-      <div style={{ position: 'absolute', left: x, top: 0, width: 1, height: h, backgroundColor: '#9ea7b366', pointerEvents: 'none' }} />
-      {hover.pane === pane ? <div testId={`cross-${pane}`} style={{ position: 'absolute', left: 0, top: Math.round(hover.y), width: f.w, height: 1, backgroundColor: '#9ea7b366', pointerEvents: 'none' }} /> : null}
+      <div style={{ position: 'absolute', left: x, top: 0, width: 1, height: h, backgroundColor: '#f0f3f640', pointerEvents: 'none' }} />
+      {hover.pane === pane ? <div testId={`cross-${pane}`} style={{ position: 'absolute', left: 0, top: Math.round(hover.y), width: f.w, height: 1, backgroundColor: '#f0f3f640', pointerEvents: 'none' }} /> : null}
     </>
   )
 }
 
 function AxisLabel({ y, text }: { y: number; text: string }) {
-  return <text style={{ position: 'absolute', left: 8, top: y - 8, color: T.faint, fontSize: 11, fontFamily: MONO }}>{text}</text>
+  return <text style={{ position: 'absolute', left: 10, top: y - 8, color: T.faint, fontSize: 11, fontFamily: MONO }}>{text}</text>
 }
 
-function AxisTag({ y, text, color, fg = T.bg, testId }: { y: number; text: string; color: string; fg?: string; testId?: string }) {
+function AxisTag({ y, text, color, testId }: { y: number; text: string; color: string; testId?: string }) {
   return (
-    <div testId={testId} style={{ position: 'absolute', left: 1, top: y - 10, width: AXIS_W - 2, height: 20, backgroundColor: color, display: 'flex', alignItems: 'center', paddingLeft: 7 }}>
-      <text style={{ color: fg, fontSize: 11, fontFamily: MONO, fontWeight: 'bold' }}>{text}</text>
+    <div testId={testId} style={{ position: 'absolute', left: 4, top: y - 10, width: AXIS_W - 8, height: 20, borderRadius: 5, backgroundColor: color, display: 'flex', alignItems: 'center', paddingLeft: 6 }}>
+      <text style={{ color: T.bg, fontSize: 11, fontFamily: MONO, fontWeight: 600 }}>{text}</text>
     </div>
   )
 }
@@ -803,277 +1048,6 @@ function Divider({ testId, onDown, onMove, onUp }: { testId: string; onDown: (e:
       style={{ height: DIVIDER, flexShrink: 0, cursor: 'row-resize', display: 'flex', alignItems: 'center', backgroundColor: T.bg }}
     >
       <div style={{ height: hot ? 2 : 1, width: '100%', backgroundColor: hot ? T.blue : T.border }} />
-    </div>
-  )
-}
-
-function Pill({ label, active, onClick, testId, mono, accent = T.fg }: { label: string; active: boolean; onClick: () => void; testId?: string; mono?: boolean; accent?: string }) {
-  const [hot, setHot] = useState(false)
-  return (
-    <div
-      testId={testId}
-      onClick={onClick}
-      onMouseEnter={() => setHot(true)}
-      onMouseLeave={() => setHot(false)}
-      style={{ display: 'flex', alignItems: 'center', height: 24, paddingLeft: 9, paddingRight: 9, borderRadius: 5, backgroundColor: active ? T.raised : hot ? '#161b2280' : 'transparent', borderWidth: 1, borderColor: active ? T.borderHi : 'transparent', cursor: 'pointer', flexShrink: 0 }}
-    >
-      <text style={{ color: active ? accent : hot ? T.fg : T.dim, fontSize: 12, fontFamily: mono ? MONO : undefined, fontWeight: active ? 'bold' : 'normal' }}>{label}</text>
-    </div>
-  )
-}
-
-function Group({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 1, paddingRight: 10, borderRightWidth: 1, borderColor: T.border, flexShrink: 0 }}>{children}</div>
-}
-
-function Center({ text }: { text: string }) {
-  return (
-    <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-      <text testId="loading" style={{ color: T.dim, fontSize: 14 }}>
-        {text}
-      </text>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------------------------
-
-function Sidebar(props: {
-  sym: string
-  watchlist: string[]
-  tickers: Record<string, { last: number; change: number }>
-  current: { sym: string; last: number; change: number }
-  onPick: (s: string) => void
-  bt: BacktestResult | null
-  bars: Bar[]
-  strategyId: string
-  params: Record<string, number>
-  onStrategy: (id: string) => void
-  hlTrade: number | null
-  onTrade: (k: number) => void
-  narrow: boolean
-}) {
-  const m = props.bt?.metrics
-  const trades = props.bt?.trades ?? []
-  const w = SIDEBAR_W
-  const eqW = w - 28
-  const hl = props.hlTrade != null ? trades[props.hlTrade] : null
-  return (
-    <div testId="sidebar" style={{ display: 'flex', flexDirection: 'column', width: w, flexShrink: 0, borderLeftWidth: 1, borderColor: T.border, backgroundColor: T.panel }}>
-      {/* Watchlist */}
-      <div style={{ display: 'flex', flexDirection: 'column', paddingTop: 10, paddingBottom: 6, borderBottomWidth: 1, borderColor: T.border, flexShrink: 0 }}>
-        <SectionTitle text="Watchlist" />
-        {props.watchlist.map((s) => {
-          const t = s === props.current.sym && Number.isFinite(props.current.last) ? { last: props.current.last, change: props.tickers[s]?.change ?? props.current.change } : props.tickers[s]
-          const active = s === props.sym
-          return (
-            <Row key={s} testId={`wl-${s}`} active={active} onClick={() => props.onPick(s)}>
-              <text style={{ color: active ? T.fg : T.dim, fontSize: 13, fontWeight: active ? 'bold' : 'normal', width: 96 }}>{s}</text>
-              <div style={{ flexGrow: 1 }} />
-              <text style={{ color: T.fg, fontSize: 12, fontFamily: MONO }}>{t ? fmtPrice(t.last) : '—'}</text>
-              <text style={{ color: t && t.change < 0 ? T.red : T.green, fontSize: 12, fontFamily: MONO, width: 70, textAlign: 'right' }}>{t ? pct(t.change) : ''}</text>
-            </Row>
-          )
-        })}
-      </div>
-
-      {/* Backtest */}
-      <div style={{ display: 'flex', flexDirection: 'column', paddingTop: 10, gap: 8, flexShrink: 0 }}>
-        <SectionTitle text="Strategy backtest" />
-        <div style={{ display: 'flex', flexDirection: 'row', gap: 2, marginLeft: 12, marginRight: 12, padding: 2, borderRadius: 7, backgroundColor: T.bg, borderWidth: 1, borderColor: T.border }}>
-          {STRATEGIES.map((s) => (
-            <div
-              key={s.id}
-              testId={`strat-${s.id}`}
-              onClick={() => props.onStrategy(s.id)}
-              style={{ flexGrow: 1, flexBasis: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 24, borderRadius: 5, backgroundColor: s.id === props.strategyId ? T.raised : 'transparent', cursor: 'pointer' }}
-            >
-              <text style={{ color: s.id === props.strategyId ? T.fg : T.dim, fontSize: 12, fontWeight: s.id === props.strategyId ? 'bold' : 'normal' }}>{s.label}</text>
-            </div>
-          ))}
-        </div>
-        <text testId="bt-params" style={{ color: T.faint, fontSize: 11, fontFamily: MONO, marginLeft: 14 }}>
-          {`${Object.entries(props.params)
-            .map(([k, v]) => `${k} ${v}`)
-            .join(' · ')} · fee ${FEE_BPS}bp · slip ${SLIP_BPS}bp`}
-        </text>
-        <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', marginLeft: 12, marginRight: 12, rowGap: 8 }}>
-          <Metric label="Return" value={m ? pct(m.totalReturn, 1) : '—'} color={m && m.totalReturn < 0 ? T.red : T.green} testId="m-return" />
-          <Metric label="Sharpe" value={m ? m.sharpe.toFixed(2) : '—'} testId="m-sharpe" />
-          <Metric label="Max DD" value={m ? pct(m.maxDrawdown, 1) : '—'} color={T.red} testId="m-dd" />
-          <Metric label="CAGR" value={m ? pct(m.cagr, 1) : '—'} />
-          <Metric label="Sortino" value={m ? m.sortino.toFixed(2) : '—'} />
-          <Metric label="Win rate" value={m ? `${(m.winRate * 100).toFixed(0)}%` : '—'} />
-          <Metric label="Profit factor" value={m ? (Number.isFinite(m.profitFactor) ? m.profitFactor.toFixed(2) : '∞') : '—'} />
-          <Metric label="Exposure" value={m ? `${(m.exposure * 100).toFixed(0)}%` : '—'} />
-          <Metric label="Trades" value={m ? String(m.trades) : '—'} testId="m-trades" />
-        </div>
-        <div style={{ position: 'relative', marginLeft: 14, width: eqW, height: 104, borderRadius: 6, overflow: 'hidden', borderWidth: 1, borderColor: T.border }}>
-          {props.bt ? (
-            <Raster
-              w={eqW}
-              h={104}
-              testId="equity"
-              draw={(cv) => drawEquity(cv, props.bars, props.bt!, CAPITAL, hl ? { a: hl.entryIndex, b: hl.exitIndex } : null)}
-              drawKey={[props.bt, eqW, hl]}
-            />
-          ) : null}
-          <text style={{ position: 'absolute', left: 8, top: 5, color: T.faint, fontSize: 10, pointerEvents: 'none' }}>equity vs buy & hold · drawdown</text>
-        </div>
-      </div>
-
-      {/* Trades */}
-      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginTop: 10, paddingLeft: 14, paddingRight: 14, height: 22, flexShrink: 0 }}>
-        <text style={{ color: T.dim, fontSize: 11, fontWeight: 'bold' }}>{`TRADES  ${trades.length}`}</text>
-        <div style={{ flexGrow: 1 }} />
-        <text style={{ color: T.faint, fontSize: 10 }}>, . to step</text>
-      </div>
-      <div testId="trades" style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, overflowY: 'scroll', paddingBottom: 6 }}>
-        {trades
-          .map((t, k) => ({ t, k }))
-          .reverse()
-          .slice(0, 200)
-          .map(({ t, k }) => (
-            <Row key={k} testId={`trade-${k}`} active={props.hlTrade === k} onClick={() => props.onTrade(k)} h={24}>
-              <text style={{ color: T.faint, fontSize: 11, fontFamily: MONO, width: 34 }}>{`#${k + 1}`}</text>
-              <text style={{ color: T.dim, fontSize: 11, fontFamily: MONO }}>{`${fmtTime(t.entryTime, false)} → ${fmtTime(t.exitTime, false)}`}</text>
-              <div style={{ flexGrow: 1 }} />
-              <text style={{ color: t.pnl >= 0 ? T.green : T.red, fontSize: 11, fontFamily: MONO }}>{pct(t.pnlPct)}</text>
-            </Row>
-          ))}
-      </div>
-    </div>
-  )
-}
-
-function SectionTitle({ text }: { text: string }) {
-  return <text style={{ color: T.dim, fontSize: 11, fontWeight: 'bold', marginLeft: 14, marginBottom: 4 }}>{text.toUpperCase()}</text>
-}
-
-function Row({ children, active, onClick, testId, h = 28 }: { children: React.ReactNode; active: boolean; onClick: () => void; testId?: string; h?: number }) {
-  const [hot, setHot] = useState(false)
-  return (
-    <div
-      testId={testId}
-      onClick={onClick}
-      onMouseEnter={() => setHot(true)}
-      onMouseLeave={() => setHot(false)}
-      style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, height: h, paddingLeft: 14, paddingRight: 14, flexShrink: 0, backgroundColor: active ? '#71b7ff1f' : hot ? T.raised : 'transparent', cursor: 'pointer' }}
-    >
-      {active ? <div style={{ position: 'absolute', left: 0, top: 4, width: 2, height: h - 8, backgroundColor: T.blue }} /> : null}
-      {children}
-    </div>
-  )
-}
-
-function Metric({ label, value, color = T.fg, testId }: { label: string; value: string; color?: string; testId?: string }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: (SIDEBAR_W - 24) / 3, paddingLeft: 2, gap: 1 }}>
-      <text style={{ color: T.faint, fontSize: 10 }}>{label}</text>
-      <text testId={testId} style={{ color, fontSize: 14, fontFamily: MONO, fontWeight: 'bold' }}>
-        {value}
-      </text>
-    </div>
-  )
-}
-
-function heat(v: number, lo: number, hi: number) {
-  if (!Number.isFinite(v)) return T.raised
-  const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo || 1)))
-  const mix = (a: number[], b: number[], k: number) => a.map((x, i) => Math.round(x + (b[i]! - x) * k))
-  const red = [120, 40, 44]
-  const mid = [28, 33, 41]
-  const green = [22, 120, 52]
-  const c = t < 0.5 ? mix(red, mid, t * 2) : mix(mid, green, (t - 0.5) * 2)
-  return `#${c.map((x) => x.toString(16).padStart(2, '0')).join('')}`
-}
-
-function SweepView({ data, onPick, onClose }: { data: { sw: Sweep; wf: ReturnType<typeof walkForward> } | null; onPick: (c: { fast: number; slow: number }) => void; onClose: () => void }) {
-  const cell = 52
-  return (
-    <div testId="sweep-view" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0c10d9' }} onClick={onClose}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 20, borderRadius: 12, backgroundColor: T.panel, borderWidth: 1, borderColor: T.borderHi }} onClick={() => {}}>
-        <text style={{ color: T.fg, fontSize: 15, fontWeight: 'bold' }}>SMA cross parameter sweep · Sharpe</text>
-        {!data ? (
-          <text style={{ color: T.dim, fontSize: 12 }}>Need at least 300 bars.</text>
-        ) : (
-          (() => {
-            const vals = data.sw.cells.map((c) => c.sharpe).filter(Number.isFinite)
-            const lo = Math.min(...vals)
-            const hi = Math.max(...vals)
-            const oos = data.wf.filter((f) => f.best)
-            const oosAvg = oos.length ? oos.reduce((a, f) => a + f.oosSharpe, 0) / oos.length : 0
-            return (
-              <>
-                <div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 20 }}>
-                    {data.sw.slows.map((s) => (
-                      <div key={s} style={{ height: cell - 14, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', width: 54 }}>
-                        <text style={{ color: T.faint, fontSize: 11, fontFamily: MONO }}>{`slow ${s}`}</text>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <div style={{ display: 'flex', flexDirection: 'row', gap: 2, height: 18 }}>
-                      {data.sw.fasts.map((f) => (
-                        <text key={f} style={{ color: T.faint, fontSize: 11, fontFamily: MONO, width: cell, textAlign: 'center' }}>{`fast ${f}`}</text>
-                      ))}
-                    </div>
-                    {data.sw.slows.map((s) => (
-                      <div key={s} style={{ display: 'flex', flexDirection: 'row', gap: 2 }}>
-                        {data.sw.fasts.map((f) => {
-                          const c = data.sw.cells.find((x) => x.fast === f && x.slow === s)!
-                          const best = data.sw.best === c
-                          return (
-                            <div
-                              key={f}
-                              testId={`cell-${f}-${s}`}
-                              onClick={() => Number.isFinite(c.sharpe) && onPick(c)}
-                              style={{ width: cell, height: cell - 14, borderRadius: 4, backgroundColor: heat(c.sharpe, lo, hi), display: 'flex', alignItems: 'center', justifyContent: 'center', borderWidth: best ? 2 : 0, borderColor: T.yellow, cursor: 'pointer' }}
-                            >
-                              <text style={{ color: Number.isFinite(c.sharpe) ? T.fg : T.faint, fontSize: 12, fontFamily: MONO }}>{Number.isFinite(c.sharpe) ? c.sharpe.toFixed(2) : '·'}</text>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <text testId="overfit" style={{ color: T.yellow, fontSize: 12, width: 380 }}>
-                  {`In-sample best ${data.sw.best ? `${data.sw.best.fast}/${data.sw.best.slow} Sharpe ${data.sw.best.sharpe.toFixed(2)}` : '—'}. Walk-forward out-of-sample Sharpe averages ${oosAvg.toFixed(2)} over ${oos.length} folds: the best cell is the most overfit one.`}
-                </text>
-                <text style={{ color: T.faint, fontSize: 11 }}>Click a cell to backtest it · Esc closes</text>
-              </>
-            )
-          })()
-        )}
-      </div>
-    </div>
-  )
-}
-
-function Help() {
-  const rows: [string, string][] = [
-    ['1–7', 'timeframe 1m 5m 15m 1h 4h 1D 1W'],
-    ['drag · scroll', 'zoom to range · pan'],
-    ['⌃/⌥ scroll · ⇧ drag', 'zoom at cursor · pan'],
-    ['↑ ↓ ← →  0', 'zoom · pan · reset (or double-click)'],
-    ['c  l', 'chart type · log scale'],
-    ['e s b v u d', 'EMA SMA Bollinger VWAP SuperTrend Donchian'],
-    ['r m k a o', 'RSI MACD Stoch ATR OBV panes'],
-    ['t h g f  x', 'trend · level · box · fib · delete last'],
-    ['n  w  , .', 'next strategy · sweep · step trades'],
-    ['[ ]  p', 'watchlist symbol · backtest panel'],
-    ['q  ⌃C', 'quit'],
-  ]
-  return (
-    <div testId="help" style={{ position: 'absolute', right: 16, top: 16, display: 'flex', flexDirection: 'column', gap: 6, padding: 16, borderRadius: 10, backgroundColor: T.panel, borderWidth: 1, borderColor: T.borderHi, pointerEvents: 'none' }}>
-      {rows.map(([k, v]) => (
-        <div key={k} style={{ display: 'flex', flexDirection: 'row', gap: 14 }}>
-          <text style={{ color: T.blue, fontSize: 12, fontFamily: MONO, width: 150 }}>{k}</text>
-          <text style={{ color: T.dim, fontSize: 12 }}>{v}</text>
-        </div>
-      ))}
     </div>
   )
 }

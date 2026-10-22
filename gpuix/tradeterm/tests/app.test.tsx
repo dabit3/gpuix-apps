@@ -32,14 +32,14 @@ describeNative('tradeterm window', () => {
     pump()
   }
   const text = (id: string) => app.getByTestId(id).textContent()
-  const visible = async () => Number((await text('status')).match(/(\d[\d,]*) visible/)![1]!.replace(/,/g, ''))
+  const visible = async () => Number((await text("range")).match(/(\d[\d,]*) bars/)![1]!.replace(/,/g, ''))
   const press = async (k: string) => {
     await app.getByTestId('root').press(k)
     await settle(120)
   }
 
   beforeAll(async () => {
-    root.render(<App symbol="BTC-USD" timeframe="1h" offline preload={{ bars, source: 'sample', note: 'test' }} />)
+    root.render(<App symbol="BTC-USD" timeframe="1h" offline strategy="sma" preload={{ bars, source: 'sample', note: 'test' }} />)
     pump()
     app = await connectTest(root.renderer)
     await settle(400)
@@ -110,6 +110,45 @@ describeNative('tradeterm window', () => {
     await settle(600)
     expect(await app.getByTestId('sweep-view').count()).toBe(1)
     expect(await text('overfit')).toMatch(/overfit/i)
+    await press('escape')
+    expect(await app.getByTestId('sweep-view').count()).toBe(0)
+  })
+
+  it('the Indicators menu toggles panes with checkmarks', async () => {
+    expect(await app.getByTestId('pane-stoch').count()).toBe(0)
+    await app.getByTestId('menu-ind').click()
+    await settle(150)
+    expect(await app.getByTestId('menu').count()).toBe(1)
+    await app.getByTestId('ind-stoch').click()
+    await settle(200)
+    expect(await app.getByTestId('pane-stoch').count()).toBe(1)
+    await press('escape')
+    expect(await app.getByTestId('menu').count()).toBe(0)
+    await press('k')
+    expect(await app.getByTestId('pane-stoch').count()).toBe(0)
+  })
+
+  it('/ opens the command palette and "sol 1d" opens SOL-USD on the daily chart', async () => {
+    await press('/')
+    expect(await app.getByTestId('palette').count()).toBe(1)
+    for (const ch of ['s', 'o', 'l']) await press(ch)
+    await press('space')
+    for (const ch of ['1', 'd']) await press(ch)
+    expect(await text('palette-query')).toBe('sol 1d')
+    expect(await app.getByTestId('cmd-go-SOL-USD-1D').count()).toBe(1)
+    await press('enter')
+    await settle(500)
+    expect(await app.getByTestId('palette').count()).toBe(0)
+    expect(await text('symbol')).toBe('SOL-USD')
+    expect(await text('tf')).toBe('1D')
+  })
+
+  it('palette searches actions too: "sweep" opens the sweep sheet', async () => {
+    await press('/')
+    for (const ch of 'sweep') await press(ch)
+    await press('enter')
+    await settle(600)
+    expect(await app.getByTestId('sweep-view').count()).toBe(1)
     await press('escape')
     expect(await app.getByTestId('sweep-view').count()).toBe(0)
   })

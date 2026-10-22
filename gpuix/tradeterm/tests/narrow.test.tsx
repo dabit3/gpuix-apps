@@ -28,7 +28,7 @@ describeNative('tradeterm in a narrow split pane', () => {
   }
 
   beforeAll(async () => {
-    root.render(<App symbol="ETH-USD" timeframe="15m" offline preload={{ bars, source: 'sample', note: 'test' }} />)
+    root.render(<App symbol="ETH-USD" timeframe="15m" offline strategy="sma" preload={{ bars, source: 'sample', note: 'test' }} />)
     root.renderer.flush()
     app = await connectTest(root.renderer)
     await settle(400)

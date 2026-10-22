@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { HOME } from './data/feed'
+import { home } from './data/feed'
 
 export type Point = { t: number; p: number }
 export type DrawingKind = 'trend' | 'hline' | 'rect' | 'fib'
@@ -26,7 +26,7 @@ export const DEFAULT_STATE: State = {
   paneSizes: {},
 }
 
-const file = () => join(HOME, 'state.json')
+const file = () => join(home(), 'state.json')
 
 export function loadState(): State {
   try {
@@ -40,7 +40,7 @@ let timer: ReturnType<typeof setTimeout> | undefined
 export function saveState(s: State, immediate = false) {
   const write = () => {
     try {
-      mkdirSync(HOME, { recursive: true })
+      mkdirSync(home(), { recursive: true })
       writeFileSync(file(), JSON.stringify(s, null, 2))
     } catch {}
   }
