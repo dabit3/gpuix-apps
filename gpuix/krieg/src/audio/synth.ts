@@ -89,6 +89,10 @@ export function song(loops = 1) {
   return delay(out, step * 3, 0.25)
 }
 
+// Music runs under a tiny sh guard that kills the player when krieg dies by any means (window closed, SIGKILL)
+// or when the guard itself is terminated, so the song never outlives the game.
+const GUARD = '"$@" & a=$!; trap \'kill $a 2>/dev/null; exit 1\' TERM INT HUP; while kill -0 $PPID 2>/dev/null && kill -0 $a 2>/dev/null; do sleep 0.3; done; kill -0 $a 2>/dev/null && { kill $a; exit 1; }; exit 0'
+
 export class Audio {
   dir = join(tmpdir(), 'krieg-audio')
   enabled: boolean
@@ -100,7 +104,7 @@ export class Audio {
   private last: Record<string, number> = {}
   ms = 0
 
-  constructor(enabled: boolean) {
+  constructor(enabled: boolean, private player = '/usr/bin/afplay') {
     this.enabled = enabled && process.platform === 'darwin' && existsSync('/usr/bin/afplay')
     if (!this.enabled) return
     const t0 = performance.now()
@@ -112,6 +116,8 @@ export class Audio {
     this.wk = new Worker(URL.createObjectURL(new Blob([code], { type: 'application/javascript' })))
     this.wk.onmessage = () => { this.n-- }
     this.wk.unref()
+    process.on('exit', () => this.stop())
+    for (const sig of ['SIGHUP', 'SIGTERM'] as const) process.on(sig, () => { this.stop(); process.exit(128 + (sig === 'SIGHUP' ? 1 : 15)) })
   }
 
   play(name: string, vol = 0.6) {
@@ -127,9 +133,10 @@ export class Audio {
 
   startMusic() {
     if (!this.enabled || !this.music || this.musicProc) return
-    const c = spawn('/usr/bin/afplay', ['-v', '0.35', join(this.dir, 'song.wav')], { stdio: 'ignore' })
+    const c = spawn('/bin/sh', ['-c', GUARD, 'krieg-music', this.player, '-v', '0.35', join(this.dir, 'song.wav')], { stdio: 'ignore' })
     this.musicProc = c
-    c.on('exit', () => { if (this.musicProc === c) { this.musicProc = null; this.startMusic() } })
+    // Loop only when the song ends on its own: a Ctrl-C SIGINT reaches afplay too, and respawning then orphans it.
+    c.on('exit', (code) => { if (this.musicProc === c) { this.musicProc = null; if (code === 0) this.startMusic() } })
   }
 
   toggleMusic() {
