@@ -714,7 +714,7 @@ export const SHORTCUTS: [string, string][] = [
   ['⇧Enter', 'New line in the composer'],
   ['Esc', 'Close menus, clear search, leave a page'],
   ['⇧⌘L', 'Toggle light / dark'],
-  ['⌘,', 'Settings'],
+  ['⌘,', 'Settings (window mode; in Ghostty use the gear, ⌘, opens Ghostty config)'],
   ['⌘B', 'Show / hide sidebar'],
   ['⌘.', 'Show / hide the right panel'],
   ['⌘+ / ⌘− / ⌘0', 'Zoom in / out / reset (also ⌃+ / ⌃− / ⌃0)'],
