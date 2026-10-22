@@ -6,6 +6,7 @@ import { C, nativeTheme } from './theme'
 import { DevinClient, describeTrigger, SCHEDULE_PRESETS, timeAgo, type ApiAutomation, type ApiNote, type ApiPlaybook, type ApiSecret, type ApiTemplate, type DevinApi } from './api'
 import type { Session } from './data'
 import { FindingsList } from './more'
+import { stepZoom } from './zoom/scale'
 
 // View-local UI state that survives the theme toggle (which remounts the tree so memoized rows repaint).
 const sticky = new Map<string, unknown>()
@@ -731,6 +732,8 @@ function SettingRow({ label, hint, children }: { label: string; hint?: string; c
 }
 
 export type SettingsProps = {
+  zoom?: number
+  onZoom?: (z: number) => void
   instance?: number
   api: DevinApi | null
   orgId: string | null
@@ -818,6 +821,13 @@ export function SettingsView(p: SettingsProps) {
         <div style={col()}>
           <SettingRow label="Appearance" hint="Also ⇧⌘L. Defaults to your Ghostty theme.">
             <Pills testId="pref-theme" value={p.themeName} onChange={p.onTheme} items={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]} />
+          </SettingRow>
+          <SettingRow label="Zoom" hint="Also ⌃+ / ⌃− / ⌃0 (Ghostty keeps ⌘+ for its own font size). Scales the whole app.">
+            <div style={row({ gap: 6 })}>
+              <Btn small label="−" testId="zoom-out" disabled={(p.zoom ?? 1) <= 0.75} onClick={() => p.onZoom?.(stepZoom(p.zoom ?? 1, -1))} />
+              <Btn small label={`${Math.round((p.zoom ?? 1) * 100)}%`} testId="zoom-reset" onClick={() => p.onZoom?.(1)} />
+              <Btn small label="+" testId="zoom-in" disabled={(p.zoom ?? 1) >= 2} onClick={() => p.onZoom?.(stepZoom(p.zoom ?? 1, 1))} />
+            </div>
           </SettingRow>
           <SettingRow label="Default agent" hint="Sent as devin_mode when you start a session.">
             <Pills testId="pref-mode" value={p.mode} onChange={p.onMode} items={p.modes} />

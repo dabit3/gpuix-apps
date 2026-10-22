@@ -8,6 +8,9 @@ import { DevinClient, loadConfig, type DevinConfig } from './src/api'
 import { defaultStore, removeCredentials, saveCredentials } from './src/keystore'
 import { resolveTheme } from './src/theme'
 import { loadPrefs } from './src/prefs'
+import { setZoom } from './src/zoom/scale'
+
+setZoom(loadPrefs().zoom ?? 1)
 
 const HELP = `devin-tui: the Devin web app, GPU-painted inside your terminal (GPUIX + kitty graphics)
 

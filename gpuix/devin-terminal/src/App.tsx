@@ -42,6 +42,7 @@ import type { ApiPlaybook, ApiSession } from './api'
 import { ActionMenu, AutomationsView, Btn, copyText, CustomizeView, Field, notificationsFor, NotificationsView, ReviewView, SecurityView, SettingsView, useSticky, WEB, type MenuAction, type View } from './views'
 import { clearQuarantine, originalPath, previewPath, shotsFrom, type PreviewDeps, type Shot } from './computer'
 import { loadPrefs, savePrefs, type Prefs } from './prefs'
+import { getZoom, setZoom, stepZoom } from './zoom/scale'
 import { EnvironmentView, PrReview, ReposView, SessionExtras, SessionsView, UsageView, type SessionsFilter } from './more'
 
 export { C }
@@ -1401,7 +1402,10 @@ export function DevinApp({
   stateRef.current = state
 
   // Reflow for narrow hosts (a Ghostty split): drop the right panel, then shrink and finally hide the sidebar.
-  const { width: hostWidth } = useWindowSize()
+  const [zoom, setZoomState] = useState(getZoom())
+  const { width: rawWidth } = useWindowSize()
+  // Layout breakpoints work in zoomed points, like browser zoom.
+  const hostWidth = rawWidth / zoom
   const compact = hostWidth > 0 && hostWidth < 1080
   const tiny = hostWidth > 0 && hostWidth < 600
   const panelWidth = live && (state.panelTab === 'computer' || !state.panelTab) && hostWidth >= 1360 ? 520 : PANEL_WIDTH
@@ -1666,6 +1670,11 @@ export function DevinApp({
       toggleTheme()
       return
     }
+    if (mod && (key === '=' || key === '+' || key === '-' || key === '0')) {
+      event.preventDefault()
+      changeZoom(key === '0' ? 1 : stepZoom(getZoom(), key === '-' ? -1 : 1))
+      return
+    }
     if (mod && key === ',') {
       event.preventDefault()
       setView('settings')
@@ -1781,6 +1790,11 @@ export function DevinApp({
     if (page === 'shortcuts') setSettingsKey((k) => k + 1000)
     setView('settings')
   }
+  const changeZoom = (z: number) => {
+    setZoom(z)
+    setZoomState(getZoom())
+    updatePrefs({ zoom: getZoom() })
+  }
   const navigate = (v: View, tab?: string) => {
     if (v === 'customize' && (tab === 'knowledge' || tab === 'playbooks')) setCustomizeTab(tab)
     if (v === 'sessions') setSessionsTab((s) => ({ filter: (tab as SessionsFilter) ?? 'all', n: s.n + 1 }))
@@ -1843,6 +1857,8 @@ export function DevinApp({
         orgId={orgId}
         baseUrl={baseUrl}
         keyHint={keyHint}
+        zoom={zoom}
+        onZoom={changeZoom}
         themeName={themeName}
         onTheme={(t) => {
           if (t !== themeName) toggleTheme()
@@ -1881,7 +1897,7 @@ export function DevinApp({
 
   return (
     <div
-      key={themeName}
+      key={`${themeName}-${zoom}`}
       ref={rootRef}
       tabIndex={-1}
       autoFocus
