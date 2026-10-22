@@ -15,22 +15,22 @@ REC=$!
 sleep 2.5; front
 $I "convt demo -w" 85; sleep 0.5; $I --key 36; sleep 3.5
 # image: format chips, quality drag, max size
-$I --move 1166 216 500; sleep 0.4; $I --click 1166 216; sleep 1.8
-$I --move 1324 387 500; sleep 0.3; $I --drag 1324 387 1140 387 1500 250; sleep 1.5
-$I --move 1229 453 400; $I --click 1229 453; sleep 1.5
-$I --click 1104 216; sleep 1.2
+$I --move 1147 203 500; sleep 0.4; $I --click 1147 203; sleep 1.8
+$I --move 1304 386 500; sleep 0.3; $I --drag 1304 386 1140 386 1500 250; sleep 1.5
+$I --move 1212 457 400; $I --click 1212 457; sleep 1.5
+$I --click 1085 203; sleep 1.2
 # dunes, then keyboard format cycling
-$I --move 200 403 500; $I --click 200 403; sleep 1.5
+$I --move 200 372 500; $I --click 200 372; sleep 1.5
 for k in 124 124 124; do $I --key $k; sleep 0.7; done
 $I --key 123; $I --key 123; $I --key 123; sleep 1
 # video: preset via key 3, audio waveform, doc preview
-$I --move 200 334 500; $I --click 200 334; sleep 1.6
+$I --move 200 319 500; $I --click 200 319; sleep 1.6
 $I --key 18; sleep 0.8; $I --key 20; sleep 1.5
-$I --move 200 275 400; $I --click 200 275; sleep 1.8
-$I --move 200 580 500; $I --click 200 580; sleep 1.5
+$I --move 200 266 400; $I --click 200 266; sleep 1.8
+$I --move 200 531 500; $I --click 200 531; sleep 1.5
 # convert everything
 $I "a" 60; sleep 0.6; $I --key 36; sleep 6
-$I --move 200 334 500; $I --click 200 334; sleep 2.5
+$I --move 200 319 500; $I --click 200 319; sleep 2.5
 # split: watch-folder drop + ffprobe in the new pane
 front; $I --key 2 cmd; sleep 2
 $I "cp demo-more/* demo/" 70; $I --key 36; sleep 3

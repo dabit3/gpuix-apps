@@ -50,7 +50,7 @@ Keys (Ghostty owns most Cmd shortcuts, so everything is a plain key):
 | o | reveal the output in Finder |
 | Ctrl-C | quit and restore the terminal |
 
-Everything is clickable too: files, chips, the quality slider (drag it), toggles, Convert, Cancel and Reveal. Mouse wheel scrolls the file list.
+Everything is clickable too: files, format buttons, presets, the quality slider (drag it), toggles, Convert, Cancel and Reveal. Mouse wheel scrolls the file list.
 
 ## What it does
 

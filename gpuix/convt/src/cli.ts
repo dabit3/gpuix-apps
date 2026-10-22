@@ -70,7 +70,7 @@ const { start } = await import('./app')
 
 const theme = loadGhosttyTheme(values.theme)
 const jobs = values.jobs ? Math.max(1, Number(values.jobs) | 0) : undefined
-const store = new Store(detectEngines(), { concurrency: jobs, color: (k) => theme.kinds[k] })
+const store = new Store(detectEngines(), { concurrency: jobs, color: () => theme.dim })
 if (values.to) {
   const want = values.to.toLowerCase().replace(/^\./, '').replace('jpeg', 'jpg')
   for (const k of Object.keys(TARGETS) as (keyof typeof TARGETS)[]) if (TARGETS[k].some((t) => t.id === want)) store.settings[k].target = want
