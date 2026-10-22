@@ -219,6 +219,8 @@ export function drawMain(cv: Canvas, spec: MainSpec, f: Frame, priceTicks: numbe
   for (const p of priceTicks) cv.hline(yOf(f, p), grid)
   if (!bars.length) return
   const [a, b] = visRange(bars.length, f)
+  // A view left over from a longer series (e.g. BTC → a newly listed coin) can sit past the last bar for one frame.
+  if (b < a) return
   const pxPerBar = f.w / (f.end - f.start)
   const up = rgba(T.green)
   const dn = rgba(T.red)
