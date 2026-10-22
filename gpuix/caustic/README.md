@@ -5,7 +5,7 @@ multi-threaded ray tracer draw a sunlit pool into a GPUIX `<img>`, and GPUIX pai
 graphics protocol. Drag the water to make ripples, push the beach ball around, orbit, zoom, make it rain, and split
 the pane: every `caustic` you start shares its ripples with the others.
 
-![two linked caustic panes in Ghostty, LITE left and FULL right](media/split.png)
+![two linked caustic panes in Ghostty: FULL noon pool left, LITE golden hour right](media/split.png)
 
 Rebuild of prompt 13 of the "15 rebuild prompts" file, *CAUSTIC//VOLUME — real-time water caustics in Three.js*
 (inspired by [@ScottieFoxTTV](https://x.com/ScottieFoxTTV/status/2103869371869212740)), as a GPUIX terminal app.

@@ -5,7 +5,7 @@ import { App, controls, keyName } from '../src/app'
 import type { FromEngine, ToEngine } from '../src/protocol'
 import type { Source } from '../src/source'
 import { fallbackTheme } from '../src/theme'
-import { DEFAULT_SETTINGS } from '../src/scene'
+import { DEFAULT_SETTINGS, type Settings } from '../src/scene'
 
 function fakeSource() {
   const sent: ToEngine[] = []
@@ -82,7 +82,7 @@ describeNative('caustic UI in the GPU test renderer', () => {
     const W = 1200, H = 760
     const { render, renderer } = createTestRoot({ width: W, height: H })
     render(<App source={source} theme={fallbackTheme()} size={{ width: W, height: H }} />)
-    await connectTest(renderer)
+    const app = await connectTest(renderer)
     const sets = () => sent.flatMap((m) => (m.type === 'set' ? [m.settings] : []))
     expect(renderer.getAllText().join('\n')).toContain('lagoon')
     controls.current!.key({ key: '6' })
@@ -102,6 +102,16 @@ describeNative('caustic UI in the GPU test renderer', () => {
     controls.current!.key({ key: 'left' })
     expect(sets().at(-1)).toMatchObject({ sunAz: 18 })
     expect(sent.slice(before).some((m) => m.type === 'orbit')).toBe(false)
+    // A drag that starts on the sun-azimuth track keeps updating it until release (not just the press).
+    const left = W - 14 - 13 - 132
+    let hit: Partial<Settings> | undefined
+    for (let y = 150; y < 420 && !hit; y += 3) {
+      const n = sets().length
+      await app.mouse.drag({ x: left + 6, y }, { x: left + 126, y })
+      hit = sets().slice(n).find((x) => 'sunAz' in x && Object.keys(x).length === 1)
+      if (hit) expect(sets().at(-1)!.sunAz).toBeGreaterThan(300)
+    }
+    expect(hit).toBeDefined()
     controls.current!.key({ key: 'escape' })
   })
 })

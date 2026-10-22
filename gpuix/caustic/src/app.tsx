@@ -52,6 +52,8 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
   const rowRef = useRef(0)
   const setRow = (f: number | ((r: number) => number)) => { rowRef.current = typeof f === 'function' ? f(rowRef.current) : f; setRowState(rowRef.current) }
   const slide = useRef<TunableKey | null>(null)
+  const slideMove = (e: { x?: number }) => { if (!slide.current) return false; slideTo(slide.current, e.x ?? 0); return true }
+  const slideEnd = () => { slide.current = null }
   const tuneRef = useRef(tune)
   tuneRef.current = tune
   const frames = useRef(0)
@@ -85,6 +87,8 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
   const uv = (e: { x?: number; y?: number }) => ({ u: ((e.x ?? 0) / size.width) * 2 - 1, v: 1 - ((e.y ?? 0) / size.height) * 2 })
   const pointer = (phase: 'down' | 'move' | 'up') => (e: { x?: number; y?: number; button?: number | null }) => {
     if (phase === 'down' && e.button != null && e.button !== 0) return
+    if (phase === 'move' && slideMove(e)) return
+    if (phase === 'up' && slide.current) { slide.current = null; return }
     source.post({ type: 'pointer', phase, ...uv(e) })
   }
 
@@ -158,7 +162,7 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
   const mono = 'Menlo'
 
   return (
-    <div testId="app-root" tabIndex={-1} autoFocus onKeyDown={(e: KeyLike & { stopPropagation?: () => void }) => { if (controls.current?.key(e)) e.stopPropagation?.() }} onMouseMove={(e: { x?: number }) => { if (slide.current) slideTo(slide.current, e.x ?? 0) }} onMouseUp={() => { slide.current = null }} style={{ width: W, height: H, backgroundColor: t.bg, position: 'relative', overflow: 'hidden', display: 'flex' }}>
+    <div testId="app-root" tabIndex={-1} autoFocus onKeyDown={(e: KeyLike & { stopPropagation?: () => void }) => { if (controls.current?.key(e)) e.stopPropagation?.() }} onMouseMove={slideMove} onMouseUp={slideEnd} style={{ width: W, height: H, backgroundColor: t.bg, position: 'relative', overflow: 'hidden', display: 'flex' }}>
       <div
         testId="pool"
         onMouseDown={pointer('down')}
@@ -213,7 +217,7 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
           </div>
         ) : null}
         {tune && !tiny ? (
-          <div testId="tune" style={{ ...panel, backgroundColor: alpha(t.bg, 0.86), width: 300, padding: 13, paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div testId="tune" onMouseMove={slideMove} onMouseUp={slideEnd} style={{ ...panel, backgroundColor: alpha(t.bg, 0.86), width: 300, padding: 13, paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
             <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
               <text style={{ fontSize: 12, fontWeight: 700, color: t.fg }}>Sandbox</text>
               <text style={{ fontSize: 11, color: t.faint }}>↑↓ pick · ←→ adjust · drag</text>
@@ -231,6 +235,8 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
                   <div
                     testId={`track-${T.key}`}
                     onMouseDown={(e: { x?: number; button?: number | null }) => { if (e.button != null && e.button !== 0) return; slide.current = T.key; setRow(i); slideTo(T.key, e.x ?? 0) }}
+                    onMouseMove={slideMove}
+                    onMouseUp={slideEnd}
                     style={{ width: TRACK_W, height: 18, display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative', backgroundColor: alpha(t.bg, 0.01) }}
                   >
                     <div style={{ position: 'absolute', left: 0, top: 7, width: TRACK_W, height: 4, borderRadius: 2, backgroundColor: alpha(t.fg, 0.14), pointerEvents: 'none' }} />
