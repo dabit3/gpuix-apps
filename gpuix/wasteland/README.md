@@ -33,7 +33,8 @@ Run it, split the pane (Cmd-D), and use the other pane: `wasteland log -f` follo
 | --- | --- |
 | click map | walk / talk / loot / attack (hover shows names) |
 | arrows / WASD | step |
-| scroll | zoom the map |
+| scroll / Z | zoom the map (3 levels) |
+| H / ? / F1 | field manual (all controls) |
 | 1-5 or click tabs | WRIST-LINK: Status, Items, Map, Quests, Radio |
 | 1-9 | dialogue choices |
 | T | enter T.A.R.G.E.T. (combat); up/down picks a body part, left/right the enemy, Enter fires |
@@ -43,6 +44,11 @@ Run it, split the pane (Cmd-D), and use the other pane: `wasteland log -f` follo
 | Ctrl-C | quit and restore the terminal |
 
 ## What's in it
+
+- **Look**: an amber/green phosphor isometric city under a procedural night sky: a distant Manhattan skyline with lit windows, a moon over the river, falling ash, flickering burn-barrel fires with embers and smoke, pulsing radiation pools, neon signs, a red mast beacon, a CRT curve and scanlines. All lights are computed per pixel on the CPU each frame.
+- **Guidance**: a quest tracker (top-left) always shows the current objective with distance and compass direction, and an amber waypoint bounces over the target in the world, or sits at the screen edge when it's off-screen. Hovering anything shows its verb (TALK, LOOT, ATTACK).
+- **Combat feel**: a COMBAT / ROUND banner, a live enemy health list, a large hit-chance readout per body part, letterboxed slow-motion shots with screen shake and impact flashes, CRITICAL and TARGET DOWN banners, and blood splats where enemies fall.
+- **UX**: the title screen is the live city with an attract camera behind the character creator (derived HP/AP/carry update as you spend points); dialogue types out, and each check shows your value against the DC in green or red; toasts announce quests, loot and level-ups; older log lines fade.
 
 - **Character creation**: 7 original attributes (Grit, Wits, Reflex, Charm, Stamina, Perception, Fortune), derived skills, pick 2 of 6 perks.
 - **World**: Shelter 34 and a 40x32-tile Lower Manhattan district (brownstones, bodega, St. Brigid's church, the Bleecker St subway station, a collapsed overpass, radioactive crater), 13 named NPCs, 4 enemy types, 24 items.
@@ -90,10 +96,11 @@ bun run check:assets
 - `tests/engine.test.ts`: content counts, every dialogue edge resolves, every NPC/container reachable, both main quests completed via the peaceful ending with a save/load mid-quest, failed checks, loot, repair, healing, barter, radiation, T.A.R.G.E.T. combat.
 - `tests/render.test.ts`: a varied, non-empty isometric frame within the time budget; portraits differ per NPC and weapons show wear.
 - `tests/app.test.tsx` (`@gpuix/react/testing`): character creation, starting the game, tabs, inventory art, dialogue by keyboard, Ctrl-S save hook, narrow-pane layout.
+- `tests/ux.test.tsx`: the objective resolver follows quest stages to world locations; the quest tracker, field manual, and combat tracker/T.A.R.G.E.T. readout render in the test renderer.
 
 ## Performance
 
-Measured on this macOS VM (Apple Paravirtual GPU, no real Mac GPU): the CPU renderer takes about 6 ms per 1000x700 frame after a ~70 ms first frame (`bun scripts/preview.ts`). The world view redraws at up to 60 Hz while something moves and idles otherwise. End-to-end terminal frame rate is bounded by the Kitty-protocol transfer and the paravirtual GPU, so expect a real Mac to be smoother than the recording.
+Measured on this macOS VM (Apple Paravirtual GPU, no real Mac GPU): the CPU renderer (sky, skyline, dynamic lights and particles included) takes about 6-8 ms per 1000x700 frame after a ~75 ms first frame (`bun scripts/preview.ts`). The world view redraws at up to 60 Hz while something moves and idles otherwise. End-to-end terminal frame rate is bounded by the Kitty-protocol transfer and the paravirtual GPU, so expect a real Mac to be smoother than the recording.
 
 ## GPUIX findings (0.11.0, terminal mode)
 
