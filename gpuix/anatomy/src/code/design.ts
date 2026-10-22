@@ -162,7 +162,7 @@ export function designCodebase(cb: Codebase, opts: CodeDesignOptions = {}): Mach
   for (const l of cb.languages) { const n = LANG[l.ext] ?? l.ext; byLang.set(n, (byLang.get(n) ?? 0) + l.loc) }
   const langs = [...byLang.entries()].sort((x, y) => y[1] - x[1]).filter(([, loc], i) => i === 0 || loc / Math.max(1, cb.totalLoc) >= 0.01).slice(0, 2).map(([n, loc]) => `${n} ${Math.round((loc / Math.max(1, cb.totalLoc)) * 100)}%`).join(', ')
   const rest = cb.rest.modules ? ` · top ${mods.length} of ${mods.length + cb.rest.modules} modules` : ''
-  return a.spec({ name: `${cb.name} · codebase`, description: `${plural(cb.files.length, 'file')} · ${fmtLoc(cb.totalLoc)} lines · ${langs}${rest} · belts = drive tree, packets = imports`, unit: 'mm', camera: { view: 'iso', yaw: -0.2, zoom: 1.05 } }, Math.ceil(extent))
+  return a.spec({ name: `${cb.name} · codebase`, description: `${plural(cb.files.length, 'file')} · ${fmtLoc(cb.totalLoc)} lines · ${langs}${rest} · belts = drive tree, packets = imports`, unit: 'mm', camera: { view: 'iso', yaw: -0.2, zoom: 0.92 } }, Math.ceil(extent))
 }
 
 /** Basename, or `dir/index.ts` for generic names so the tree stays readable. */
