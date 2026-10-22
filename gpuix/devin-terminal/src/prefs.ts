@@ -10,6 +10,8 @@ export type Prefs = {
   readAt?: number
   /** Local title overrides (the public API has no rename). */
   titles?: Record<string, string>
+  /** UI zoom (⌘+ / ⌘− / ⌘0), 0.75–2. */
+  zoom?: number
 }
 
 export function prefsPath(env: Record<string, string | undefined> = process.env) {

@@ -1,3 +1,4 @@
+import { getZoom } from './zoom/scale'
 export type ThemeName = 'dark' | 'light'
 
 export type Palette = {
@@ -124,5 +125,29 @@ export function nativeTheme() {
     diffDel: C.del,
     codeText: C.codeText,
     codeWash: C.codeWash,
+    metrics: nativeMetrics(getZoom()),
+  }
+}
+
+/** Native text (markdown, code, diff) ignores `style` sizes, so zoom scales its metrics directly. */
+export function nativeMetrics(z: number) {
+  const s = (n: number) => Math.round(n * z * 100) / 100
+  return {
+    mdTextSize: s(14.5),
+    mdLineHeight: s(23),
+    mdBlockGap: s(12),
+    mdHeadingSizes: [20, 17, 15.5, 14.5].map(s),
+    mdHeadingLineHeights: [28, 25, 23, 23].map(s),
+    mdTableCellPadding: s(8),
+    mdInlineCodeRadius: s(4),
+    mdCodePaddingX: s(14),
+    mdCodePaddingY: s(12),
+    mdCodeRadius: s(10),
+    mdCodeHeaderPaddingY: s(8),
+    mdCodeHeaderTextSize: s(12),
+    codeTextSize: s(13),
+    codeLineHeight: s(20),
+    diffTextSize: s(12.5),
+    diffLineHeight: s(20),
   }
 }

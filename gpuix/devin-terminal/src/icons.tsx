@@ -90,6 +90,17 @@ const ICONS = {
 
 export type IconName = keyof typeof ICONS
 
+// The Devin mark is the official artwork (raster, from the brand lockups); pick the variant that contrasts with its background.
+const MARK_WHITE = new URL('../assets/icons/devin-mark-white.png', import.meta.url).pathname
+const MARK_BLACK = new URL('../assets/icons/devin-mark-black.png', import.meta.url).pathname
+function isLight(hex: string) {
+  const m = /^#?([0-9a-f]{6})/i.exec(hex)
+  if (!m) return false
+  const n = parseInt(m[1]!, 16)
+  return ((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114 > 140
+}
+
 export function Icon({ name, size = 14, color }: { name: IconName; size?: number; color: string }) {
+  if (name === 'devin') return <img src={isLight(color) ? MARK_WHITE : MARK_BLACK} objectFit="contain" style={{ width: size, height: size, flexShrink: 0, pointerEvents: 'none' }} />
   return <svg source={ICONS[name]} style={{ width: size, height: size, flexShrink: 0, color, pointerEvents: 'none' }} />
 }
