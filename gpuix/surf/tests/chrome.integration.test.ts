@@ -158,6 +158,15 @@ test('page zoom re-lays the page out, frames keep the pane size, and clicks land
   browser.mouse({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', buttons: 0, clickCount: 1 })
   expect(await until(async () => (await browser.evaluate("document.getElementById('go').textContent")) === `clicked ${before + 1}`)).toBe(true)
   // zoom is per tab: a new tab starts at 100%, and the zoomed tab keeps 200%
+  // a zoomed tab keeps painting after it navigates away mid-capture
+  await browser.evaluate("let h = 0; setInterval(() => { document.body.style.background = 'hsl(' + (h += 7) + ',60%,50%)' }, 16)")
+  await Bun.sleep(400)
+  await browser.evaluate(`location.href = 'http://localhost:${server.port}/long'`)
+  expect(await until(async () => (await browser.evaluate('document.readyState+location.pathname')) === 'complete/long')).toBe(true)
+  await Bun.sleep(300)
+  browser.frames.take()
+  await browser.evaluate("document.body.style.background = 'rgb(255, 0, 0)'")
+  expect(await until(async () => !!browser.frames.take())).toBe(true)
   const zoomed = browser.activeId
   await browser.newTab('about:blank')
   expect(browser.active?.zoom).toBe(1)

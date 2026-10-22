@@ -103,7 +103,7 @@ export class Browser {
     c.on('Page.javascriptDialogOpening', (p, sid) => { this.cdp.post('Page.handleJavaScriptDialog', { accept: p.type !== 'beforeunload' ? false : true }, sid) })
     c.on('Page.frameStoppedLoading', (p, sid) => { const t = this.bySession(sid); if (t && this.isMain(p.frameId, t)) { t.loading = false; t.progress = 1; this.changed(); void this.refreshHistory(t); void this.refreshTitle(t) } })
     c.on('Page.domContentEventFired', (_p, sid) => { const t = this.bySession(sid); if (t && t.loading) { t.progress = Math.max(t.progress, 0.7); this.changed() } })
-    c.on('Page.frameNavigated', (p, sid) => { const t = this.bySession(sid); if (t && !p.frame.parentId) { t.url = p.frame.url; t.security = securityOf(t.url); void this.refreshHistory(t); this.changed() } })
+    c.on('Page.frameNavigated', (p, sid) => { const t = this.bySession(sid); if (t && !p.frame.parentId) { t.url = p.frame.url; t.security = securityOf(t.url); void this.refreshHistory(t); this.changed(); if (t.zoom > 1) void this.resumeZoomed(t) } })
     c.on('Page.navigatedWithinDocument', (p, sid) => { const t = this.bySession(sid); if (t) { t.url = p.url; void this.refreshHistory(t); void this.refreshTitle(t); this.changed() } })
     c.on('Page.domContentEventFired', (_p, sid) => { const t = this.bySession(sid); if (t) void this.refreshTitle(t) })
     c.on('Network.requestWillBeSent', (_p, sid) => { const t = this.bySession(sid); if (t?.loading) { t.requests++; this.bump(t) } })
@@ -194,6 +194,7 @@ export class Browser {
   }
 
   private async startScreencast(t: Tab) {
+    this.lastCast = ''
     await this.cdp.send('Page.startScreencast', { format: 'jpeg', quality: QUALITY, maxWidth: this.viewport.frameWidth, maxHeight: this.viewport.frameHeight, everyNthFrame: 1 }, t.sessionId).catch(() => {})
   }
 
@@ -272,7 +273,11 @@ export class Browser {
     if (!tab || tab.id !== this.activeId) { ack(); return }
     const now = performance.now()
     if (this.inputAt) { const d = now - this.inputAt; if (d < 600) this.latency = this.latency ? this.latency * 0.7 + d * 0.3 : d; this.inputAt = 0 }
-    if (tab.zoom > 1) { ack(); void this.captureCrisp(tab) } else {
+    if (tab.zoom > 1) {
+      ack()
+      // each screenshot makes Chrome emit a screencast frame, so only a frame whose pixels changed triggers the next capture
+      if (p.data !== this.lastCast) { this.lastCast = p.data; void this.captureCrisp(tab) }
+    } else {
       const bytes = decodeBase64(p.data)
       // replaced (dropped) frames must still be acked or Chrome stops sending
       const size = imageSize(bytes)
@@ -288,6 +293,14 @@ export class Browser {
     for (const fn of this.frameListeners) fn()
   }
 
+  /** With screenshots taken under emulation, headless Chrome stops screencasting a tab once it commits a new document, so a zoomed-in tab restarts it. */
+  private async resumeZoomed(t: Tab) {
+    if (t.id !== this.activeId || this.viewportJob) return
+    await this.cdp.send('Page.stopScreencast', {}, t.sessionId).catch(() => {})
+    await this.startScreencast(t)
+  }
+
+  private lastCast = ''
   private crispJob: Promise<void> | null = null
   private crispAgain = false
   private crispWanted = false
