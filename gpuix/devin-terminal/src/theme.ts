@@ -57,8 +57,8 @@ export const DARK: Palette = {
   userBubble: '#1b1e23',
   sendBg: '#ececec',
   sendFg: '#0a0c10',
-  chip: '#16263d',
-  chipText: '#6cb0ff',
+  chip: '#22252b',
+  chipText: '#c9cbcf',
   codeText: '#e6e6e6',
   codeWash: '#ffffff12',
 }
@@ -88,8 +88,8 @@ export const LIGHT: Palette = {
   userBubble: '#f4f4f5',
   sendBg: '#1a1a1a',
   sendFg: '#ffffff',
-  chip: '#e8f0fe',
-  chipText: '#2f6fde',
+  chip: '#efeff0',
+  chipText: '#3a3a3c',
   codeText: '#1a1a1a',
   codeWash: '#0000000a',
 }
@@ -115,7 +115,7 @@ export function resolveTheme(flag: string | undefined, ghosttyConfig?: string): 
 export function nativeTheme() {
   return {
     appearance: C.name,
-    accent: C.accent,
+    accent: C.secondary,
     text: C.text,
     textMuted: C.tertiary,
     bg: C.card,
