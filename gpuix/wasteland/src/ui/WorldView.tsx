@@ -8,6 +8,8 @@ import { C } from './theme'
 
 export interface WorldHandle { zoom: number; cineUntil: number; cineTarget: [number, number] | null; fps: number }
 
+let lastZoomAt = 0
+
 export function WorldView({ game, onChange, onTileClick, handle, attract }: {
   game: { current: GameState }
   onChange: () => void
@@ -95,7 +97,9 @@ export function WorldView({ game, onChange, onTileClick, handle, attract }: {
       }}
       onScroll={(e) => {
         const dy = e.deltaY ?? 0
-        if (Math.abs(dy) < 0.5) return
+        const now = performance.now()
+        if (Math.abs(dy) < 0.5 || now - lastZoomAt < 220) return
+        lastZoomAt = now
         handle.current.zoom = Math.max(2, Math.min(4, handle.current.zoom + (dy > 0 ? 1 : -1)))
       }}
     >
