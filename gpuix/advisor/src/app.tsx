@@ -237,11 +237,11 @@ const rel = (text: string, root: string) => text.replaceAll(`${root}/`, '')
 
 function Issue({ text }: { text: string }) {
   const t = text
-  const m = t.match(/^(\S+:\d+\S*)\s+([\s\S]*)$/)
+  const m = t.match(/^`?([\w./-]+\.\w+(?::[\w?\u2013-]+)?)`?(\s+\([^)]*\))?[:\s\u2014\u2013-]+([\s\S]+)$/)
   return (
     <div style={{ ...col, gap: 1 }}>
-      {m ? <Txt size={11.5} mono color={T.text} style={clip}>{m[1]}</Txt> : null}
-      <Txt size={12.5} color={T.muted} style={{ minWidth: 0, lineClamp: 2, textOverflow: 'ellipsis' }}>{m ? m[2] : t}</Txt>
+      {m ? <Txt size={11.5} mono color={T.text} style={clip}>{`${m[1]}${m[2] ? ` ${m[2].trim()}` : ''}`}</Txt> : null}
+      <Txt size={12.5} color={T.muted} style={{ minWidth: 0, lineClamp: 2, textOverflow: 'ellipsis' }}>{m ? m[3] : t}</Txt>
     </div>
   )
 }
