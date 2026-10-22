@@ -571,7 +571,7 @@ function Column(props: {
 }) {
   const { entries, cursor, offset, visible, active, marks, hover } = props
   const rows = entries.slice(offset, offset + visible)
-  const inView = cursor >= offset && cursor < offset + visible
+  const inView = cursor >= offset && cursor < offset + visible && cursor < entries.length
   const selMarked = inView && marks.has(entries[cursor]!.path)
   return (
     <div

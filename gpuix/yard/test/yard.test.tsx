@@ -210,6 +210,19 @@ describeNative('yard in the GPU test renderer', () => {
     expect(text()).toContain('Fujifilm GFX100 II')
   })
 
+  it('creates a new folder and enters it while it is still empty', async () => {
+    await press('n')
+    await type('Fresh')
+    await press('enter', r().findByTestId('prompt')!.id)
+    expect(existsSync(join(root, 'Fresh'))).toBe(true)
+    expect(text()).toContain('Fresh')
+    await press('l')
+    expect(text()).toContain('Fresh')
+    expect(text()).toContain('Empty folder')
+    await press('j k h')
+    expect(text()).toContain('Photos')
+  })
+
   it('fuzzy-jumps to a nested file and previews highlighted code', async () => {
     await press('/')
     await type('sched')
