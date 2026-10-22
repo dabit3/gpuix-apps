@@ -154,6 +154,7 @@ export function App(props: AppProps) {
   const drag = useRef<{ kind: 'zoom' | 'pan' | 'draw' | 'split'; x: number; y: number; view: View; pane?: string; size?: number } | null>(null)
   const followRef = useRef(true)
   const triggers = useRef<Record<string, Box>>({})
+  const [headerH, setHeaderH] = useState(56)
   const animate = !props.preload
 
   const bars: Bar[] = data?.bars ?? []
@@ -438,7 +439,7 @@ export function App(props: AppProps) {
     for (const c of CHART_TYPES) out.push({ id: `chart-${c.id}`, title: c.label, sub: `Chart style${st.chart === c.id ? ' · current' : ''}`, icon: 'candles', hint: 'c', keywords: `${c.label} chart style`, run: () => setChart(c.id) })
     out.push({ id: 'log', title: st.log ? 'Linear scale' : 'Log scale', sub: 'Price axis', icon: 'wave', hint: 'l', keywords: 'log linear scale axis', run: () => update((s) => ({ ...s, log: !s.log })) })
     for (const t of TOOLS) out.push({ id: `tool-${t.id}`, title: t.label, sub: 'Drawing tool', icon: t.icon, hint: t.key, keywords: `${t.label} ${t.id} draw drawing`, run: () => setTool(t.id) })
-    for (const s of STRATEGIES) out.push({ id: `strat-${s.id}`, title: `Backtest ${s.label}`, sub: `Strategy · ${STRATEGY_SHORT[s.id] ?? s.label}`, icon: 'play', hint: 'n', keywords: `${s.label} ${s.id} strategy backtest`, run: () => (setStrategy(s.id), setPanel(true)) })
+    for (const s of STRATEGIES) out.push({ id: `strat-${s.id}`, title: `Backtest ${s.label}`, sub: `Strategy · ${STRATEGY_SHORT[s.id] ?? s.label}`, icon: 'play', hint: 'n', keywords: `${s.label} ${s.id} strategy backtest`, run: () => (setStrategy(s.id), wide && setPanel(true)) })
     out.push({ id: 'sweep', title: 'Parameter sweep', sub: 'SMA cross · walk-forward check', icon: 'grid', hint: 'w', keywords: 'sweep parameter optimize walk forward heatmap', run: () => setSweepOpen(true) })
     out.push({ id: 'panel', title: showPanel ? 'Hide inspector' : 'Show inspector', sub: 'Watchlist and backtest', icon: 'sidebar', hint: 'p', keywords: 'inspector sidebar panel watchlist backtest', run: () => setPanel(!showPanel) })
     out.push({ id: 'reset', title: 'Reset view', sub: 'Jump to the latest bars', icon: 'candles', hint: '0', keywords: 'reset view latest home', run: () => resetView(true) })
@@ -641,9 +642,10 @@ export function App(props: AppProps) {
   const measureTrigger = (id: string) => (e: EventPayload) => {
     triggers.current[id] = { x: e.x ?? 0, y: e.y ?? 0, w: e.width ?? 0, h: e.height ?? 0 }
   }
+  // The menu buttons lead the toolbar's first row, which sits right under the (possibly wrapped) title bar.
   const menuAt = (id: string, w: number) => {
-    const b = triggers.current[id] ?? { x: 12, y: 80, w: 0, h: 28 }
-    return { x: Math.max(8, Math.min(size.w - w - 8, b.x)), y: b.y + b.h + 6 }
+    const b = triggers.current[id] ?? { x: 12, y: 0, w: 0, h: 28 }
+    return { x: Math.max(8, Math.min(size.w - w - 8, b.x)), y: headerH + 1 + 4 + 28 + 6 }
   }
   const chartLabel = CHART_TYPES.find((c) => c.id === st.chart)!.label
 
@@ -662,7 +664,12 @@ export function App(props: AppProps) {
       style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: T.bg, userSelect: 'none' }}
     >
       {/* Title bar: symbol, price, change, source, timeframe. */}
-      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minHeight: 56, paddingTop: 8, paddingBottom: 8, paddingLeft: 18, paddingRight: 14, columnGap: 18, rowGap: 8, flexShrink: 0 }}>
+      <div
+        onLayout={(e) => {
+          const h = Math.round(e.height ?? 0)
+          if (h && h !== headerH) setHeaderH(h)
+        }}
+        style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minHeight: 56, paddingTop: 8, paddingBottom: 8, paddingLeft: 18, paddingRight: 14, columnGap: 18, rowGap: 8, flexShrink: 0 }}>
         <SymbolButton sym={sym} tf={tf} onClick={() => setPal({ q: '', i: 0 })} />
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <text testId="last" style={{ color: flash === 'up' ? T.green : flash === 'down' ? T.red : T.fg, fontSize: 24, fontFamily: MONO, fontWeight: 600 }}>
@@ -696,7 +703,7 @@ export function App(props: AppProps) {
       </div>
 
       {/* Body */}
-      <div style={{ display: 'flex', flexDirection: 'row', flexGrow: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'row', flexGrow: 1, minHeight: 0, position: 'relative' }}>
         <div
           testId="chart-col"
           style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minWidth: 0, position: 'relative' }}
@@ -886,6 +893,7 @@ export function App(props: AppProps) {
         </div>
 
         {showPanel ? (
+          <InspectorSlot overlay={!wide}>
           <Inspector
             sym={sym}
             watchlist={st.watchlist}
@@ -903,6 +911,7 @@ export function App(props: AppProps) {
             animate={animate}
             revealKey={`${sym}:${tf}:${strategy.id}:${JSON.stringify(sp)}:${data?.source}`}
           />
+          </InspectorSlot>
         ) : null}
       </div>
 
@@ -937,7 +946,7 @@ export function App(props: AppProps) {
           onPick={(c) => {
             setParams((p) => ({ ...p, sma: { fast: c.fast, slow: c.slow } }))
             setStrategy('sma')
-            setPanel(true)
+            if (wide) setPanel(true)
             setSweepOpen(false)
           }}
           onClose={() => setSweepOpen(false)}
@@ -963,6 +972,16 @@ type Handlers = {
   onMouseUp: (e: EventPayload) => void
   onMouseLeave: () => void
   onScroll: (e: EventPayload) => void
+}
+
+/** Inline column in wide panes; a slide-over sheet in narrow splits so the chart keeps its width. */
+function InspectorSlot({ overlay, children }: { overlay: boolean; children: React.ReactNode }) {
+  if (!overlay) return <>{children}</>
+  return (
+    <div testId="inspector-sheet" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, display: 'flex', flexDirection: 'row', boxShadow: [{ offsetX: -12, offsetY: 0, blurRadius: 32, spreadRadius: 0, color: '#000000b3' }] }}>
+      {children}
+    </div>
+  )
 }
 
 function SymbolButton({ sym, tf, onClick }: { sym: string; tf: string; onClick: () => void }) {
