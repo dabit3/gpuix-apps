@@ -74,9 +74,17 @@ export function WorldView({ game, onChange, onTileClick, handle, attract }: {
       frames++
       if (now - fpsT > 1000) { h.fps = Math.round((frames * 1000) / (now - fpsT)); frames = 0; fpsT = now }
     }
-    tick()
-    const id = setInterval(tick, 16)
-    return () => clearInterval(id)
+    // Self-pacing loop: always leave the event loop idle time for input, even when a frame runs long.
+    let timer: ReturnType<typeof setTimeout> | undefined, live = true
+    const loop = () => {
+      if (!live) return
+      const t0 = performance.now()
+      tick()
+      const dt = performance.now() - t0
+      timer = setTimeout(loop, Math.max(4, 16 - dt, dt * 0.6))
+    }
+    loop()
+    return () => { live = false; clearTimeout(timer) }
   }, [size.w, size.h])
 
   const local = (e: { x?: number; y?: number }): [number, number] => [(e.x ?? 0) - layout.current.x, (e.y ?? 0) - layout.current.y]

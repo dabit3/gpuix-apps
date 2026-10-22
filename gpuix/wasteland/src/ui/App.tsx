@@ -75,6 +75,9 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
   const handle = useRef<WorldHandle>({ zoom: 3, cineUntil: 0, cineTarget: null, fps: 0 })
   const flushed = useRef<GameState["log"][number] | null>(game.current.log[game.current.log.length - 1] ?? null)
   const lastMove = useRef(0)
+  const [dsel, setDsel] = useState(0)
+  const rootRef = useRef<{ id: number } | null>(null)
+  const onKeyRef = useRef<((e: KeyEv) => void) | null>(null)
   const [create, setCreate] = useState({ stats: { ...DEFAULT_STATS } as Record<Stat, number>, perks: ['deadeye', 'tinkerer'], row: 0 })
 
   const refresh = useCallback(() => {
@@ -140,7 +143,9 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
   const compact = (win?.width ?? 1400) < 980
   const showPanel = !compact || panelOpen
 
-  const onKey = (e: { key?: string; keyChar?: string | null; modifiers?: { ctrl?: boolean; control?: boolean; shift?: boolean } }) => {
+  const dkey = game.current.dialogue ? `${game.current.dialogue.npc}:${game.current.dialogue.node}` : ''
+  useEffect(() => setDsel(0), [dkey])
+  const onKey = (e: KeyEv) => {
     const k = keyName(e)
     const ctrl = !!(e.modifiers?.ctrl || e.modifiers?.control)
     if (screen === 'title') {
@@ -160,29 +165,37 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
     if (k === 'f9') return doLoad()
     if (k === 'tab') { if (compact) setPanelOpen(!panelOpen); else setTab(TABS[(TABS.indexOf(tab) + 1) % TABS.length]!); return }
     const mode = s.mode
+    const d = MOVE_KEYS[k]
+    const fresh = !e.isHeld
     if (mode === 'dialogue') {
-      const n = Number(k)
+      const n = Number(k), count = visibleOptions(s).length
       if (n >= 1 && n <= 9) act((g) => chooseOption(g, n - 1))
-      else if (k === 'escape') act(closePanel)
+      else if (k === 'up' || k === 'w') setDsel((dsel + count - 1) % Math.max(1, count))
+      else if (k === 'down' || k === 's') setDsel((dsel + 1) % Math.max(1, count))
+      else if (k === 'enter' || k === 'space') act((g) => chooseOption(g, Math.min(dsel, count - 1)))
+      else if (k === 'escape' || ((k === 'left' || k === 'right' || k === 'a' || k === 'd') && fresh)) act(closePanel)
       return
     }
-    if (mode === 'loot') { if (k === 'a' || k === 'enter') act((g) => { takeFromContainer(g, 'all'); closePanel(g) }); else if (k === 'escape') act(closePanel); return }
-    if (mode === 'barter') { if (k === 'escape') act(closePanel); return }
+    if (mode === 'loot' || mode === 'barter') {
+      if (mode === 'loot' && (k === 'enter' || k === 'space' || k === 'e')) return act((g) => { takeFromContainer(g, 'all'); closePanel(g) })
+      if (k === 'escape') return act(closePanel)
+      if (!d || !fresh) return
+      act(closePanel)
+    }
     if (mode === 'target') {
       const parts = BODY_PARTS, i = parts.indexOf(s.target!.part)
       if (k === 'up' || k === 'w') act((g) => selectPart(g, parts[(i + 3) % 4]!))
       else if (k === 'down' || k === 's') act((g) => selectPart(g, parts[(i + 1) % 4]!))
       else if (k === 'left' || k === 'a') act((g) => cycleTarget(g, -1))
       else if (k === 'right' || k === 'd') act((g) => cycleTarget(g, 1))
-      else if (k === 'enter' || k === 'f' || k === 'space') doFire()
+      else if (k === 'enter' || k === 'f' || k === 'space') { if (s.player.ap < (weaponDef(s).ap ?? 2)) doEndTurn(); else doFire() }
       else if (k === 'e') doEndTurn()
       else if (k === 'escape') act(closePanel)
       return
     }
     if (mode === 'dead' || mode === 'ending') { if (k === 'enter') { if (mode === 'dead') doLoad(); else act((g) => { g.mode = 'explore' }) } return }
-    const dirs: Record<string, [number, number]> = { up: [-1, -1], w: [-1, -1], down: [1, 1], s: [1, 1], left: [-1, 1], a: [-1, 1], right: [1, -1], d: [1, -1] }
-    const d = dirs[k]
     if (d) {
+      if (s.mode === 'combat' && s.player.ap < 1) { if (fresh) doEndTurn(); return }
       const now = performance.now()
       if (now - lastMove.current < 85) return
       lastMove.current = now
@@ -208,8 +221,11 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
     setCreate({ ...create, stats: { ...create.stats, [st]: v } })
   }
 
+  onKeyRef.current = onKey
+  keyBridge.handle = onKeyRef
+  keyBridge.rootId = () => rootRef.current?.id
   const root = (body: React.ReactNode) => (
-    <div testId="root" tabIndex={-1} autoFocus onKeyDown={onKey} style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: C.bg }}>{body}</div>
+    <div ref={rootRef as never} testId="root" tabIndex={-1} autoFocus onKeyDown={(e: KeyEv) => { keyBridge.handledAt = performance.now(); onKey(e) }} style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: C.bg }}>{body}</div>
   )
 
   if (screen === 'title') {
@@ -300,12 +316,12 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
     <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, minHeight: 0 }}>
       <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, position: 'relative' }}>
         <WorldView game={game} onChange={refresh} handle={handle} onTileClick={(x, y) => act((g2) => interactAt(g2, x, y))} />
-        {s.mode === 'dialogue' && <Dialogue s={s} act={act} compact={compact} />}
+        {s.mode === 'dialogue' && <Dialogue s={s} act={act} compact={compact} sel={dsel} />}
         {s.mode === 'loot' && <Loot s={s} act={act} />}
         {s.mode === 'barter' && <Barter s={s} act={act} />}
         {s.mode === 'target' && <Target s={s} act={act} onFire={doFire} />}
         {(s.mode === 'dead' || s.mode === 'ending') && <EndCard s={s} onLoad={doLoad} onContinue={() => act((g2) => { g2.mode = 'explore' })} onNew={() => setScreen('title')} />}
-        {s.mode !== 'dialogue' && s.mode !== 'dead' && s.mode !== 'ending' && <Tracker s={s} compact={compact} />}
+        {(s.mode === 'explore' || s.mode === 'combat' || s.mode === 'target') && <Tracker s={s} compact={compact} />}
         {toasts.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, position: 'absolute', top: 14, left: 0, right: 0, pointerEvents: 'none' }}>
             {toasts.map((t, i) => (
@@ -340,8 +356,14 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
 }
 
 type Act = (fn: (s: GameState) => void) => void
+type KeyEv = { key?: string; keyChar?: string | null; isHeld?: boolean; modifiers?: { ctrl?: boolean; control?: boolean; shift?: boolean } }
+const MOVE_KEYS: Record<string, [number, number]> = { up: [-1, -1], w: [-1, -1], down: [1, 1], s: [1, 1], left: [-1, 1], a: [-1, 1], right: [1, -1], d: [1, -1] }
 
-function Dialogue({ s, act, compact }: { s: GameState; act: Act; compact: boolean }) {
+/** Window-level fallback: GPUIX can drop focus from the root (e.g. after mouse interaction), so the
+ * render() onKeyDown forwards keys the root handler did not see, then refocuses the root. */
+export const keyBridge: { handle: { current: ((e: KeyEv) => void) | null } | null; handledAt: number; rootId: () => number | undefined } = { handle: null, handledAt: -1, rootId: () => undefined }
+
+function Dialogue({ s, act, compact, sel }: { s: GameState; act: Act; compact: boolean; sel: number }) {
   const d = s.dialogue!
   const npc = NPCS[d.npc]!
   const node = npc.dialogue.nodes[d.node]!
@@ -363,7 +385,7 @@ function Dialogue({ s, act, compact }: { s: GameState; act: Act; compact: boolea
         {d.result && <T c={d.result.endsWith('SUCCESS') ? C.green : C.red} s={12}>{`[${d.result}]`}</T>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
           {opts.map((o, i) => (
-            <div key={i} testId={`opt-${i + 1}`} onClick={() => act((g) => chooseOption(g, i))} style={{ display: 'flex', flexDirection: 'row', gap: 8, paddingLeft: 6, paddingTop: 2, paddingBottom: 2, borderRadius: 3, cursor: 'pointer', hover: { backgroundColor: C.sel } }}>
+            <div key={i} testId={`opt-${i + 1}`} onClick={() => act((g) => chooseOption(g, i))} style={{ display: 'flex', flexDirection: 'row', gap: 8, paddingLeft: 6, paddingTop: 2, paddingBottom: 2, borderRadius: 3, cursor: 'pointer', backgroundColor: i === sel ? C.sel : undefined, hover: { backgroundColor: C.sel } }}>
               <T c={C.amber}>{`${i + 1}.`}</T>
               {o.check && <T c={(stats[o.check.stat] ?? 0) >= o.check.dc ? C.green : C.red}>{`[${o.check.stat.toUpperCase()} ${stats[o.check.stat] ?? '?'}/${o.check.dc}]`}</T>}
               <T c={C.text}>{o.text}</T>
@@ -393,7 +415,7 @@ function Loot({ s, act }: { s: GameState; act: Act }) {
       {c.caps > 0 && <T c={C.amber} s={12}>{`${c.caps} caps`}</T>}
       {c.items.length === 0 && c.caps === 0 && <T c={C.dim} s={12}>Empty.</T>}
       {c.items.map((st) => <ItemLine key={st.uid} st={st} right={`${ITEMS[st.id]!.weight} lb`} onClick={() => act((g) => takeFromContainer(g, st.uid))} testId={`loot-${st.id}`} />)}
-      <Row><Btn label="A  TAKE ALL" onClick={() => act((g) => { takeFromContainer(g, 'all'); closePanel(g) })} testId="take-all" active /><Btn label="ESC  CLOSE" onClick={() => act(closePanel)} /></Row>
+      <Row><Btn label="ENTER  TAKE ALL" onClick={() => act((g) => { takeFromContainer(g, 'all'); closePanel(g) })} testId="take-all" active /><Btn label="ESC  CLOSE" onClick={() => act(closePanel)} /></Row>
     </div>
   )
 }
@@ -626,7 +648,8 @@ function Tracker({ s, compact }: { s: GameState; compact: boolean }) {
 
 const HELP: [string, string][] = [
   ['click / WASD / arrows', 'walk, talk, loot, attack'], ['scroll  /  Z', 'zoom the city'], ['T', 'T.A.R.G.E.T. (pauses combat)'],
-  ['arrows in T.A.R.G.E.T.', 'body part / next target'], ['ENTER  /  F', 'fire'], ['E', 'end turn'],
+  ['arrows in T.A.R.G.E.T.', 'body part / next target'], ['ENTER  /  F', 'fire'], ['E', 'end turn (auto when AP runs out)'],
+  ['up/down + ENTER  /  1-9', 'dialogue choice'], ['ENTER  /  walk away', 'loot all / close a panel'],
   ['1-5  /  I M Q R', 'WRIST-LINK tabs'], ['TAB', 'cycle tabs / open menu'], ['CTRL-S  /  CTRL-L', 'save / load'],
   ['wasteland radio "..."', 'broadcast from another pane'], ['CTRL-C', 'quit to the shell'],
 ]
