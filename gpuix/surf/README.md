@@ -86,4 +86,4 @@ bun run typecheck
 - The first click into an unfocused Ghostty split only focuses the split; it doesn't reach the app.
 - A remote `<img src="https://…">` that fails to load paints the text `img: load failed` in place of the image, so favicons are fetched in Bun and passed as data URLs only when they exist.
 - If the omnibox `<input>` still had focus (after `+`, then switching tabs), the first page click was lost and the page reloaded, probably because the input submitted as focus moved away. Tab clicks now return focus to the page, and the omnibox `onSubmit` is ignored unless the omnibox is focused.
-- Headless Chrome's screencast frame size is capped by the browser window size, not just `maxWidth/maxHeight`; `Browser.setWindowBounds` lifts the cap.
+- Headless Chrome's screencast frame size is capped by the browser window's content area, not just `maxWidth/maxHeight`. `Browser.setContentsSize` sizes that area exactly. `Browser.setWindowBounds` doesn't work for this: once a second tab exists the window gets an 87 px inset, so the frame comes back short, the image is letterboxed, and clicks land one row below what you see.

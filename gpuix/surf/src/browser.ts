@@ -183,13 +183,15 @@ export class Browser {
     await this.cdp.send('Page.startScreencast', { format: 'jpeg', quality: QUALITY, maxWidth: this.viewport.frameWidth, maxHeight: this.viewport.frameHeight, everyNthFrame: 1 }, t.sessionId).catch(() => {})
   }
 
-  /** Headless screencast frames are capped by the window size, so the window must hold the full device-pixel frame at DPR > 1. */
+  /** Headless screencast frames are capped by the window's content area, so the window must hold the full device-pixel frame at DPR > 1. Sizing the contents rather than the window bounds avoids the window inset (87 px seen after `Target.createTarget`) cropping the frame. */
   private async fitWindow() {
     const t = this.active
     if (!t) return
     const { frameWidth: w, frameHeight: h } = this.viewport
     const win = await this.cdp.send('Browser.getWindowForTarget', { targetId: t.id }).catch(() => null)
-    if (win?.windowId != null) await this.cdp.send('Browser.setWindowBounds', { windowId: win.windowId, bounds: { width: Math.max(w, 400), height: Math.max(h, 300) } }).catch(() => {})
+    if (win?.windowId == null) return
+    const ok = await this.cdp.send('Browser.setContentsSize', { windowId: win.windowId, width: w, height: h }).then(() => true, () => false)
+    if (!ok) await this.cdp.send('Browser.setWindowBounds', { windowId: win.windowId, bounds: { width: Math.max(w, 400), height: Math.max(h, 300) } }).catch(() => {})
   }
 
   private async applyViewport(t: Tab) {

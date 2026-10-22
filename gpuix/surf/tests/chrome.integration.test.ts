@@ -88,3 +88,22 @@ test('find skips hidden text and scrolls the match into view', async () => {
   expect(await browser.find('needle')).toEqual({ count: 1, found: true, index: 1 })
   expect(await browser.find('nothing-here', { fromStart: true })).toEqual({ count: 0, found: false, index: 0 })
 }, 30000)
+
+test('frames keep the viewport aspect after opening a tab and switching back', async () => {
+  const first = browser.activeId
+  await browser.navigate(`http://127.0.0.1:${server.port}/`)
+  await browser.newTab('about:blank')
+  await browser.activate(first)
+  expect(browser.activeId).toBe(first)
+  await browser.evaluate("setInterval(() => document.body.style.background = document.body.style.background === 'white' ? 'ivory' : 'white', 50)")
+  const want = browser.viewport.width / browser.viewport.height
+  let got = 0
+  expect(await until(async () => {
+    browser.frames.take()
+    await Bun.sleep(200)
+    const f = browser.frames.take()
+    if (!f) return false
+    got = f.width / f.height
+    return Math.abs(got - want) / want < 0.01
+  })).toBe(true)
+}, 30000)
