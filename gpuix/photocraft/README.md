@@ -48,31 +48,41 @@ bun run typecheck
 
 ## Controls
 
+Every command lives in the menu bar (File, Edit, Image, Layer, Select, Filter, View) and in the command palette (Ctrl-K: fuzzy search, arrows, Enter). Shortcuts:
+
 | Input | Action |
 |---|---|
-| Tool rail / `V M O L W B E K G I H` | move, rect marquee, ellipse, lasso, magic wand, brush, eraser, fill, gradient, eyedropper, hand |
-| Scroll on canvas | zoom at cursor · Shift-scroll pans · `F` / Ctrl-0 fit |
-| `[` `]` | brush size · top bar sliders for size, hardness, opacity, flow |
-| Ctrl-Z / Ctrl-Shift-Z (Ctrl-Y) | undo / redo (also History panel rows) |
-| Ctrl-J · Ctrl-Shift-N | duplicate layer · new layer |
+| `V M O L W C` | move, rectangular marquee, elliptical marquee, lasso, magic wand, crop |
+| `B E S J` | brush, eraser, clone stamp (Alt-click sets the source), spot healing |
+| `K G T I H` | paint bucket, gradient (linear/radial), type, eyedropper, hand |
+| Ctrl-K | command palette |
+| Ctrl-T · Enter · Esc | free transform (drag corners to scale, outside to rotate, inside to move; Shift snaps/frees) · apply · cancel |
+| Ctrl-L · Ctrl-M · Ctrl-U · Ctrl-B | Levels · Curves · Hue/Saturation · Color Balance adjustment layers |
+| Scroll on canvas | zoom at cursor · Shift-scroll pans · Ctrl-0 / `F` fit · Ctrl-1 actual pixels |
+| `[` `]` · Shift-click | brush size · straight line from the last stroke |
+| Ctrl-Z / Ctrl-Shift-Z | undo / redo (also History panel rows) |
+| Ctrl-J · Ctrl-Shift-N · Ctrl-Alt-E | duplicate layer · new layer · merge down |
 | `Q` | add a layer mask / toggle mask editing (brush hides, eraser reveals) |
 | `+` / `-` · `1`…`0` | cycle blend mode · opacity 10…100 % |
-| Ctrl-A · Ctrl-D / Esc · Ctrl-Shift-I | select all · deselect · invert selection |
-| `X` · `D` | swap / reset colours |
+| Ctrl-A · Ctrl-D · Ctrl-Shift-I · Shift-F6 | select all · deselect · inverse · feather |
+| Ctrl-O · Ctrl-Shift-P | open a file · place an image as a new layer (type a path) |
 | Ctrl-E · Ctrl-Shift-E · Ctrl-S | export PNG · export JPEG · save `.pcraft` |
-| `?` | key overlay · Ctrl-C quits and restores the terminal |
+| `?` | shortcut overlay · Ctrl-C quits and restores the terminal |
 
-Ghostty owns Cmd shortcuts, so every Cmd shortcut has a Ctrl or plain-key equivalent (Cmd also works with `--window`).
+Ghostty owns Cmd shortcuts, so everything uses Ctrl or plain keys (Cmd also works with `--window`).
 
 ## What's in it
 
-- **Document model** (`src/core`, no UI deps): pixel layers and non-destructive adjustment layers, each with visibility, opacity, 16 blend modes and an optional mask.
+- **Document model** (`src/core`, no UI deps): pixel layers, live type layers and non-destructive adjustment layers, each with visibility, opacity, 16 blend modes and an optional mask.
 - **Blend modes**: normal, multiply, screen, overlay, darken, lighten, color dodge, color burn, hard light, soft light, difference, exclusion, hue, saturation, color, luminosity, using the W3C Compositing and Blending formulas.
-- **Canvas**: a CPU compositor writes RGBA into a GPUIX `<img>` with `setImagePixels`. Edits mark a dirty rect; only that rect is recomposited and only the matching screen rect is re-rendered (checkerboard, zoom, selection outline, brush ring).
-- **Brush/eraser**: Catmull-Rom smoothed stroke engine with fixed spacing, size/hardness/opacity/flow, constrained by the active selection.
-- **Selections**: rectangle, ellipse, lasso/polygon, magic wand (tolerance, contiguous), add/subtract with Shift/Alt, invert. Adding an adjustment with a selection active uses the selection as its mask.
-- **Adjustments** (non-destructive): curves (draggable spline editor), hue/saturation, brightness/contrast, exposure, vibrance, black & white, invert, threshold.
-- **Filters** (destructive, selection-aware): gaussian blur, unsharp mask, noise, motion blur, high-pass, median.
+- **Canvas**: a CPU compositor writes RGBA into a GPUIX `<img>` with `setImagePixels`. Edits mark a dirty rect; only that rect is recomposited and only the matching screen rect is re-rendered (checkerboard, zoom, pixel grid, selection outline, brush ring, crop frame, transform box, text caret).
+- **Painting**: Catmull-Rom smoothed stroke engine with spacing, size/hardness/opacity/flow; clone stamp (aligned, samples the active layer); spot healing (membrane inpainting solved coarse-to-fine, plus borrowed grain); paint bucket; linear and radial gradients; all constrained by the selection.
+- **Type**: click with the type tool and type; glyph outlines come from the system font (SF on macOS, via opentype.js) and are filled by our own anti-aliased scanline rasterizer. Type stays editable (click it again), is saved in `.pcraft`, and becomes pixels when you paint on it (undo brings the live type back).
+- **Transform and canvas**: free transform with live bilinear preview (scale from the opposite corner, rotate, move; works on a selection too), crop with rule-of-thirds and Free/1:1/4:3/16:9/Original ratios, crop to selection, rotate 90°/180°, flip canvas or layer, image size, place image.
+- **Selections**: rectangle, ellipse, lasso, magic wand (tolerance, contiguous), New/Add/Subtract (or Shift/Alt), inverse, feather.
+- **Adjustments** (non-destructive): Levels (histogram with black/gamma/white handles and output range), Curves (draggable spline), Hue/Saturation, Brightness/Contrast, Color Balance, Exposure, Vibrance, Black & White, Invert, Threshold.
+- **Filters** (selection-aware) open a dialog with a live canvas preview: Gaussian Blur, Unsharp Mask, Motion Blur, Add Noise, High Pass, Median.
+- **Color picker**: saturation/brightness square, hue strip, hex readout, foreground/background, swatches.
 - **History**: command history with 64×64 tile diffs (not full images), byte-capped, merges slider drags into one step.
 - **Files**: PNG/JPEG import and export (pngjs, jpeg-js; other formats through macOS `sips`), flattened export, `.pcraft` projects (stored ZIP with a JSON manifest and per-layer PNGs) that reopen identically.
 
@@ -80,12 +90,13 @@ Ghostty owns Cmd shortcuts, so every Cmd shortcut has a Ctrl or plain-key equiva
 
 The original prompt asked for a Rust/wgpu/egui workspace. Per the GPUIX-in-Ghostty brief this is TypeScript + GPUIX instead, rendered in the terminal.
 
-Kept: the acceptance flow up to the text step works end to end (open photo → duplicate → gaussian blur → soft light 40 % → mask with brush → curves → export JPEG → save project → reopen identically; covered by a test), the full blend-mode list, the tool rail, tile-diff history, selection math, the curves editor, the layout (tools left, canvas centre, layers/properties/history right, options bar top), keyboard shortcuts for every tool and dark theme.
+Kept: the whole acceptance flow (open photo → duplicate → gaussian blur → soft light 40 % → mask with brush → curves → type layer → export JPEG → save project → reopen identically; covered by tests), the v1 tool list including crop and text, every listed adjustment and filter, the full blend-mode list, tile-diff history, a command palette, the layout (tools left, canvas centre, layers/properties/history right, options bar top), keyboard shortcuts for every tool and dark theme.
 
 Cut or changed, honestly:
 - **Compositing is CPU, not GPU shaders.** GPUIX has no custom shader hook, so blend modes run in TypeScript over typed arrays and the result is uploaded with `setImagePixels`. Images are downscaled to a 1600 px long edge by default (`--max` to change). No 60 fps on 6000×4000.
-- **Not implemented:** text layers, crop tool, levels and color balance, layer groups, lock flags, guides, RGBA16F, the command palette, pressure, a pixel grid above 400 %, WebP/TIFF export, PSD import, golden-image tests and 3-OS CI.
-- Filters run on the main thread, so a large blur briefly blocks input (~130 ms for a radius-20 blur at 1600×1071).
+- **Type** is one system font (SF / Arial fallback) with size and colour; no font picker, tracking or paragraph settings.
+- **Not implemented:** layer groups, lock flags, guides, RGBA16F, pressure, WebP/TIFF export, PSD import, golden-image tests and 3-OS CI.
+- Filters and free transform run on the main thread, so a large blur briefly blocks input (~130 ms for a radius-20 blur at 1600×1071).
 
 ## GPUIX findings (0.11.0)
 
