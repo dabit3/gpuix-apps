@@ -391,7 +391,11 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
   const overlays = (): Overlay[] => {
     const o: Overlay[] = []
     const sc = (x: number, y: number) => vp.toScreen(x, y)
-    if (ed.tool === 'crop' && crop.current) o.push({ kind: 'crop', a: sc(crop.current.x0, crop.current.y0), b: sc(crop.current.x1, crop.current.y1) })
+    if (ed.tool === 'crop' && crop.current) {
+      const c = crop.current
+      const untouched = c.x0 <= 0 && c.y0 <= 0 && c.x1 >= ed.doc.width && c.y1 >= ed.doc.height
+      o.push({ kind: 'crop', a: sc(c.x0, c.y0), b: sc(c.x1, c.y1), thirds: !untouched || gesture.current?.kind === 'crop' })
+    }
     if (ed.xf) o.push({ kind: 'xform', pts: xformCorners(ed.xf.box, ed.xf.t).map(([x, y]) => sc(x, y)) })
     if (ed.textEdit?.layer.text) {
       const t = ed.textEdit.layer.text

@@ -14,7 +14,7 @@ export type Preview =
 type P = { x: number; y: number }
 /** Persistent on-canvas chrome (screen space): crop frame, transform box, text caret, clone source. */
 export type Overlay =
-  | { kind: 'crop'; a: P; b: P }
+  | { kind: 'crop'; a: P; b: P; thirds?: boolean }
   | { kind: 'xform'; pts: P[] }
   | { kind: 'textbox'; a: P; b: P; caret: { x: number; y0: number; y1: number } | null }
   | { kind: 'cross'; x: number; y: number }
@@ -264,7 +264,7 @@ export class Viewport {
       this.shade(0, y0, x0, y1, 0.38)
       this.shade(x1, y0, this.w, y1, 0.38)
       const thirds = [128, 133, 140]
-      for (const t of [1 / 3, 2 / 3]) {
+      for (const t of o.thirds === false ? [] : [1 / 3, 2 / 3]) {
         this.line(x0 + (x1 - x0) * t, y0, x0 + (x1 - x0) * t, y1, thirds, false)
         this.line(x0, y0 + (y1 - y0) * t, x1, y0 + (y1 - y0) * t, thirds, false)
       }
