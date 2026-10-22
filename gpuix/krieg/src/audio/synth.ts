@@ -115,10 +115,12 @@ export class Audio {
   }
 
   play(name: string, vol = 0.6) {
-    if (!this.wk || !SFX[name] || this.n > 4) return
+    if (!this.wk || !SFX[name] || this.n > 2) return
+    // Each afplay launch costs ~1 core of coreaudiod/mediaremoted time, so cap the global launch rate.
     const now = performance.now()
-    if (now - (this.last[name] ?? 0) < (name === 'shoot' ? 60 : 40)) return
-    this.last[name] = now
+    const big = /die|hurt|boom|key|door|pick|win|lose/.test(name)
+    if (now - (this.last[name] ?? 0) < 90 || now - (this.last[''] ?? 0) < (big ? 50 : 160)) return
+    this.last[name] = this.last[''] = now
     this.n++
     this.wk.postMessage(['-v', String(vol), join(this.dir, `${name}.wav`)])
   }
