@@ -1,0 +1,25 @@
+{
+  "name": "convt",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "convt": "./src/cli.ts"
+  },
+  "scripts": {
+    "start": "bun src/cli.ts",
+    "fixtures": "bash scripts/make-fixtures.sh",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gpuix/native": "0.11.0",
+    "@gpuix/react": "0.11.0",
+    "react": "19"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}
