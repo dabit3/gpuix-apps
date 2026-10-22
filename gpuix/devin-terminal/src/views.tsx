@@ -5,6 +5,7 @@ import { Icon, type IconName } from './icons'
 import { C, nativeTheme } from './theme'
 import { DevinClient, describeTrigger, SCHEDULE_PRESETS, timeAgo, type ApiAutomation, type ApiNote, type ApiPlaybook, type ApiSecret, type ApiTemplate, type DevinApi } from './api'
 import type { Session } from './data'
+import { FindingsList } from './more'
 
 // View-local UI state that survives the theme toggle (which remounts the tree so memoized rows repaint).
 const sticky = new Map<string, unknown>()
@@ -20,7 +21,7 @@ export function useSticky<S>(key: string, initial: S): [S, (v: S | ((s: S) => S)
   return [v, set]
 }
 
-export type View = 'home' | 'automations' | 'security' | 'review' | 'customize' | 'settings' | 'notifications'
+export type View = 'home' | 'automations' | 'security' | 'review' | 'customize' | 'settings' | 'notifications' | 'sessions' | 'usage' | 'repos'
 
 export const SANS = 'Inter'
 const MONO = 'Menlo'
@@ -131,7 +132,7 @@ export function Toggle({ on, onChange, testId }: { on: boolean; onChange: (v: bo
   )
 }
 
-function Card({ children, testId, onClick, style }: { children: React.ReactNode; testId?: string; onClick?: () => void; style?: StyleDesc }) {
+export function Card({ children, testId, onClick, style }: { children: React.ReactNode; testId?: string; onClick?: () => void; style?: StyleDesc }) {
   return (
     <div testId={testId} onClick={onClick} style={{ ...col({ gap: 6 }), padding: 14, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, cursor: onClick ? 'pointer' : 'default', hover: onClick ? { borderColor: C.borderStrong } : {}, ...style }}>
       {children}
@@ -139,7 +140,7 @@ function Card({ children, testId, onClick, style }: { children: React.ReactNode;
   )
 }
 
-function Divider() {
+export function Divider() {
   return <div style={{ height: 1, backgroundColor: C.border, flexShrink: 0 }} />
 }
 
@@ -160,7 +161,7 @@ export function Page({ title, subtitle, actions, children, testId, narrow }: { t
   )
 }
 
-function Empty({ text }: { text: string }) {
+export function Empty({ text }: { text: string }) {
   return (
     <div style={{ ...row({ justifyContent: 'center' }), paddingTop: 28, paddingBottom: 28 }}>
       <T color={C.ghost}>{text}</T>
@@ -173,7 +174,7 @@ export function Notice({ text, tone }: { text: string; tone?: 'error' | 'ok' }) 
 }
 
 /** Loads a list from an optional API method; `null` api → [] with a hint. */
-function useApiList<T>(load: (() => Promise<T[]>) | undefined, deps: unknown[] = []) {
+export function useApiList<T>(load: (() => Promise<T[]>) | undefined, deps: unknown[] = []) {
   const [items, setItems] = useState<T[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const reload = useCallback(() => {
@@ -394,7 +395,7 @@ export function AutomationsView({ api, narrow }: { api: DevinApi | null; narrow?
 
 /* ───────────────────────────── Security ───────────────────────────── */
 
-function Stat({ label, value, testId }: { label: string; value: number | string; testId: string }) {
+export function Stat({ label, value, testId }: { label: string; value: number | string; testId: string }) {
   return (
     <Card style={{ flexGrow: 1, flexBasis: 0, minWidth: 120 }}>
       <T size={12.5} color={C.tertiary}>{label}</T>
@@ -420,7 +421,8 @@ export function SecurityView({ api, sessions, narrow }: { api: DevinApi | null; 
         <Stat testId="stat-merged" label="Merged" value={s.merged} />
         <Stat testId="stat-closed" label="Closed" value={s.closed} />
       </div>
-      <T size={12} color={C.ghost}>{`Counted from the ${sessions.length} sessions loaded in the sidebar. Security scan findings aren't in the public API, so they open on app.devin.ai.`}</T>
+      <T size={12} color={C.ghost}>{`Counted from the ${sessions.length} sessions loaded in the sidebar. Click a finding to open its fix PR or session.`}</T>
+      <FindingsList api={api} />
       <Divider />
       <T weight={600}>{`Secrets${secrets.items ? ` · ${secrets.items.length}` : ''}`}</T>
       <T size={12.5} color={C.tertiary}>Names and notes only. Values never leave Devin.</T>

@@ -16,6 +16,7 @@ export type ApiSession = {
   parent_session_id?: string | null
   child_session_ids?: string[] | null
   tags: string[]
+  is_archived?: boolean
 }
 
 export type ApiMessage = {
@@ -44,6 +45,32 @@ export type ApiAutomation = {
 }
 export type ApiAttachment = { attachment_id: string; name: string; url: string; content_type?: string | null; source: 'devin' | 'user' }
 export type ApiTemplate = { template_id: string; name: string; description: string; category: string; required_integrations: string[]; triggers: ApiTrigger[] }
+export type ApiInsights = ApiSession & {
+  analysis?: {
+    issues?: { id: string; title: string; impact?: string; label?: string; issue?: string }[]
+    action_items?: { issue_id: string; action_item: string; type?: string }[]
+    classification?: { category?: string; tools_and_frameworks?: string[]; programming_languages?: string[] }
+    suggested_prompt?: { suggested_prompt?: string; original_prompt?: string }
+  } | null
+  analysis_status?: 'started' | 'completed' | 'failed' | null
+  num_devin_messages?: number
+  num_user_messages?: number
+  session_size?: string | null
+  category?: string | null
+  origin?: string | null
+}
+export type ApiConsumption = { total_acus: number; consumption_by_date: { date: number; acus: number }[] }
+export type ApiSessionMetrics = { sessions_created_count?: number; sessions_with_merged_prs_count?: number; sessions_created_with_playbook_count?: number; avg_acus_per_session?: number; sessions_created_by_origin?: Record<string, number> }
+export type ApiPrMetrics = { prs_created_count?: number; prs_opened_count?: number; prs_merged_count?: number; prs_closed_count?: number; prs_taken_over_count?: number }
+export type ApiRepo = {
+  repo_path: string
+  repo_name: string
+  repo_description?: string | null
+  repo_language?: string | null
+  last_updated_at?: number | null
+  indexing_status?: { indexing_enabled: boolean; latest_completed_search_index_job?: unknown; latest_completed_wiki_index_job?: unknown } | null
+}
+export type ApiFinding = { finding_id: string; title: string; severity?: string | null; status?: string | null; repo_name?: string | null; pr_url?: string | null; session_id?: string | null }
 export type CreateSessionOpts = { mode?: string; repos?: string[]; tags?: string[]; playbookId?: string; title?: string; sessionLinks?: string[] }
 
 type Page<T> = { items: T[]; end_cursor?: string | null; has_next_page?: boolean }
@@ -72,6 +99,16 @@ export interface DevinApi {
   listAttachments?(id: string): Promise<ApiAttachment[]>
   /** Short-lived direct download URL for an attachment (the API answers with a presigned redirect). */
   attachmentUrl?(a: ApiAttachment): Promise<string>
+  listArchived?(max?: number): Promise<ApiSession[]>
+  unarchiveSession?(id: string): Promise<ApiSession>
+  setTags?(id: string, tags: string[]): Promise<string[]>
+  getInsights?(id: string): Promise<ApiInsights>
+  generateInsights?(id: string): Promise<unknown>
+  consumption?(after: number, before: number): Promise<ApiConsumption>
+  sessionMetrics?(after: number, before: number): Promise<ApiSessionMetrics>
+  prMetrics?(after: number, before: number): Promise<ApiPrMetrics>
+  listRepositories?(filter?: string): Promise<ApiRepo[]>
+  listFindings?(): Promise<ApiFinding[]>
 }
 
 export class DevinClient implements DevinApi {
@@ -98,8 +135,8 @@ export class DevinClient implements DevinApi {
 
   async listSessions(first = 50, after?: string): Promise<{ items: ApiSession[]; hasMore: boolean; cursor?: string | null }> {
     const q = after ? `&after=${encodeURIComponent(after)}` : ''
-    const page = await this.req<Page<ApiSession>>(`/sessions?first=${first}${q}`)
-    return { items: page.items, hasMore: page.has_next_page ?? false, cursor: page.end_cursor }
+    const page = await this.req<Page<ApiSession>>(`/sessions?first=${first}&is_archived=false${q}`)
+    return { items: page.items.filter((s) => !s.is_archived), hasMore: page.has_next_page ?? false, cursor: page.end_cursor }
   }
 
   getSession(id: string): Promise<ApiSession> {
@@ -219,6 +256,48 @@ export class DevinClient implements DevinApi {
 
   deleteAutomation(id: string) {
     return this.req<unknown>(`/automations/${id}`, { method: 'DELETE' })
+  }
+
+  /** Archived sessions, newest first (the default list hides them). */
+  async listArchived(max = 300) {
+    const items = await this.all<ApiSession>('/sessions?is_archived=true', Math.ceil(max / 100))
+    return items.slice(0, max)
+  }
+
+  unarchiveSession(id: string) {
+    return this.req<ApiSession>(`/sessions/${id}/unarchive`, { method: 'POST', body: {} })
+  }
+
+  async setTags(id: string, tags: string[]) {
+    return (await this.req<{ tags: string[] }>(`/sessions/${id}/tags`, { method: 'PUT', body: { tags } })).tags
+  }
+
+  getInsights(id: string) {
+    return this.req<ApiInsights>(`/sessions/${id}/insights`)
+  }
+
+  generateInsights(id: string) {
+    return this.req<unknown>(`/sessions/${id}/insights/generate`, { method: 'POST', body: {} })
+  }
+
+  consumption(after: number, before: number) {
+    return this.req<ApiConsumption>(`/consumption/daily?time_after=${after}&time_before=${before}`)
+  }
+
+  sessionMetrics(after: number, before: number) {
+    return this.req<ApiSessionMetrics>(`/metrics/sessions?time_after=${after}&time_before=${before}`)
+  }
+
+  prMetrics(after: number, before: number) {
+    return this.req<ApiPrMetrics>(`/metrics/prs?time_after=${after}&time_before=${before}`)
+  }
+
+  listRepositories(filter?: string) {
+    return this.all<ApiRepo>(`/repositories?load_indexing_status=true${filter ? `&filter_name=${encodeURIComponent(filter)}` : ''}`, 5)
+  }
+
+  listFindings() {
+    return this.all<ApiFinding>('/code-scans/findings', 1)
   }
 
   sendMessage(id: string, message: string): Promise<ApiSession> {

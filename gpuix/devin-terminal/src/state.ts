@@ -31,6 +31,8 @@ export type Action =
   | { type: 'rekey'; from: string; session: Session }
   | { type: 'patch'; id: string; patch: Partial<Session> }
   | { type: 'remove'; id: string }
+  | { type: 'prune'; ids: string[] }
+  | { type: 'unhide'; id: string }
 
 function mapEvents(s: Session, fn: (e: TranscriptEvent) => TranscriptEvent): Session {
   return { ...s, events: s.events.map(fn) }
@@ -188,6 +190,13 @@ export function reducer(state: State, action: Action): State {
       }
     case 'remove':
       return { ...state, hidden: [...(state.hidden ?? []), action.id], sessions: state.sessions.filter((s) => s.id !== action.id), selectedId: state.selectedId === action.id ? null : state.selectedId }
+    case 'prune': {
+      const ids = new Set(action.ids.filter((id) => id !== state.selectedId))
+      if (!state.sessions.some((s) => ids.has(s.id))) return state
+      return { ...state, sessions: state.sessions.filter((s) => !ids.has(s.id)) }
+    }
+    case 'unhide':
+      return { ...state, hidden: (state.hidden ?? []).filter((h) => h !== action.id) }
     case 'patch':
       return { ...state, sessions: state.sessions.map((s) => (s.id === action.id ? { ...s, ...action.patch } : s)) }
   }

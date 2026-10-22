@@ -35,6 +35,7 @@ export function sessionFromApi(s: ApiSession, now = Date.now() / 1000): Session 
       childIds: s.child_session_ids ?? [],
       updatedAt: s.updated_at,
       loaded: false,
+      tags: s.tags ?? [],
     },
   }
 }

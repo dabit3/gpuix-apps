@@ -50,6 +50,7 @@ export type Session = {
     childIds: string[]
     updatedAt: number
     loaded: boolean
+    tags?: string[]
   }
 }
 
