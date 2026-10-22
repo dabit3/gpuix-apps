@@ -324,7 +324,9 @@ export class Browser {
         if (this.inflightInputs.size) await within(Promise.all([...this.inflightInputs]), 250)
         const zoom = t.zoom, m = zoomedMetrics(this.viewport, zoom)
         this.capturing = true
-        const r = await within(this.cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: QUALITY, optimizeForSpeed: true }, t.sessionId).catch(() => null), 1000)
+        const r = await within(this.cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: QUALITY, optimizeForSpeed: true }, t.sessionId).catch(() => null), 3000)
+        // a screenshot under emulation can leave Chrome reading input coordinates at 1/zoom; re-applying the metrics before releasing held input resets that
+        await this.applyViewport(t)
         this.capturing = false
         for (const go of this.heldInputs.splice(0)) go()
         if (!r?.data || t.id !== this.activeId || t.zoom !== zoom) continue
