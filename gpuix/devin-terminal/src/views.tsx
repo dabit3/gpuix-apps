@@ -399,7 +399,7 @@ export function Stat({ label, value, testId }: { label: string; value: number | 
   return (
     <Card style={{ flexGrow: 1, flexBasis: 0, minWidth: 120 }}>
       <T size={12.5} color={C.tertiary}>{label}</T>
-      <T testId={testId} size={22} weight={600}>{String(value)}</T>
+      <T testId={testId} size={24} weight={400}>{String(value)}</T>
     </Card>
   )
 }

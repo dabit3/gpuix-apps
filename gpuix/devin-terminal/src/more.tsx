@@ -120,7 +120,7 @@ function Bars({ items, testId }: { items: { label: string; value: number }[]; te
         <div key={i.label} style={row({ gap: 10 })}>
           <text style={{ fontFamily: SANS, fontSize: 12.5, color: C.tertiary, width: 92, flexShrink: 0 }}>{i.label}</text>
           <div style={{ flexGrow: 1, height: 8, borderRadius: 4, backgroundColor: C.hover }}>
-            <div style={{ width: `${Math.max(i.value ? 2 : 0, (i.value / max) * 100)}%`, height: 8, borderRadius: 4, backgroundColor: C.accent }} />
+            <div style={{ width: `${Math.max(i.value ? 2 : 0, (i.value / max) * 100)}%`, height: 8, borderRadius: 4, backgroundColor: C.tertiary }} />
           </div>
           <text style={{ fontFamily: SANS, fontSize: 12.5, color: C.text, width: 44, flexShrink: 0 }}>{String(i.value)}</text>
         </div>
@@ -228,7 +228,7 @@ export function ReposView({ api, onStart, narrow }: { api: DevinApi | null; onSt
   )
 }
 
-const SEV: Record<string, string> = { critical: '#ff6a69', high: '#ff9492', medium: '#f0b72f', low: '#71b7ff' }
+const SEV: Record<string, string> = { critical: '#f85149', high: '#f85149' }
 
 export function FindingsList({ api }: { api: DevinApi | null }) {
   const findings = useApiList<ApiFinding>(api?.listFindings?.bind(api), [api])
@@ -327,7 +327,7 @@ export function SessionExtras({ session, client }: { session: Session; client: D
       {ins && (
         <Card testId="insights" style={{ gap: 8, marginTop: 6 }}>
           <div style={row({ gap: 8 })}>
-            <Icon name="sparkle" size={13} color={C.accent} />
+            <Icon name="sparkle" size={13} color={C.tertiary} />
             <T weight={600} size={13}>Insights</T>
             <div style={{ flexGrow: 1 }} />
             {!a && <Btn small label={generating || ins.analysis_status === 'started' ? 'Analyzing…' : 'Analyze'} testId="insights-generate" disabled={generating} onClick={generate} />}
@@ -357,8 +357,6 @@ export function SessionExtras({ session, client }: { session: Session; client: D
     </div>
   )
 }
-
-const BUILD_COLOR: Record<ApiBuild['status'], string> = { succeeded: '#26cd4d', failed: '#ff9492', running: '#71b7ff', pending: '#f0b72f', cancelled: '#7a828e' }
 
 export function buildDuration(b: ApiBuild): string {
   if (!b.started_at) return '—'
@@ -400,8 +398,7 @@ export function EnvironmentView({ api, narrow }: { api: DevinApi | null; narrow?
           <div key={b.build_id} style={col({ gap: 0 })}>
             <div testId={`build-${b.build_id}`} onClick={() => setOpen(open === b.build_id ? null : b.build_id)} style={{ ...row({ gap: 10 }), height: 38, paddingLeft: 10, paddingRight: 10, borderRadius: 8, cursor: 'pointer', backgroundColor: open === b.build_id ? C.hover : 'rgba(0,0,0,0)', hover: { backgroundColor: C.hover } }}>
               <Icon name={open === b.build_id ? 'chevronDown' : 'chevronRight'} size={12} color={C.ghost} />
-              <div style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: BUILD_COLOR[b.status] ?? C.ghost, pointerEvents: 'none' }} />
-              <text style={{ fontFamily: SANS, fontSize: 13, color: C.text, width: 84, pointerEvents: 'none' }}>{b.status[0]!.toUpperCase() + b.status.slice(1)}</text>
+              <text style={{ fontFamily: SANS, fontSize: 13, color: b.status === 'failed' ? C.del : b.status === 'running' || b.status === 'pending' ? C.orange : C.text, width: 84, pointerEvents: 'none' }}>{b.status[0]!.toUpperCase() + b.status.slice(1)}</text>
               <text style={{ fontFamily: SANS, fontSize: 12.5, color: C.tertiary, width: 64, pointerEvents: 'none' }}>{b.trigger === 'manual' ? 'Manual' : 'Auto'}</text>
               <text style={{ fontFamily: SANS, fontSize: 12.5, color: C.tertiary, width: 70, pointerEvents: 'none' }}>{buildDuration(b)}</text>
               {!narrow && <text style={{ fontFamily: 'Menlo', fontSize: 11.5, color: C.ghost, flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', pointerEvents: 'none' }}>{b.build_id}</text>}

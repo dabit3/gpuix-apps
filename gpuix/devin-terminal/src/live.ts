@@ -60,6 +60,18 @@ export function cleanMessage(md: string): string {
     .replace(ATTACHMENT_URL, (_, url: string) => link(url))
 }
 
+/** "12:58 PM" in local time, like the web app's message headers. */
+export function clock(unix: number): string {
+  return new Date(unix * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+/** "Nader Dabit" → "Nader", "nader@x.com" → "nader"; missing → "You". */
+export function firstName(username?: string | null): string {
+  const u = username?.trim()
+  if (!u) return 'You'
+  return u.includes('@') ? u.split('@')[0]! : u.split(/\s+/)[0]!
+}
+
 export function eventsFromMessages(messages: ApiMessage[], opts: { running?: boolean; now?: number } = {}): TranscriptEvent[] {
   const out: TranscriptEvent[] = []
   let prev: ApiMessage | null = null
@@ -68,8 +80,8 @@ export function eventsFromMessages(messages: ApiMessage[], opts: { running?: boo
       const gap = Math.round(m.created_at - prev.created_at)
       if (gap >= 2) out.push({ kind: 'work', id: `w-${m.event_id}`, seconds: gap, steps: [], open: false })
     }
-    if (m.source === 'user') out.push({ kind: 'user', id: m.event_id, text: m.message, at: timeAgo(m.created_at) })
-    else out.push({ kind: 'devin', id: m.event_id, md: cleanMessage(m.message) })
+    if (m.source === 'user') out.push({ kind: 'user', id: m.event_id, text: m.message, at: timeAgo(m.created_at), name: firstName(m.username), time: clock(m.created_at) })
+    else out.push({ kind: 'devin', id: m.event_id, md: cleanMessage(m.message), time: clock(m.created_at) })
     prev = m
   }
   if (opts.running && prev) {

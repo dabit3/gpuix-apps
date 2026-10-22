@@ -346,11 +346,9 @@ function Sidebar({
         </ActionMenu>
       </div>
       <div style={row({ paddingLeft: 16, paddingRight: 8, marginTop: 16, height: 30, flexShrink: 0, gap: 8 })}>
-        <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 13.5, fontWeight: 500 }}>Sessions</text>
-        <text testId="session-count" style={{ fontFamily: SANS, color: C.ghost, fontSize: 11.5, flexGrow: 1, whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0 }}>
-          {narrow ? `${running} running` : `${state.sessions.length} sessions · ${running} running`}
-        </text>
+        <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 13.5, fontWeight: 500, flexGrow: 1 }}>Sessions</text>
         <IconButton icon="plus" size={15} box={26} onClick={onNew} testId="sessions-new" />
+        {!narrow && <IconButton icon="sliders" size={15} box={26} onClick={() => onNav('sessions', 'all')} testId="sessions-filter-open" />}
         {!narrow && (
           <ActionMenu
             testId="sessions-menu"
@@ -410,6 +408,7 @@ function Sidebar({
           testId="help"
           side="top"
           items={[
+            { id: 'source', label: live ? 'Live · api.devin.ai' : 'Demo data', header: true },
             { id: 'docs', label: 'Documentation', icon: 'library', run: () => openUrl('https://docs.devin.ai') },
             { id: 'api', label: 'API reference', icon: 'zap', run: () => openUrl('https://docs.devin.ai/api-reference/overview') },
             { id: 'shortcuts', label: 'Keyboard shortcuts', icon: 'list', run: onShortcuts },
@@ -420,7 +419,9 @@ function Sidebar({
         </ActionMenu>
         <IconButton icon="settings" size={17} testId="settings" active={view === 'settings'} onClick={() => onNav('settings')} />
         <div style={{ flexGrow: 1 }} />
-        <text testId="data-source" style={{ fontFamily: SANS, color: C.ghost, fontSize: 11.5, marginRight: 4, whiteSpace: 'nowrap' }}>{live ? (narrow ? 'Live' : 'Live · api.devin.ai') : 'Demo data'}</text>
+        <text testId="session-count" style={{ fontFamily: SANS, color: C.ghost, fontSize: 11.5, marginRight: 4, whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 }}>
+          {narrow ? `${running} running` : `${state.sessions.length} sessions · ${running} running`}
+        </text>
         <IconButton icon={themeName === 'dark' ? 'sun' : 'moon'} size={16} testId="theme-toggle" onClick={onToggleTheme} />
       </div>
     </div>
@@ -429,10 +430,34 @@ function Sidebar({
 
 /* ───────────────────────────── Transcript ───────────────────────────── */
 
+/** Avatar + name + time above each message, like the web app's transcript. */
+function Sender({ who, name, time, children }: { who: 'user' | 'devin'; name?: string; time?: string; children: React.ReactNode }) {
+  return (
+    <div style={row({ gap: 10, alignItems: 'flex-start' })}>
+      {who === 'devin' ? (
+        <div style={{ ...row({ justifyContent: 'center' }), width: 24, height: 24, borderRadius: 6, backgroundColor: C.text, flexShrink: 0 }}>
+          <Icon name="devin" size={14} color={C.canvas} />
+        </div>
+      ) : (
+        <div style={{ ...row({ justifyContent: 'center' }), width: 24, height: 24, borderRadius: 12, backgroundColor: C.selected, flexShrink: 0 }}>
+          <text style={{ fontFamily: SANS, fontSize: 11.5, fontWeight: 600, color: C.secondary }}>{(name || 'You')[0]!.toUpperCase()}</text>
+        </div>
+      )}
+      <div style={col({ gap: 6, flexGrow: 1, flexShrink: 1, minWidth: 0 })}>
+        <div style={row({ gap: 8, height: 24 })}>
+          <text testId={who === 'devin' ? undefined : 'sender-name'} style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 600, color: C.text }}>{who === 'devin' ? 'Devin' : name || 'You'}</text>
+          {time && <text style={{ fontFamily: SANS, fontSize: 12, color: C.ghost }}>{time}</text>}
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 function UserBubble({ text }: { text: string }) {
   return (
-    <div style={col({ alignItems: 'end' })}>
-      <div style={{ maxWidth: '82%', paddingLeft: 15, paddingRight: 15, paddingTop: 10, paddingBottom: 10, borderRadius: 18, backgroundColor: C.userBubble }}>
+    <div style={col({ alignItems: 'start' })}>
+      <div style={{ maxWidth: '100%', paddingLeft: 13, paddingRight: 13, paddingTop: 9, paddingBottom: 9, borderRadius: 12, backgroundColor: C.userBubble }}>
         <text style={{ fontFamily: SANS, color: C.text, fontSize: 14.5, lineHeight: 22 }}>{text.length > 1200 ? `${text.slice(0, 1200)}…` : text}</text>
       </div>
     </div>
@@ -660,10 +685,18 @@ const EventView = memo(function EventView({ event, sessionId, onToggleWork }: { 
   let body: React.ReactNode
   switch (event.kind) {
     case 'user':
-      body = <UserBubble text={event.text} />
+      body = (
+        <Sender who="user" name={event.name} time={event.time}>
+          <UserBubble text={event.text} />
+        </Sender>
+      )
       break
     case 'devin':
-      body = <DevinMessage id={event.id} md={event.md} streaming={event.streaming} fresh={event.fresh} />
+      body = (
+        <Sender who="devin" time={event.time}>
+          <DevinMessage id={event.id} md={event.md} streaming={event.streaming} fresh={event.fresh} />
+        </Sender>
+      )
       break
     case 'plan':
       body = <PlanCard items={event.items} />
@@ -677,7 +710,7 @@ const EventView = memo(function EventView({ event, sessionId, onToggleWork }: { 
   }
   return (
     <div style={{ ...col({ alignItems: 'center' }), width: '100%', minWidth: 0, paddingLeft: 32, paddingRight: 32, paddingTop: 9, paddingBottom: 9 }}>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} style={{ ...col(), width: '100%', minWidth: 0, maxWidth: 740 }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} style={{ ...col(), width: '100%', minWidth: 0, maxWidth: 740, paddingLeft: event.kind === 'user' || event.kind === 'devin' ? 0 : 34 }}>
         {body}
       </motion.div>
     </div>
