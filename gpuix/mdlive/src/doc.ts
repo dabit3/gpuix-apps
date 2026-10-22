@@ -68,13 +68,38 @@ export function parseBlocks(source: string, baseDir = '.'): Block[] {
   let buf: string[] = []
   let bufStart = i
   const flush = () => {
-    if (buf.some((l) => l.trim())) {
-      const items = buf.map((l, j) => ({ m: l.match(TASK), line: bufStart + j, blank: !l.trim() }))
-      if (items.every((x) => x.m || x.blank)) {
-        const tasks = items.filter((x) => x.m).map((x) => ({ checked: x.m![1] !== ' ', text: x.m![2]!, line: x.line }))
-        out.push({ kind: 'tasks', src: buf.join('\n'), line: bufStart, tasks })
-      } else out.push({ kind: 'md', src: buf.join('\n'), line: bufStart })
+    // Split into runs so task items render as checkboxes even when they sit
+    // directly under an ordinary list or paragraph.
+    let run: string[] = []
+    let runStart = bufStart
+    let runIsTasks = false
+    const emit = () => {
+      while (run.length && !run[run.length - 1]!.trim()) run.pop()
+      if (run.some((l) => l.trim())) {
+        if (runIsTasks) {
+          const tasks = run
+            .map((l, j) => ({ m: l.match(TASK), line: runStart + j }))
+            .filter((x) => x.m)
+            .map((x) => ({ checked: x.m![1] !== ' ', text: x.m![2]!, line: x.line }))
+          out.push({ kind: 'tasks', src: run.join('\n'), line: runStart, tasks })
+        } else out.push({ kind: 'md', src: run.join('\n'), line: runStart })
+      }
+      run = []
     }
+    buf.forEach((l, j) => {
+      if (!l.trim()) {
+        if (run.length) run.push(l)
+        return
+      }
+      const isTask = TASK.test(l)
+      if (run.length && isTask !== runIsTasks) emit()
+      if (!run.length) {
+        runStart = bufStart + j
+        runIsTasks = isTask
+      }
+      run.push(l)
+    })
+    emit()
     buf = []
   }
   for (; i < lines.length; i++) {
@@ -171,7 +196,7 @@ export function stats(blocks: Block[]): Stats {
     const text = stripInline(b.kind === 'heading' ? b.title! : b.src)
       .replace(/^\s*([-*+]|\d+[.)]|>|\|)\s*/gm, ' ')
       .replace(/\[[ xX]\]/g, ' ')
-      .replace(/[|#>*_~`-]+/g, ' ')
+      .replace(/[|#>*_~`]+|(?<![\p{L}\p{N}])-+|-+(?![\p{L}\p{N}])/gu, ' ')
     words += text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
   }
   return {

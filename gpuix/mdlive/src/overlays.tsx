@@ -18,7 +18,7 @@ export const progressBus: { set: ((f: number) => void) | null } = { set: null }
 export function Progress({ t, width }: { t: UiTheme; width: number }) {
   const [f, setF] = useState(0)
   useEffect(() => {
-    progressBus.set = (v) => setF((p) => (Math.abs(p - v) > 0.002 ? v : p))
+    progressBus.set = (v) => setF((p) => (Math.abs(p - v) > 0.002 || v <= 0 || v >= 1 ? Math.max(0, Math.min(1, v)) : p))
     return () => {
       progressBus.set = null
     }
