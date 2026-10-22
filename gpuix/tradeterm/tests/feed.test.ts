@@ -44,3 +44,86 @@ describe('bars', () => {
     }
   })
 })
+
+describe('Hyperliquid', () => {
+  const { hyperliquidCoin, parseHyperliquidCandles, parseHyperliquidCtxs, loadBars, loadTickers } = require('../src/data/feed') as typeof import('../src/data/feed')
+  const hlRow = (t: number, c: number) => ({ t: t * 1000, T: t * 1000 + 3599999, s: 'HYPE', i: '1h', o: String(c - 1), h: String(c + 1), l: String(c - 2), c: String(c), v: '1000', n: 5 })
+
+  it('maps symbols to perp coins and parses candleSnapshot rows', () => {
+    expect(hyperliquidCoin('HYPE-USD')).toBe('HYPE')
+    expect(hyperliquidCoin('AAVE-USD')).toBe('AAVE')
+    expect(parseHyperliquidCandles([hlRow(3600, 40)])).toEqual([{ t: 3600, o: 39, h: 41, l: 38, c: 40, v: 1000 }])
+  })
+
+  it('reads mid price and day change from metaAndAssetCtxs', () => {
+    const payload = [{ universe: [{ name: 'BTC' }, { name: 'HYPE' }, { name: 'AAVE' }] }, [{ markPx: '1', prevDayPx: '1' }, { midPx: '44', markPx: '43.9', prevDayPx: '40' }, { midPx: null, markPx: '150', prevDayPx: '160' }]]
+    const t = parseHyperliquidCtxs(payload, ['HYPE-USD', 'AAVE-USD', 'NOPE-USD'])
+    expect(t['HYPE-USD']!.last).toBe(44)
+    expect(t['HYPE-USD']!.change).toBeCloseTo(0.1, 10)
+    expect(t['AAVE-USD']!.last).toBe(150)
+    expect(t['AAVE-USD']!.change).toBeCloseTo(-0.0625, 10)
+    expect(t['NOPE-USD']).toBeUndefined()
+  })
+
+  describe('routing (mocked network)', () => {
+    const realFetch = globalThis.fetch
+    const calls: string[] = []
+    const hlBars = Array.from({ length: 50 }, (_, i) => hlRow(1_800_000_000 + i * 3600, 40 + i))
+    const mock = (binanceOk: boolean) => {
+      calls.length = 0
+      globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+        const u = String(url)
+        calls.push(u.includes('hyperliquid') ? `hl:${JSON.parse(String(init?.body)).type}` : u.includes('binance') ? 'binance' : 'other')
+        if (u.includes('hyperliquid')) {
+          const body = JSON.parse(String(init?.body))
+          if (body.type === 'candleSnapshot') return Response.json(hlBars)
+          return Response.json([{ universe: [{ name: 'HYPE' }] }, [{ midPx: '45', markPx: '45', prevDayPx: '50' }]])
+        }
+        if (u.includes('binance') && binanceOk && u.includes('ticker')) return Response.json([{ symbol: 'BTCUSDT', lastPrice: '80000', priceChangePercent: '1.5' }])
+        return new Response('nope', { status: 400 })
+      }) as typeof fetch
+    }
+    const env = process.env.TRADETERM_OFFLINE
+    const restore = () => {
+      globalThis.fetch = realFetch
+      process.env.TRADETERM_OFFLINE = env
+    }
+
+    it('exchange "hyperliquid" asks Hyperliquid first and labels the source', async () => {
+      mock(true)
+      delete process.env.TRADETERM_OFFLINE
+      try {
+        const d = await loadBars('HYPE-USD', '1h', 50, { exchange: 'hyperliquid' })
+        expect(d.source).toBe('hyperliquid')
+        expect(d.bars.length).toBe(50)
+        expect(calls[0]).toBe('hl:candleSnapshot')
+      } finally {
+        restore()
+      }
+    })
+
+    it('auto falls through to Hyperliquid when Binance and Coinbase fail', async () => {
+      mock(false)
+      delete process.env.TRADETERM_OFFLINE
+      try {
+        const d = await loadBars('HYPE-USD', '1h', 50)
+        expect(calls[0]).toBe('binance')
+        expect(d.source).toBe('hyperliquid')
+      } finally {
+        restore()
+      }
+    })
+
+    it('tickers: Binance answers what it can, Hyperliquid fills the rest', async () => {
+      mock(true)
+      try {
+        const t = await loadTickers(['BTC-USD', 'HYPE-USD'])
+        expect(t['BTC-USD']).toEqual({ last: 80000, change: 0.015 })
+        expect(t['HYPE-USD']!.last).toBe(45)
+        expect(t['HYPE-USD']!.change).toBeCloseTo(-0.1, 10)
+      } finally {
+        restore()
+      }
+    })
+  })
+})

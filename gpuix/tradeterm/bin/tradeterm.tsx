@@ -9,6 +9,7 @@ usage
 examples
   tradeterm BTC-USD 1h
   tradeterm ETH-USD 15m -s rsi
+  tradeterm HYPE 15m -x hyperliquid
   tradeterm SOL 4h --offline
 
 arguments
@@ -18,12 +19,14 @@ arguments
 options
   -n, --bars <count>     history to load (default 3000; 26280 ≈ 3 years of 1h)
   -s, --strategy <id>    sma | rsi | donchian (default: last used)
+  -x, --exchange <name>  auto | hyperliquid | binance (default: last used; auto = Binance,
+                         then Coinbase, then Hyperliquid)
       --offline          use the built-in sample data instead of the network
       --native           open a native window instead of rendering in the terminal
   -h, --help             this help
 
-data: Binance public market data (data-api.binance.vision), Coinbase Exchange as a
-fallback, then the local cache, then labelled sample data. No API keys.
+data: Binance public market data (data-api.binance.vision), Coinbase Exchange and
+Hyperliquid (api.hyperliquid.xyz) as fallbacks, then the local cache, then labelled sample data. No API keys.
 Works in Ghostty and kitty (kitty graphics protocol). Press ? in the app for keys.`
 
 function fail(msg: string): never {
@@ -33,7 +36,7 @@ function fail(msg: string): never {
 
 const argv = process.argv.slice(2)
 const pos: string[] = []
-const opts = { bars: 3000, strategy: undefined as string | undefined, offline: false, native: false }
+const opts = { bars: 3000, strategy: undefined as string | undefined, exchange: undefined as 'auto' | 'hyperliquid' | 'binance' | undefined, offline: false, native: false }
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]!
   const val = () => argv[++i] ?? fail(`${a} needs a value`)
@@ -46,6 +49,11 @@ for (let i = 0; i < argv.length; i++) {
   } else if (a === '-s' || a === '--strategy') {
     opts.strategy = val()
     if (!['sma', 'rsi', 'donchian'].includes(opts.strategy)) fail(`unknown strategy "${opts.strategy}"`)
+  } else if (a === '-x' || a === '--exchange') {
+    const x = val().toLowerCase()
+    const ex = x === 'hl' ? 'hyperliquid' : x
+    if (ex !== 'auto' && ex !== 'hyperliquid' && ex !== 'binance') fail(`unknown exchange "${x}"`)
+    opts.exchange = ex
   } else if (a === '--offline') opts.offline = true
   else if (a === '--native') opts.native = true
   else if (a.startsWith('-')) fail(`unknown option ${a}`)
@@ -76,7 +84,7 @@ const quit = () => {
   process.exit(0)
 }
 
-render(<App symbol={symbol} timeframe={tf} bars={opts.bars} offline={opts.offline} strategy={opts.strategy} onQuit={quit} />, {
+render(<App symbol={symbol} timeframe={tf} bars={opts.bars} offline={opts.offline} strategy={opts.strategy} exchange={opts.exchange} onQuit={quit} />, {
   terminal: !opts.native,
   title: `tradeterm ${symbol} ${tf}`,
   width: 1440,
