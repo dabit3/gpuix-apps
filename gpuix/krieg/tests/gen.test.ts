@@ -57,7 +57,7 @@ describe('procedural level', () => {
     expect(noKey(l.exit.x, l.exit.y)).toBe(false)
     expect(withKey(l.exit.x, l.exit.y)).toBe(true)
     expect(l.lights.length).toBeLessThanOrEqual(16)
-    expect(new Set(l.enemies.map((e) => e.kind))).toEqual(new Set(['spider', 'sentry']))
+    expect(new Set(l.enemies.map((e) => e.kind))).toEqual(new Set(['trooper', 'imp', 'brute', 'barrel']))
     expect(solidAt(l, l.start.x, l.start.y)).toBe(false)
   })
   test('line of sight is blocked by walls', () => {

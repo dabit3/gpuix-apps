@@ -3,6 +3,7 @@ import { boot } from '../src/boot'
 import { Renderer } from '../src/engine/raycast'
 import { scene } from '../src/game/scene'
 import { World, type Input } from '../src/game/world'
+import type { EnemyKind } from '../src/gen/level'
 import { keyName } from '../src/app'
 import { song, SFX } from '../src/audio/synth'
 import { BUDGET, measure } from '../src/size'
@@ -25,7 +26,7 @@ describe('raycaster', () => {
   })
 })
 
-function facing(w: World, kind: 'spider' | 'sentry') {
+function facing(w: World, kind: EnemyKind) {
   const e = w.enemies.find((e) => e.kind === kind)!
   // Put the enemy two cells in front of the player in open space.
   e.x = w.p.x + Math.cos(w.p.angle) * 1.5; e.y = w.p.y + Math.sin(w.p.angle) * 1.5
@@ -33,19 +34,19 @@ function facing(w: World, kind: 'spider' | 'sentry') {
 }
 
 describe('gameplay', () => {
-  test('rifle hitscan damages, flashes and kills an enemy in front', () => {
+  test('chaingun hitscan damages, flashes and kills an enemy in front', () => {
     const w = new World(1337)
-    w.god = true
-    const e = facing(w, 'spider')
+    w.god = true; w.swap(1)
+    const e = facing(w, 'trooper')
     for (let i = 0; i < 120 && e.state !== 'dead'; i++) w.step(1 / 60, { ...idle, fire: true })
     expect(e.state).toBe('dead')
     expect(w.kills).toBe(1)
     expect(w.p.ammo).toBeLessThan(80)
   })
-  test('rifle shot leaves a barrel-to-impact tracer, impact particles and a hit marker', () => {
+  test('chaingun shot leaves a barrel-to-impact tracer, impact particles and a hit marker', () => {
     const w = new World(1337)
-    w.god = true
-    const e = facing(w, 'spider')
+    w.god = true; w.swap(1); w.p.cool = 0
+    const e = facing(w, 'imp')
     w.step(1 / 60, { ...idle, fire: true })
     expect(w.tracers.length).toBe(1)
     const tr = w.tracers[0]!
@@ -61,8 +62,8 @@ describe('gameplay', () => {
   })
   test('rocket explodes with splash damage', () => {
     const w = new World(1337)
-    w.god = true; w.swap(1)
-    const e = facing(w, 'sentry')
+    w.god = true; w.swap(2)
+    const e = facing(w, 'brute')
     e.x = w.p.x + Math.cos(w.p.angle) * 2.2; e.y = w.p.y + Math.sin(w.p.angle) * 2.2
     for (let i = 0; i < 60; i++) w.step(1 / 60, { ...idle, fire: i > 20 && i < 24 })
     expect(w.p.rockets).toBe(5)
@@ -70,11 +71,51 @@ describe('gameplay', () => {
   })
   test('enemy that sees the player switches to chase/attack and hurts it', () => {
     const w = new World(1337)
-    const e = facing(w, 'spider')
+    const e = facing(w, 'brute')
     e.x = w.p.x + Math.cos(w.p.angle) * 2.2; e.y = w.p.y + Math.sin(w.p.angle) * 2.2
     for (let i = 0; i < 240; i++) w.step(1 / 60, idle)
     expect(['chase', 'attack']).toContain(e.state)
     expect(w.p.hp).toBeLessThan(100)
+  })
+  test('shotgun fires a 7-pellet spread for one shell and staggers or kills', () => {
+    const w = new World(1337)
+    w.god = true
+    const e = facing(w, 'trooper')
+    w.step(1 / 60, { ...idle, fire: true })
+    expect(w.p.shells).toBe(23)
+    expect(w.tracers.length).toBe(7)
+    expect(e.hp).toBeLessThan(e.maxHp)
+    expect(e.pain > 0 || e.state === 'dead').toBe(true)
+  })
+  test('monsters fall into persistent corpses; overkill gibs', () => {
+    const w = new World(1337)
+    const a = w.enemies.find((e) => e.kind === 'imp')!, b = w.enemies.find((e) => e.kind === 'trooper')!
+    w.damage(a, 70); w.damage(b, 200)
+    expect(a.state).toBe('dead'); expect(a.gib).toBe(false); expect(b.gib).toBe(true)
+    for (let i = 0; i < 120; i++) w.step(1 / 60, idle)
+    expect(a.dissolve).toBe(1)
+    const s = scene(w, boot(1337, 32).sprites, 0)
+    expect(s.sprites.filter((d) => d.x === a.x && d.y === a.y).length).toBe(1)
+  })
+  test('barrels explode, chain and hurt nearby monsters but do not count as kills', () => {
+    const w = new World(1337)
+    const [b1, b2] = w.enemies.filter((e) => e.kind === 'barrel')
+    const m = w.enemies.find((e) => e.kind === 'brute')!
+    const at = (o: { x: number; y: number }, d: number) => { o.x = w.p.x + Math.cos(w.p.angle) * d; o.y = w.p.y + Math.sin(w.p.angle) * d }
+    at(b1!, 1.5); at(b2!, 2.3); at(m, 3)
+    w.damage(b1!, 30)
+    expect(b1!.state).toBe('dead'); expect(b2!.state).toBe('dead')
+    expect(m.hp).toBeLessThan(m.maxHp)
+    expect(w.fx.some((f) => f.kind === 'boom')).toBe(true)
+    expect(w.monsters).toBe(w.enemies.filter((e) => e.kind !== 'barrel').length)
+  })
+  test('troopers telegraph then fire a visible hitscan tracer at the player', () => {
+    const w = new World(1337)
+    const e = facing(w, 'trooper')
+    e.x = w.p.x + Math.cos(w.p.angle) * 3; e.y = w.p.y + Math.sin(w.p.angle) * 3
+    let wound = false, traced = false
+    for (let i = 0; i < 240; i++) { w.step(1 / 60, idle); if (e.atk > 0.15) wound = true; if (w.tracers.length) traced = true }
+    expect(wound).toBe(true); expect(traced).toBe(true)
   })
   test('walls block movement', () => {
     const w = new World(1337)
@@ -111,6 +152,7 @@ describe('synth + size budget', () => {
   })
   test('minified bundle stays under 64 KB', async () => {
     const r = await measure()
-    expect(r.bytes).toBeLessThan(BUDGET)
+    expect(r.packed).toBeLessThan(BUDGET)
+    expect(r.bytes).toBeGreaterThan(r.packed)
   }, 30000)
 })

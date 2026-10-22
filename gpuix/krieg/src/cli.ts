@@ -11,7 +11,8 @@ const HELP = `krieg: a .kkrieger-style procedural FPS that renders inside your t
 usage
   krieg [options]          play
   krieg map [options]      live tactical map of a running game (run it in a split pane)
-  krieg size               print the size budget report (fails above 64 KB)
+  krieg size               print the size budget report (fails if the packed build is above 64 KB)
+  krieg build              write the packed single-file build to dist/krieg.js
 
 options
   -s, --seed <n>    level seed (default 1337, deterministic)
@@ -23,7 +24,7 @@ options
 
 keys
   WASD move  ·  drag look  ·  click/f fire  ·  arrows or q/e turn  ·  space jump  ·  c crouch
-  1/2 or scroll weapon  ·  t texture lab  ·  m music  ·  p perf  ·  b bloom  ·  esc title  ·  ctrl-c quit`
+  1/2/3 or scroll weapon  ·  t texture lab  ·  m music  ·  p perf  ·  b bloom  ·  esc title  ·  ctrl-c quit`
 
 const argv = process.argv.slice(2)
 if (process.env.RUST_LOG !== 'error') {
@@ -42,7 +43,14 @@ if (cmd === 'size') {
   const { measure, formatReport, BUDGET } = await import('./size')
   const r = await measure()
   console.log(formatReport(r))
-  process.exit(r.bytes > BUDGET ? 1 : 0)
+  process.exit(r.packed > BUDGET ? 1 : 0)
+} else if (cmd === 'build') {
+  const { pack } = await import('./size')
+  const { join } = await import('node:path')
+  const out = join(import.meta.dir, '..', 'dist', 'krieg.js'), src = await pack()
+  await Bun.write(out, src)
+  ;(await import('node:fs')).chmodSync(out, 0o755)
+  console.log(`dist/krieg.js  ${src.length} bytes`)
 } else if (cmd === 'map') {
   const { render } = await import('@gpuix/react')
   const { MapApp } = await import('./map')
@@ -53,7 +61,7 @@ if (cmd === 'size') {
   const { App } = await import('./app')
   const { measure } = await import('./size')
   const { createElement } = await import('react')
-  const size = await measure().then((r) => ({ bytes: r.bytes, gzip: r.gzip })).catch(() => undefined)
+  const size = await measure().then((r) => ({ bytes: r.bytes, gzip: r.gzip, packed: r.packed })).catch(() => undefined)
   const scale = Math.max(2, Math.min(4, Number(val('-q', '--scale') ?? 2) | 0))
   render(createElement(App, { opts: { seed, mute: has('-m', '--mute'), god: has('-g', '--god'), scale, size } }), { terminal, title: 'krieg', width: 1280, height: 800 } as never)
 } else {

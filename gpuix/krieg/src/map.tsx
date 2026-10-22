@@ -62,8 +62,9 @@ export function MapApp({ seed }: { seed: number }) {
       })
       live.q.forEach(([x, y, k]) => disc(x * cell, y * cell, Math.max(1, cell / 6), k === 'ebolt' ? 0xff6a5a : 0xffb757))
       live.e.forEach(([x, y, kind, st], i) => {
+        if (kind === 'barrel') return
         if (st === 'dead') { put(x * cell, y * cell, 0x3a3f46); return }
-        const r = Math.max(2, Math.round(cell / (kind === 'sentry' ? 2.6 : 3.2)))
+        const r = Math.max(2, Math.round(cell / (kind === 'brute' ? 2.4 : 3.2)))
         disc(x * cell, y * cell, r + (i === sel ? 2 : 0), i === sel ? 0xffffff : 0x0a0c10)
         disc(x * cell, y * cell, r, STATE_COLOR[st] ?? 0xffffff)
       })

@@ -11,8 +11,8 @@ export const LMR = 4 // lightmap samples per cell
 export interface Room { i: number; j: number; x0: number; y0: number; x1: number; y1: number; theme: number; kind: 'start' | 'key' | 'exit' | 'room' }
 export interface Door { x: number; y: number; vertical: boolean; locked: boolean; open: number; timer: number }
 export interface Light { x: number; y: number; r: number; g: number; b: number; radius: number }
-export type EnemyKind = 'spider' | 'sentry'
-export type PickupKind = 'health' | 'ammo' | 'rockets' | 'key'
+export type EnemyKind = 'trooper' | 'imp' | 'brute' | 'barrel'
+export type PickupKind = 'health' | 'ammo' | 'shells' | 'rockets' | 'key'
 export interface Spawn<K> { kind: K; x: number; y: number; room: number }
 
 export interface Level {
@@ -185,10 +185,11 @@ export function generateLevel(seed = 1337): Level {
   const pickups: Spawn<PickupKind>[] = []
   rooms.forEach((rm, k) => {
     if (rm.kind === 'start') return
-    const n = rm.kind === 'exit' ? 2 : d1[k]! >= 2 ? 2 : 1
-    for (let e = 0; e < n; e++) enemies.push({ kind: (e + k) % 2 ? 'sentry' : 'spider', ...free(rm), room: k })
+    const n = rm.kind === 'exit' ? 3 : d1[k]! >= 2 ? 3 : 2
+    for (let e = 0; e < n; e++) enemies.push({ kind: (['trooper', 'imp', 'brute'] as const)[(e + k) % 3]!, ...free(rm), room: k })
+    enemies.push({ kind: 'barrel', ...free(rm), room: k })
     if (rm.kind === 'key') pickups.push({ kind: 'key', x: (rm.x0 + rm.x1 + 1) / 2, y: (rm.y0 + rm.y1 + 1) / 2, room: k })
-    else if (rm.kind !== 'exit') pickups.push({ kind: (['health', 'ammo', 'rockets'] as const)[k % 3]!, ...free(rm), room: k })
+    else if (rm.kind !== 'exit') pickups.push({ kind: (['health', 'shells', 'ammo', 'rockets'] as const)[k % 4]!, ...free(rm), room: k })
   })
   const s = rooms[startRoom]!
   // Stand in line with the nearest doorway out of the start room and face it, so W walks straight out.

@@ -7,12 +7,13 @@ import { MATERIALS } from './gen/materials'
 import { Audio } from './audio/synth'
 import { boot, type Boot } from './boot'
 import { scene } from './game/scene'
+import type { Sprite } from './engine/raycast'
 import { WEAPONS, type Input } from './game/world'
 import { writeLive } from './live'
 import { MONO, T } from './theme'
 
 
-export interface Opts { seed: number; mute: boolean; god: boolean; scale: number; size?: { bytes: number; gzip: number } }
+export interface Opts { seed: number; mute: boolean; god: boolean; scale: number; size?: { bytes: number; gzip: number; packed: number } }
 type Mode = 'title' | 'play' | 'lab'
 
 export function keyName(e: { key?: string; keyChar?: string }) {
@@ -66,9 +67,9 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
         w.p.angle += look.current.dx * 0.006
         w.p.pitch = Math.max(-0.35, Math.min(0.35, w.p.pitch + look.current.dy * 0.0016))
         look.current.dx = look.current.dy = 0
-        const a = w.p.ammo + w.p.rockets
+        const a = w.p.ammo + w.p.rockets + w.p.shells
         w.step(dt, inp)
-        if (w.p.ammo + w.p.rockets !== a) shot.current = 0
+        if (w.p.ammo + w.p.rockets + w.p.shells !== a) shot.current = 0
         for (const ev of w.events) audio.current.play(ev)
       } else if (m === 'title') {
         w.p.angle += dt * 0.18
@@ -101,6 +102,7 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
     if (w.state !== 'play') { if (n === 'enter' || n === 'r') restart(); else if (n === 'n') restart((w.level.seed * 48271) % 2147483647); return }
     if (n === '1') w.swap(0)
     else if (n === '2') w.swap(1)
+    else if (n === '3') w.swap(2)
     else if (n === 'tab' || n === 'x') w.swap()
     else if (n === 'r') setScale((s) => (s === 2 ? 3 : s === 3 ? 4 : 2))
     else if (n === 'm') audio.current.toggleMusic()
@@ -139,7 +141,7 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
     <div testId="krieg" tabIndex={-1} autoFocus onKeyDown={onKeyDown} onKeyUp={onKeyUp} onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onScroll={onScroll}
       style={{ width: W, height: H, backgroundColor: T.bg, position: 'relative', fontFamily: MONO, userSelect: 'none' }}>
       <img ref={img} objectFit="fill" style={{ width: W, height: H }} />
-      {mode === 'play' && <Hud hud={hud} W={W} H={H} fs={fs} small={small} perf={perf} />}
+      {mode === 'play' && <Hud hud={hud} faces={g.current.sprites.faces} W={W} H={H} fs={fs} small={small} perf={perf} />}
       {mode === 'title' && <Title hud={hud} W={W} H={H} small={small} opts={opts} audioMs={audio.current.ms} audioOn={audio.current.enabled} />}
       {mode === 'lab' && <Lab boot={g.current} W={W} H={H} small={small} />}
     </div>
@@ -149,7 +151,8 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
 function snap(b: Boot, fps: number, ms: number, rw = 0, rh = 0) {
   const w = b.world, p = w.p
   return {
-    fps, ms, rw, rh, hp: Math.ceil(p.hp), ammo: p.ammo, rockets: p.rockets, weapon: p.weapon, key: p.hasKey, kills: w.kills, total: w.enemies.length,
+    fps, ms, rw, rh, hp: Math.ceil(p.hp), ammo: p.ammo, shells: p.shells, rockets: p.rockets, weapon: p.weapon, key: p.hasKey, kills: w.kills, total: w.monsters,
+    face: (p.hp <= 50 ? 6 : 0) + (w.state === 'dead' ? 5 : p.hurt > 0.45 ? 3 : p.killT > 0.3 ? 4 : [0, 1, 0, 2][Math.floor(w.time / 1.3) % 4]!),
     time: w.time, state: w.state, toast: w.toast.t > 0 ? w.toast.text : '', seed: w.level.seed, timings: b.timings,
     hit: p.hitT, kill: p.killT,
     alerted: w.enemies.filter((e) => e.state === 'chase' || e.state === 'attack').length,
@@ -168,7 +171,7 @@ function Bar({ v, max, color, w }: { v: number; max: number; color: string; w: n
   )
 }
 
-function Hud({ hud, W, H, fs, small, perf }: { hud: HudState; W: number; H: number; fs: number; small: boolean; perf: boolean }) {
+function Hud({ hud, faces, W, H, fs, small, perf }: { hud: HudState; faces: Sprite[]; W: number; H: number; fs: number; small: boolean; perf: boolean }) {
   const pad = small ? 10 : 18
   const hpColor = hud.hp > 50 ? T.green : hud.hp > 25 ? T.amber : T.red
   // Hit marker: the crosshair opens up and turns amber on a hit, red on a kill.
@@ -189,16 +192,7 @@ function Hud({ hud, W, H, fs, small, perf }: { hud: HudState; W: number; H: numb
         {hud.alerted > 0 ? <text style={txt(T.red, fs - 1)}>{`${hud.alerted} HOSTILE${hud.alerted > 1 ? 'S' : ''} ALERTED`}</text> : <text style={txt(T.mute, fs - 1)}>{`undetected`}</text>}
         <text style={txt(hud.key ? T.amber : T.mute, fs - 1)}>{hud.key ? `■ ACCESS KEY` : `□ access key`}</text>
       </div>
-      <div style={{ ...ov, left: pad, bottom: pad, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <text style={txt(hpColor, fs + 6, { fontWeight: 700 })}>{`${hud.hp}`}</text>
-        <Bar v={hud.hp} max={100} color={hpColor} w={small ? 90 : 150} />
-        <text style={txt(T.dim, fs - 2)}>{`HEALTH`}</text>
-      </div>
-      <div style={{ ...ov, right: pad, bottom: pad, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-        <text style={txt(hud.weapon === 0 ? T.blue : T.amber, fs + 6, { fontWeight: 700 })}>{`${hud.weapon === 0 ? hud.ammo : hud.rockets}`}</text>
-        <text style={txt(T.fg, fs - 1)}>{WEAPONS[hud.weapon]!.name}</text>
-        <text style={txt(T.mute, fs - 2)}>{`1 rifle ${hud.ammo}  ·  2 launcher ${hud.rockets}`}</text>
-      </div>
+      <StatusBar hud={hud} faces={faces} W={W} small={small} hpColor={hpColor} />
       {hud.toast !== '' && (
         <div style={{ ...ov, left: 0, top: H * 0.22, width: W, display: 'flex', justifyContent: 'center' }}>
           <text style={txt(T.amber, fs + 2, { fontWeight: 700 })}>{hud.toast}</text>
@@ -213,6 +207,47 @@ function Hud({ hud, W, H, fs, small, perf }: { hud: HudState; W: number; H: numb
       {hud.state !== 'play' && <End hud={hud} W={W} H={H} small={small} />}
     </>
   )
+}
+
+const AMMO = [['SHELLS', 'shells'], ['BULLETS', 'ammo'], ['ROCKETS', 'rockets']] as const
+
+// Doom-style status bar: ammo, health, arms, the reacting face, key and kills.
+function StatusBar({ hud, faces, W, small, hpColor }: { hud: HudState; faces: Sprite[]; W: number; small: boolean; hpColor: string }) {
+  const bh = small ? 58 : 76, big = small ? 22 : 30, lab = small ? 9 : 11, wc = [T.amber, T.blue, T.green][hud.weapon]!
+  const cell = (label: string, body: any, w: number) => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, width: w }}>
+      {body}
+      <text style={txt(T.mute, lab)}>{label}</text>
+    </div>
+  )
+  return (
+    <div style={{ ...ov, left: 0, bottom: 0, width: W, height: bh, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: small ? 8 : 22, backgroundColor: '#0a0c10e0', borderTopWidth: 1, borderColor: T.line }}>
+      {cell(WEAPONS[hud.weapon]!.name, <text style={txt(wc, big, { fontWeight: 700 })}>{`${hud[AMMO[hud.weapon]![1]]}`}</text>, small ? 70 : 130)}
+      {cell('HEALTH', <text style={txt(hpColor, big, { fontWeight: 700 })}>{`${hud.hp}%`}</text>, small ? 56 : 90)}
+      {!small && cell('ARMS', <div style={{ display: 'flex', gap: 4 }}>{[1, 2, 3].map((n) => (
+        <div key={n} style={{ width: 20, height: 20, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: hud.weapon === n - 1 ? '#ffffff1f' : '#00000000', borderWidth: 1, borderColor: hud.weapon === n - 1 ? wc : T.line }}>
+          <text style={txt(hud.weapon === n - 1 ? wc : T.dim, 12, { fontWeight: 700 })}>{`${n}`}</text>
+        </div>))}</div>, 80)}
+      <div style={{ display: 'flex', width: bh - 8, height: bh - 6, borderRadius: 4, backgroundColor: '#161b22', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: hud.face % 6 === 3 ? T.red : T.line }}>
+        <Face img={faces[hud.face]!} size={bh - 16} />
+      </div>
+      {cell('KILLS', <text style={txt(T.fg, small ? 16 : 20, { fontWeight: 700 })}>{`${hud.kills}/${hud.total}`}</text>, small ? 50 : 80)}
+      {cell('KEY', <div style={{ width: small ? 12 : 16, height: small ? 12 : 16, borderRadius: 3, backgroundColor: hud.key ? T.amber : '#00000000', borderWidth: 2, borderColor: hud.key ? T.amber : T.line }} />, small ? 30 : 50)}
+      {!small && <div style={{ display: 'flex', flexDirection: 'column', gap: 2, width: 110 }}>
+        {AMMO.map(([n, k], i) => (
+          <div key={n} style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <text style={txt(hud.weapon === i ? wc : T.mute, 11)}>{n}</text>
+            <text style={txt(hud.weapon === i ? wc : T.dim, 11, { fontWeight: 700 })}>{`${hud[k]}`}</text>
+          </div>))}
+      </div>}
+    </div>
+  )
+}
+
+function Face({ img, size }: { img: Sprite; size: number }) {
+  const ref = useRef<ImgInstance>(null)
+  useLayoutEffect(() => { ref.current?.setImagePixels(img.w, img.h, new Uint8Array(img.px.buffer, img.px.byteOffset, img.px.byteLength), { format: 'bgra' }) }, [img])
+  return <img ref={ref} objectFit="fill" style={{ width: Math.round(size * img.w / img.h), height: size }} />
 }
 
 function End({ hud, W, H, small }: { hud: HudState; W: number; H: number; small: boolean }) {
@@ -238,11 +273,11 @@ function Title({ hud, W, H, small, opts, audioMs, audioOn }: { hud: HudState; W:
   const rows: [string, string][] = [
     ['textures', `${MATERIALS.length} op graphs · ${t.textures.toFixed(0)} ms`],
     ['level', `seed ${hud.seed} · ${t.level.toFixed(0)} ms`],
-    ['sprites', `2 enemies · 2 weapons · ${t.sprites.toFixed(0)} ms`],
+    ['sprites', `3 monsters · 3 weapons · ${t.sprites.toFixed(0)} ms`],
     ['audio', audioOn ? `synth → wav · ${audioMs.toFixed(0)} ms` : 'muted'],
     ['assets', '0 files'],
   ]
-  if (opts.size) rows.push(['bundle', `${(opts.size.bytes / 1024).toFixed(1)} KB min · ${(opts.size.gzip / 1024).toFixed(1)} KB gz`])
+  if (opts.size) rows.push(['bundle', `${(opts.size.packed / 1024).toFixed(1)} KB packed · ${(opts.size.bytes / 1024).toFixed(1)} KB min`])
   return (
     <div style={{ ...ov, left: 0, top: 0, width: W, height: H, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: small ? 12 : 20 }}>
       <text style={txt(T.fg, small ? 40 : 72, { fontWeight: 700 })}>{`KRIEG`}</text>
@@ -256,7 +291,7 @@ function Title({ hud, W, H, small, opts, audioMs, audioOn }: { hud: HudState; W:
         ))}
       </div>
       <text style={txt(T.amber, small ? 13 : 15, { fontWeight: 700 })}>{`click or press enter`}</text>
-      {!small && <text style={txt(T.mute, 12)}>{`WASD move · drag look · click fire · space jump · c crouch · 1/2 weapon · t texture lab · r quality`}</text>}
+      {!small && <text style={txt(T.mute, 12)}>{`WASD move · drag look · click fire · space jump · c crouch · 1/2/3 weapon · t texture lab · r quality`}</text>}
     </div>
   )
 }
