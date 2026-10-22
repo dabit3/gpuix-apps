@@ -4,7 +4,7 @@ The Devin web app (app.devin.ai), rebuilt in React and painted by [GPUIX](https:
 
 ![devin-tui in Ghostty: a live session on the left, a second instance in light mode on the right](media/screenshot.png)
 
-Demo video: [`media/demo.mp4`](media/demo.mp4), real time and real input, no overlays. Ghostty (`theme = GitHub Dark High Contrast`) opens on the prompt, `devin-tui` loads the account's real sessions sorted by activity (child sessions stay collapsed under their parents), ⌘K search opens the real `TryDevin.ai` session (transcript, PR tabs) and then `Build iPhone Duo Apps`, a new prompt starts a real Devin session whose reply streams in, Cmd-D splits the pane and `devin-tui -t light -s duo` opens a second instance in light mode, the divider is dragged so both reflow, the split is zoomed, and Ctrl-C returns each pane to its prompt.
+Demo video: [`media/demo.mp4`](media/demo.mp4), real time and real input, no overlays. Ghostty (`theme = GitHub Dark High Contrast`) opens on the prompt, `devin-tui` loads the account's real sessions sorted by activity (child sessions stay collapsed under their parents) with the API key read from the macOS Keychain, ⌘K search opens the real `TryDevin.ai` session, then the sidebar opens the live Automations list and Customize, where a playbook expands and stays open through a light/dark toggle. Settings → Devin API shows the key stored in the Keychain and runs Test connection against the API. A new prompt starts a real Devin session whose reply streams in, Cmd-D splits the pane and `devin-tui -t light -s duo` opens a second instance in light mode, the divider is dragged so both reflow, the split is zoomed, and Ctrl-C returns each pane to its prompt.
 
 ## Run
 
@@ -57,6 +57,36 @@ Don't pipe anything into `devin-tui`: GPUIX 0.11.0 treats a stdin pipe as the au
 - The right panel shows the session's details (status, mode, ACUs, link, child sessions) and one tab per PR with its state and an "Open on GitHub" button.
 - The messages API returns the conversation, not Devin's shell/editor/browser steps, so live sessions show messages and work durations. The scripted demo data (`--demo`) still shows the shell, diff, browser, plan and PR cards.
 
+## API key (Settings → Devin API)
+
+You don't need environment variables. Open Settings (gear, bottom left) → **Devin API**, enter the organization ID and paste a personal access token. **Test** checks it against the API, and **Save** only stores a token that passes. The app reconnects straight away, so it switches between demo and live mode without a restart.
+
+- **Storage:** the macOS Keychain (generic password, service `devin-tui`, account `default`). The token is written through `security -i` on stdin, so it never appears in a process list. `~/.config/devin-tui/config.json` keeps only the org ID. Without a Keychain (Linux, or if the write fails) the token goes into that file instead, created `0600` in a `0700` folder.
+- **Lookup order:** `DEVIN_API_KEY` / `DEVIN_ORG_ID` / `DEVIN_API_BASE` environment variables, then the Keychain, then the file. The page tells you which one is active, and warns when an environment variable overrides the saved key.
+- **Display:** the field is masked while you type (the eye button shows it). After saving, the page shows only the first and last four characters.
+- **Remove** (click twice) deletes the Keychain item and strips the token from the file.
+
+## Pages and menus
+
+Everything in the sidebar, the composer and the session header does something. Pages backed by the API work for real. Pages the public API doesn't cover open the matching app.devin.ai page in your browser instead of faking it.
+
+| Control | What it does | Endpoint |
+|---|---|---|
+| Automations | List, pause/resume, create (name, prompt, schedule preset), delete (click twice), browse templates | `GET/POST /automations`, `PATCH/DELETE /automations/{id}`, `GET /automations/templates` |
+| Customize → Playbooks | Search, read, create, "Use in new session" (attaches it to the composer) | `GET/POST /playbooks`, `playbook_id` on create |
+| Customize → Knowledge | Search, read, enable/disable, create notes | `GET/POST /knowledge/notes`, `PUT /knowledge/notes/{id}` |
+| Security | PR totals (open / merged / closed) from your sessions, and secret names (never values) | `GET /secrets` |
+| Review | Start a review session for a PR URL or repo; lists your sessions' open PRs | `POST /sessions` |
+| Bell | Sessions that are waiting for you, finished, or failed since you last looked; "Mark all read" | derived from sessions |
+| Session ⋯ | Copy link, open in web app, open PR, start a linked session, rename (local only, the API has no rename), archive, stop | `POST /sessions/{id}/archive`, `DELETE /sessions/{id}` |
+| Composer + / / | Attach a repo, a playbook or a linked session; slash commands (`/new`, `/ask`, `/theme`, `/automate`, `/review`, `/settings`) | `repos`, `playbook_id`, `session_links` on create |
+| Agent / Ask | Ask starts a session told to answer only, tagged `ask` | `POST /sessions` |
+| Mode picker | Fusion, Ultra, Normal, Lite (`devin_mode`) | |
+| Settings | Preferences (theme, default mode, default repo, saved locally in `~/.config/devin-tui/prefs.json`), Devin API, keyboard shortcuts; everything else opens app.devin.ai | |
+| Sidebar icon, More, Help | Hide/show the sidebar; DeepWiki, Oncall, docs, app.devin.ai | |
+
+The mic and voice buttons were removed: GPUIX has no audio capture in a terminal app.
+
 ## Design
 
 Laid out after the current web app: org header with search/notifications, New session (⇧⌘O), Automations, Security, Review, Customize, More, then Sessions with search (⌘K), nested sessions and "Load more…". The home view is the Devin mark with the Agent/Ask toggle over the big composer (+, slash commands, settings, repository, mode, mic, voice, split send button). Sessions get a branch/title/PR-count header with a status chip, the transcript, the status line and the composer. Inter is bundled (`assets/fonts`) and registered with `registerFont()`.
@@ -93,19 +123,17 @@ Env flags: `GPUIX_WINDOW=1` (same as `--window`), `GPUIX_BACKGROUND=1` (don't st
 
 ## Test
 
-- `api.test.ts`: the client hits the right v3 URLs with the bearer token, follows message pages, sends the right create/message bodies and surfaces HTTP errors; status mapping, message cleanup, work-gap rows, config loading (env beats file) and theme resolution.
+- `api.test.ts`: the client hits the right v3 URLs with the bearer token, follows message pages, sends the right create/message bodies and surfaces HTTP errors; status mapping, message cleanup, work-gap rows, config loading (env beats saved) and theme resolution.
+- `keystore.test.ts` (fake `security` runner): saving goes to the Keychain and leaves only the org ID in a `0600` file; env vars beat the Keychain; Remove clears it; without a Keychain the token lands in the `0600` file and Remove strips it.
+- `features.test.tsx`: request shapes for automations, knowledge, archive/stop and create-with-playbook; then, in the GPUIX test renderer against a fake API: Automations (list, pause, create, delete), Security (PR stats, secret names), Customize (toggle a note, use a playbook in a new session), the bell, session ⋯ → Archive, and Settings → Devin API (masked entry, verify, save).
 - `app.test.tsx` (GPUIX native test renderer + automation client):
   1. Demo data: switching sessions, New session + Ultra + prompt creates a streaming session that finishes with all PR checks green, ↑/↓, ⌘K search and Esc.
   2. 700 px wide (a half split) with the CLI's prompt: compact layout, no right panel, sidebar still switches sessions.
-  3. Live mode against a fake `DevinApi`: sessions load and nest (the waiting child shows "Waiting for you"), opening one polls its messages, a message added server-side appears on the next poll, the composer calls `sendMessage`, New session + Fast calls `createSession` and the new session takes over the header, and the theme toggle switches to light and back.
+  3. Live mode against a fake `DevinApi`: sessions load and nest, opening one polls its messages, a message added server-side appears on the next poll, the composer calls `sendMessage`, New session calls `createSession`, and the theme toggle switches to light and back.
 
 ```
-(pass) Devin API client > calls the v3 org endpoints with the bearer token and follows message pages
-(pass) Devin API client > maps statuses, messages and config
-(pass) devin-terminal > switches sessions, changes agent mode, and streams a new session to a finished PR
-(pass) devin-terminal > reflows into a narrow split and starts the CLI prompt as a new session
-(pass) devin-terminal > live mode: lists real-shaped sessions, polls messages, sends, creates, and toggles light mode
- 5 pass  0 fail
+bun test   →  9 pass  0 fail  (4 files)
+bun run typecheck
 ```
 
 ## Performance (Apple Paravirtual Metal VM, not real Apple Silicon)

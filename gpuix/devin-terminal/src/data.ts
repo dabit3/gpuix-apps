@@ -1,5 +1,5 @@
 export type Status = 'running' | 'blocked' | 'finished' | 'failed' | 'sleeping'
-export type AgentMode = 'normal' | 'fast' | 'ultra'
+export type AgentMode = 'fusion' | 'ultra' | 'normal' | 'lite' | 'fast'
 
 export type Step =
   | { kind: 'shell'; id: string; cmd: string; output: string; cwd: string; exit?: number; running?: boolean }
@@ -70,9 +70,11 @@ export const STATUS_LABEL: Record<Status, string> = {
 }
 
 export const MODES: { value: AgentMode; label: string; description: string }[] = [
-  { value: 'normal', label: 'Normal', description: 'Balanced speed and depth' },
-  { value: 'fast', label: 'Fast', description: 'Quick edits, fewer checks' },
+  { value: 'fusion', label: 'Fusion', description: 'Several models, best answer wins' },
   { value: 'ultra', label: 'Ultra', description: 'Deep planning, parallel agents' },
+  { value: 'normal', label: 'Normal', description: 'Balanced speed and depth' },
+  { value: 'lite', label: 'Lite', description: 'Small tasks, lowest cost' },
+  { value: 'fast', label: 'Fast', description: 'Quick edits, fewer checks' },
 ]
 
 const PATCH_RATE_LIMIT = `diff --git a/src/middleware/rateLimit.ts b/src/middleware/rateLimit.ts

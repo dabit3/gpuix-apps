@@ -110,3 +110,19 @@ export function resolveTheme(flag: string | undefined, ghosttyConfig?: string): 
   if (/light:/i.test(theme)) return 'dark'
   return /light/i.test(theme) ? 'light' : 'dark'
 }
+
+/** Colors for GPUIX markdown/code/diff elements. */
+export function nativeTheme() {
+  return {
+    appearance: C.name,
+    accent: C.accent,
+    text: C.text,
+    textMuted: C.tertiary,
+    bg: C.card,
+    border: C.border,
+    diffAdd: C.add,
+    diffDel: C.del,
+    codeText: C.codeText,
+    codeWash: C.codeWash,
+  }
+}
