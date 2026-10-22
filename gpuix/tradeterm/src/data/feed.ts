@@ -52,7 +52,8 @@ export function parseHyperliquidCandles(rows: unknown): Bar[] {
 /** Hyperliquid's public info endpoint serves the most recent 5000 candles per coin and interval. */
 async function fromHyperliquid(sym: string, tf: Timeframe, count: number): Promise<Bar[]> {
   const now = Date.now()
-  const startTime = now - Math.min(count, 5000) * TF_SECONDS[tf] * 1000
+  // Clamp at the epoch: 3000 weekly bars would otherwise ask for a negative start time, which the API rejects.
+  const startTime = Math.max(0, now - Math.min(count, 5000) * TF_SECONDS[tf] * 1000)
   const rows = await postJson(`${HYPERLIQUID}/info`, { type: 'candleSnapshot', req: { coin: hyperliquidCoin(sym), interval: HL_TF[tf], startTime, endTime: now } })
   return dedupe(parseHyperliquidCandles(rows))
 }
@@ -110,20 +111,28 @@ export async function loadBars(sym: string, tf: Timeframe, count = 3000, opts: {
     opts.exchange === 'hyperliquid'
       ? [['hyperliquid', fromHyperliquid], ['binance', fromBinance], ['coinbase', fromCoinbase]]
       : [['binance', fromBinance], ['coinbase', fromCoinbase], ['hyperliquid', fromHyperliquid]]
+  // A source with much less history than asked for (a coin Binance listed last month) is kept as a fallback
+  // while the next source is tried; the longest series wins.
+  let best: { bars: Bar[]; source: Source } | null = null
   for (const [source, fn] of order) {
     try {
       const bars = await fn(sym, tf, count)
       if (bars.length > 10) {
-        try {
-          mkdirSync(join(home(), 'cache'), { recursive: true })
-          writeFileSync(cachePath(sym, tf), JSON.stringify(bars))
-        } catch {}
-        return { bars, source }
+        if (!best || bars.length > best.bars.length) best = { bars, source }
+        if (bars.length >= Math.min(count, 1000) * 0.9) break
+        continue
       }
       errors.push(`${source}: empty`)
     } catch (e) {
       errors.push(`${source}: ${(e as Error).message}`)
     }
+  }
+  if (best) {
+    try {
+      mkdirSync(join(home(), 'cache'), { recursive: true })
+      writeFileSync(cachePath(sym, tf), JSON.stringify(best.bars))
+    } catch {}
+    return best
   }
   try {
     const bars = JSON.parse(readFileSync(cachePath(sym, tf), 'utf8')) as Bar[]

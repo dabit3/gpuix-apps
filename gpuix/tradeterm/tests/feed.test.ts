@@ -69,7 +69,7 @@ describe('Hyperliquid', () => {
     const realFetch = globalThis.fetch
     const calls: string[] = []
     const hlBars = Array.from({ length: 50 }, (_, i) => hlRow(1_800_000_000 + i * 3600, 40 + i))
-    const mock = (binanceOk: boolean) => {
+    const mock = (binanceOk: boolean, binanceKlines = 0) => {
       calls.length = 0
       globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
         const u = String(url)
@@ -79,6 +79,7 @@ describe('Hyperliquid', () => {
           if (body.type === 'candleSnapshot') return Response.json(hlBars)
           return Response.json([{ universe: [{ name: 'HYPE' }] }, [{ midPx: '45', markPx: '45', prevDayPx: '50' }]])
         }
+        if (u.includes('binance') && binanceKlines && u.includes('klines')) return Response.json(Array.from({ length: binanceKlines }, (_, i) => [(1_800_100_000 + i * 3600) * 1000, '40', '41', '39', '40.5', '10']))
         if (u.includes('binance') && binanceOk && u.includes('ticker')) return Response.json([{ symbol: 'BTCUSDT', lastPrice: '80000', priceChangePercent: '1.5' }])
         return new Response('nope', { status: 400 })
       }) as typeof fetch
@@ -114,6 +115,19 @@ describe('Hyperliquid', () => {
       }
     })
 
+    it('auto keeps looking when Binance has only a short history and takes the longest series', async () => {
+      mock(true, 20)
+      delete process.env.TRADETERM_OFFLINE
+      try {
+        const d = await loadBars('HYPE-USD', '1h', 50)
+        expect(calls[0]).toBe('binance')
+        expect(d.source).toBe('hyperliquid')
+        expect(d.bars.length).toBe(50)
+      } finally {
+        restore()
+      }
+    })
+
     it('tickers: Binance answers what it can, Hyperliquid fills the rest', async () => {
       mock(true)
       try {
@@ -125,5 +139,18 @@ describe('Hyperliquid', () => {
         restore()
       }
     })
+  })
+})
+
+describe('chart drawing', () => {
+  it('drawMain survives a view that sits past the end of a shorter series', () => {
+    const { drawMain, mainFrame } = require('../src/chart') as typeof import('../src/chart')
+    const { Canvas } = require('../src/raster') as typeof import('../src/raster')
+    const bars = sampleBars('HYPE-USD', '1h', 679)
+    const spec = { bars, view: { start: 2870, end: 3006 }, log: false, chart: 'candles' as const, overlays: [], drawings: [], pending: null, backtest: null, highlightTrade: null }
+    const cv = new Canvas()
+    cv.resize(400, 300)
+    const f = mainFrame(spec, 400, 300)
+    expect(() => drawMain(cv, spec, f, [], [])).not.toThrow()
   })
 })
