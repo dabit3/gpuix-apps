@@ -317,7 +317,7 @@ export function SessionExtras({ session, client }: { session: Session; client: D
       </div>
       {client?.setTags && (
         <div style={row({ gap: 6 })}>
-          <div style={{ flexGrow: 1 }}>
+          <div style={{ flexGrow: 1, flexShrink: 1, minWidth: 0 }}>
             <Field testId="tag-input" value={draft} onChange={setDraft} placeholder="Add a tag" />
           </div>
           <Btn small label="Add" testId="tag-add" disabled={!draft.trim()} onClick={add} />
