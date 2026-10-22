@@ -35,7 +35,7 @@ import {
 } from './data'
 import { byRecent, filterSessions, formatDuration, reducer, type PanelTab, type State } from './state'
 import { Icon, type IconName } from './icons'
-import { C, setTheme, type ThemeName } from './theme'
+import { C, nativeTheme, setTheme, type ThemeName } from './theme'
 import type { DevinApi } from './api'
 import { eventsFromMessages, sessionFromApi, statusLine } from './live'
 import type { ApiPlaybook, ApiSession } from './api'
@@ -54,21 +54,6 @@ const NO_REPO = 'No repository'
 const MAX_PAGES = 20
 const CLEAR = '#00000000'
 const PLACEHOLDER = 'Ask Devin to build features, fix bugs, or work on your code'
-
-function nativeTheme() {
-  return {
-    appearance: C.name,
-    accent: C.accent,
-    text: C.text,
-    textMuted: C.tertiary,
-    bg: C.card,
-    border: C.border,
-    diffAdd: C.add,
-    diffDel: C.del,
-    codeText: C.codeText,
-    codeWash: C.codeWash,
-  }
-}
 
 function statusColor(s: Status): string {
   return s === 'running' ? C.blue : s === 'blocked' ? C.orange : s === 'finished' ? C.add : s === 'failed' ? C.del : C.ghost

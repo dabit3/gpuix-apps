@@ -126,6 +126,7 @@ describeNative('devin-terminal features', () => {
     await app.getByTestId('customize-tab-playbooks').click()
     await until(() => text().includes('Release checklist'), 'playbooks again')
     await app.getByTestId('playbook-pb1').click()
+    expect(await app.getByTestId('playbook-body-pb1').count()).toBe(1)
     await app.getByTestId('playbook-use-pb1').click()
     await until(() => text().includes('Playbook · Release checklist'), 'playbook chip')
     await app.getByTestId('composer').fill('Ship it')

@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, type StyleDesc } from '@gpuix/react'
 import { Icon, type IconName } from './icons'
-import { C } from './theme'
+import { C, nativeTheme } from './theme'
 import { DevinClient, describeTrigger, SCHEDULE_PRESETS, timeAgo, type ApiAutomation, type ApiNote, type ApiPlaybook, type ApiSecret, type ApiTemplate, type DevinApi } from './api'
 import type { Session } from './data'
 
@@ -575,7 +575,7 @@ export function CustomizeView({ api, tab, onTab, onUsePlaybook, narrow }: { api:
                     </div>
                     {openId === p.playbook_id && (
                       <>
-                        <markdown style={{ fontFamily: SANS, fontSize: 13, color: C.secondary }}>{p.body.slice(0, 4000)}</markdown>
+                        <markdown testId={`playbook-body-${p.playbook_id}`} source={p.body.slice(0, 4000)} theme={nativeTheme()} style={{ width: '100%', minWidth: 0, fontFamily: SANS, fontSize: 13, lineHeight: 20, color: C.secondary }} />
                         <div style={row({ gap: 8 })}>
                           <Btn testId={`playbook-use-${p.playbook_id}`} small primary label="Use in new session" onClick={() => onUsePlaybook(p)} />
                           <Btn small label="Open on web" icon="share" onClick={() => openUrl(`${WEB}/playbooks/${p.playbook_id}`)} />
@@ -599,7 +599,7 @@ export function CustomizeView({ api, tab, onTab, onUsePlaybook, narrow }: { api:
                       <Toggle testId={`note-toggle-${n.note_id}`} on={n.is_enabled} onChange={(v) => toggleNote(n, v)} />
                     </div>
                     <T size={12} color={C.tertiary} style={{ whiteSpace: openId === n.note_id ? 'normal' : 'nowrap', textOverflow: 'ellipsis' }}>{`${n.folder_path ? `${n.folder_path} · ` : ''}Trigger: ${n.trigger}`}</T>
-                    {openId === n.note_id && <markdown style={{ fontFamily: SANS, fontSize: 13, color: C.secondary }}>{n.body.slice(0, 4000)}</markdown>}
+                    {openId === n.note_id && <markdown testId={`note-body-${n.note_id}`} source={n.body.slice(0, 4000)} theme={nativeTheme()} style={{ width: '100%', minWidth: 0, fontFamily: SANS, fontSize: 13, lineHeight: 20, color: C.secondary }} />}
                   </Card>
                 ))}
       </div>
