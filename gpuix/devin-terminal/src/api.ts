@@ -42,6 +42,7 @@ export type ApiAutomation = {
   next_run_at?: number | string | null
   last_invocation?: { created_at?: number; status?: string; session_id?: string } | null
 }
+export type ApiAttachment = { attachment_id: string; name: string; url: string; content_type?: string | null; source: 'devin' | 'user' }
 export type ApiTemplate = { template_id: string; name: string; description: string; category: string; required_integrations: string[]; triggers: ApiTrigger[] }
 export type CreateSessionOpts = { mode?: string; repos?: string[]; tags?: string[]; playbookId?: string; title?: string; sessionLinks?: string[] }
 
@@ -68,6 +69,9 @@ export interface DevinApi {
   createAutomation?(a: { name: string; rrule: string; prompt: string }): Promise<ApiAutomation>
   setAutomationEnabled?(id: string, enabled: boolean): Promise<ApiAutomation>
   deleteAutomation?(id: string): Promise<unknown>
+  listAttachments?(id: string): Promise<ApiAttachment[]>
+  /** Short-lived direct download URL for an attachment (the API answers with a presigned redirect). */
+  attachmentUrl?(a: ApiAttachment): Promise<string>
 }
 
 export class DevinClient implements DevinApi {
@@ -136,6 +140,19 @@ export class DevinClient implements DevinApi {
 
   terminateSession(id: string) {
     return this.req<ApiSession>(`/sessions/${id}`, { method: 'DELETE' })
+  }
+
+  async listAttachments(id: string): Promise<ApiAttachment[]> {
+    const r = await this.req<ApiAttachment[] | { items: ApiAttachment[] }>(`/sessions/${id}/attachments`)
+    return Array.isArray(r) ? r : (r.items ?? [])
+  }
+
+  async attachmentUrl(a: ApiAttachment): Promise<string> {
+    const path = `/attachments/${a.attachment_id}/${encodeURIComponent(a.name)}`
+    const res = await this.f(`${this.base}${path}`, { headers: { Authorization: `Bearer ${this.cfg.apiKey}` }, redirect: 'manual' })
+    const loc = res.headers.get('location')
+    if (res.status >= 300 && res.status < 400 && loc) return loc
+    throw new Error(`Devin API ${res.status} on ${path}`)
   }
 
   private async all<T>(path: string, max = 5): Promise<T[]> {

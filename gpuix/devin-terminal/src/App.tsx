@@ -39,7 +39,8 @@ import { C, nativeTheme, setTheme, type ThemeName } from './theme'
 import type { DevinApi } from './api'
 import { eventsFromMessages, sessionFromApi, statusLine } from './live'
 import type { ApiPlaybook, ApiSession } from './api'
-import { ActionMenu, AutomationsView, Btn, copyText, CustomizeView, Field, notificationsFor, NotificationsView, ReviewView, SecurityView, SettingsView, WEB, type MenuAction, type View } from './views'
+import { ActionMenu, AutomationsView, Btn, copyText, CustomizeView, Field, notificationsFor, NotificationsView, ReviewView, SecurityView, SettingsView, useSticky, WEB, type MenuAction, type View } from './views'
+import { clearQuarantine, originalPath, previewPath, shotsFrom, type PreviewDeps, type Shot } from './computer'
 import { loadPrefs, savePrefs, type Prefs } from './prefs'
 
 export { C }
@@ -59,11 +60,18 @@ function statusColor(s: Status): string {
   return s === 'running' ? C.blue : s === 'blocked' ? C.orange : s === 'finished' ? C.add : s === 'failed' ? C.del : C.ghost
 }
 
-function openUrl(url: string) {
-  if (!url || typeof Bun === 'undefined') return
+let urlOpener = (url: string) => {
+  if (typeof Bun === 'undefined') return
   try {
     Bun.spawn(['open', url], { stdout: 'ignore', stderr: 'ignore' })
   } catch {}
+}
+/** Swaps how links open (tests record them instead of launching a browser). */
+export function setUrlOpener(fn: (url: string) => void) {
+  urlOpener = fn
+}
+function openUrl(url: string) {
+  if (url) urlOpener(url)
 }
 
 /** Window-level key handler; `app.tsx` forwards `render({ onKeyDown })` here. */
@@ -951,15 +959,18 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
   )
 }
 
-function LivePanel({ session, sessions, tab, onTab, onSelect }: { session: Session; sessions: Session[]; tab: PanelTab; onTab: (t: PanelTab) => void; onSelect: (id: string) => void }) {
+function LivePanel({ session, sessions, tab, onTab, onSelect, client, pollMs, previews }: { session: Session; sessions: Session[]; tab: PanelTab; onTab: (t: PanelTab) => void; onSelect: (id: string) => void; client: DevinApi | null; pollMs: number; previews?: Omit<PreviewDeps, 'resolve'> }) {
   const live = session.live!
-  const tabs = [{ id: 'details', label: 'Session', icon: 'list' as IconName }, ...live.prs.map((p, i) => ({ id: `pr-${i}`, label: `PR #${prLabel(p.url).number}`, icon: 'pr' as IconName }))]
-  const current = tabs.some((t) => t.id === tab) ? tab : 'details'
+  const tabs = [{ id: 'computer', label: 'Computer', icon: 'monitor' as IconName }, { id: 'details', label: 'Session', icon: 'list' as IconName }, ...live.prs.map((p, i) => ({ id: `pr-${i}`, label: `PR #${prLabel(p.url).number}`, icon: 'pr' as IconName }))]
+  const current = tabs.some((t) => t.id === tab) ? tab : 'computer'
   const children = sessions.filter((s) => s.live?.parentId === session.id)
   const pr = current.startsWith('pr-') ? live.prs[Number(current.slice(3))] : undefined
   return (
     <>
       <PanelTabs tabs={tabs} tab={current} onTab={onTab} />
+      {current === 'computer' ? (
+        <ComputerPanel key={session.id} session={session} client={client} pollMs={pollMs} previews={previews} />
+      ) : (
       <div style={{ ...col(), flexGrow: 1, minHeight: 0, paddingLeft: 18, paddingRight: 18, paddingTop: 8, overflow: 'scroll' }}>
         {pr ? (
           <div style={col({ gap: 12, paddingTop: 8 })}>
@@ -1010,7 +1021,126 @@ function LivePanel({ session, sessions, tab, onTab, onSelect }: { session: Sessi
           </>
         )}
       </div>
+      )}
     </>
+  )
+}
+
+/** Devin's computer, as far as the public API shows it: the screenshots and recordings Devin posts, newest first. */
+function ComputerPanel({ session, client, pollMs, previews }: { session: Session; client: DevinApi | null; pollMs: number; previews?: Omit<PreviewDeps, 'resolve'> }) {
+  const [shots, setShots] = useState<Shot[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [pick, setPick] = useSticky<number>(`computer-${session.id}`, -1)
+  const [preview, setPreview] = useState<{ id: string; path: string | null } | null>(null)
+  const running = session.status === 'running' || session.status === 'blocked'
+  useEffect(() => {
+    if (!client?.listAttachments) return
+    let alive = true
+    const load = () =>
+      client.listAttachments!(session.id)
+        .then((list) => {
+          if (!alive) return
+          const next = shotsFrom(list)
+          setShots((prev) => (prev && prev.length === next.length && prev.at(-1)?.attachment_id === next.at(-1)?.attachment_id ? prev : next))
+          setError(null)
+        })
+        .catch((e: Error) => alive && setError(e.message))
+    load()
+    const timer = running ? setInterval(load, pollMs) : null
+    return () => {
+      alive = false
+      if (timer) clearInterval(timer)
+    }
+  }, [client, session.id, running, pollMs])
+  const n = shots?.length ?? 0
+  const idx = n ? (pick < 0 || pick >= n ? n - 1 : pick) : -1
+  const shot = idx >= 0 ? shots![idx]! : null
+  const following = pick < 0 || pick >= n - 1
+  useEffect(() => {
+    if (!shot || !client?.attachmentUrl) return
+    let alive = true
+    previewPath(shot, { ...previews, resolve: (a) => client.attachmentUrl!(a) }).then((path) => alive && setPreview({ id: shot.attachment_id, path }))
+    return () => {
+      alive = false
+    }
+  }, [shot?.attachment_id, client])
+  const go = (i: number) => setPick(i >= n - 1 ? -1 : Math.max(0, i))
+  const [opening, setOpening] = useState(false)
+  // app.devin.ai attachment links need a web-app login and S3 serves them as downloads, so fetch the original and open it locally.
+  const openOriginal = (s: Shot) => {
+    const fallback = () => openUrl(session.live?.url ?? s.url)
+    if (!client?.attachmentUrl) return fallback()
+    setOpening(true)
+    originalPath(s, { ...previews, resolve: (a) => client.attachmentUrl!(a) })
+      .then((file) => (file ? (clearQuarantine(file), openUrl(file)) : fallback()))
+      .finally(() => setOpening(false))
+  }
+  const ready = preview && shot && preview.id === shot.attachment_id ? preview : null
+  if (error && !shots) return <Empty text={error.slice(0, 80)} />
+  if (!shots) return <Empty text="Loading Devin's screenshots…" />
+  if (!shot)
+    return (
+      <div style={{ ...col({ gap: 8, alignItems: 'center', justifyContent: 'center' }), flexGrow: 1, padding: 28 }}>
+        <Icon name="monitor" size={22} color={C.ghost} />
+        <text testId="computer-empty" style={{ fontFamily: SANS, color: C.text, fontSize: 13.5, fontWeight: 500 }}>No screenshots yet</text>
+        <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 12.5, lineHeight: 18, textAlign: 'center' }}>
+          Devin's screen shows up here whenever Devin posts a screenshot or recording in this session.
+        </text>
+      </div>
+    )
+  const recent = shots.map((s, i) => ({ s, i })).slice(-6).reverse()
+  return (
+    <div style={{ ...col({ gap: 10 }), flexGrow: 1, minHeight: 0, padding: 14 }}>
+      <div style={{ ...row({ gap: 6 }), flexShrink: 0 }}>
+        <text testId="computer-name" style={{ fontFamily: MONO, color: C.secondary, fontSize: 12, flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{shot.name}</text>
+        <text testId="computer-count" style={{ fontFamily: SANS, color: C.ghost, fontSize: 12.5, flexShrink: 0 }}>{`${idx + 1} / ${n}`}</text>
+        <IconButton icon="arrowLeft" testId="computer-prev" size={14} box={26} onClick={() => idx > 0 && go(idx - 1)} color={idx > 0 ? C.secondary : C.ghost} />
+        <IconButton icon="arrowRight" testId="computer-next" size={14} box={26} onClick={() => idx < n - 1 && go(idx + 1)} color={idx < n - 1 ? C.secondary : C.ghost} />
+      </div>
+      <Button
+        testId="computer-stage"
+        onClick={() => openOriginal(shot)}
+        style={{ ...col({ alignItems: 'center', justifyContent: 'center' }), position: 'relative', flexGrow: 1, minHeight: 200, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden', cursor: 'pointer' }}
+      >
+        {ready?.path ? (
+          <img testId="computer-image" src={ready.path} objectFit="contain" alt={shot.name} style={{ width: '100%', height: '100%', pointerEvents: 'none' }} />
+        ) : (
+          <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 13, pointerEvents: 'none' }}>{ready ? 'No preview here. Click to open it in the browser.' : 'Loading preview…'}</text>
+        )}
+        {shot.kind === 'video' && (
+          <div style={{ ...row({ gap: 5 }), position: 'absolute', top: 10, left: 10, height: 24, paddingLeft: 9, paddingRight: 9, borderRadius: 12, backgroundColor: C.sendBg, pointerEvents: 'none' }}>
+            <text testId="computer-video-badge" style={{ fontFamily: SANS, color: C.sendFg, fontSize: 12, fontWeight: 500 }}>▶ Recording</text>
+          </div>
+        )}
+      </Button>
+      <div style={{ ...row({ gap: 8 }), flexShrink: 0 }}>
+        {following ? (
+          <>
+            <div style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: running ? C.add : C.ghost }} />
+            <text testId="computer-following" style={{ fontFamily: SANS, color: C.tertiary, fontSize: 12.5, flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{running ? 'Showing the latest · updates as Devin posts' : 'Latest from this session'}</text>
+          </>
+        ) : (
+          <div style={{ flexGrow: 1 }}>
+            <Btn label="Jump to latest" testId="computer-latest" small onClick={() => setPick(-1)} />
+          </div>
+        )}
+        <Btn label={opening ? 'Opening…' : 'Open'} icon="link" testId="computer-open" small onClick={() => !opening && openOriginal(shot)} />
+      </div>
+      <div style={{ ...col({ gap: 1 }), flexShrink: 0 }}>
+        {recent.map(({ s, i }) => (
+          <div
+            key={s.attachment_id}
+            testId={`computer-item-${i}`}
+            onClick={() => go(i)}
+            style={{ ...row({ gap: 8 }), height: 28, paddingLeft: 8, paddingRight: 8, borderRadius: 7, cursor: 'pointer', backgroundColor: i === idx ? C.selected : C.canvas, hover: { backgroundColor: i === idx ? C.selected : C.hover } }}
+          >
+            <Icon name={s.kind === 'video' ? 'laptop' : 'monitor'} size={13} color={i === idx ? C.text : C.ghost} />
+            <text style={{ fontFamily: MONO, color: i === idx ? C.text : C.tertiary, fontSize: 11.5, flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{s.name}</text>
+            <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 11.5, flexShrink: 0 }}>{s.kind === 'video' ? 'Recording' : 'Screenshot'}</text>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -1125,6 +1255,8 @@ export interface DevinAppProps {
   initialPrompt?: string
   /** Real Devin API client. Without one the app runs on scripted demo data. */
   client?: DevinApi | null
+  /** Overrides for where attachment previews are cached and how video posters are made (tests). */
+  previews?: Omit<PreviewDeps, 'resolve'>
   /** Live mode: select the first session matching this query once the list loads. */
   sessionQuery?: string
   theme?: ThemeName
@@ -1140,6 +1272,7 @@ export function DevinApp({
   initialMode = 'normal',
   initialPrompt,
   client = null,
+  previews,
   sessionQuery,
   theme = 'dark',
   userName = 'Nader Dabit',
@@ -1167,7 +1300,7 @@ export function DevinApp({
     search: '',
     mode: initialMode,
     panelOpen: true,
-    panelTab: live ? 'details' : 'shell',
+    panelTab: live ? 'computer' : 'shell',
     repo: initialRepo ?? (live ? NO_REPO : REPOS[1]!),
   }))
   const [draft, setDraft] = useState('')
@@ -1223,6 +1356,7 @@ export function DevinApp({
   const { width: hostWidth } = useWindowSize()
   const compact = hostWidth > 0 && hostWidth < 1080
   const tiny = hostWidth > 0 && hostWidth < 600
+  const panelWidth = live && (state.panelTab === 'computer' || !state.panelTab) && hostWidth >= 1360 ? 520 : PANEL_WIDTH
   const visible = useMemo(() => filterSessions(state.sessions, state.search), [state.sessions, state.search])
   const selected = state.sessions.find((s) => s.id === state.selectedId) ?? null
   const repos = useMemo(() => {
@@ -1739,10 +1873,10 @@ export function DevinApp({
         )}
       </div>
       {selected && view === 'home' && !compact && (
-        <motion.div initial={false} animate={{ width: state.panelOpen ? PANEL_WIDTH : 0 }} transition={{ duration: 0.25, ease: 'easeOut' }} style={{ height: '100%', overflow: 'hidden', flexShrink: 0 }}>
-          <div style={{ ...col(), width: PANEL_WIDTH, height: '100%', backgroundColor: C.canvas, borderLeftWidth: 1, borderColor: C.border }}>
+        <motion.div initial={false} animate={{ width: state.panelOpen ? panelWidth : 0 }} transition={{ duration: 0.25, ease: 'easeOut' }} style={{ height: '100%', overflow: 'hidden', flexShrink: 0 }}>
+          <div style={{ ...col(), width: panelWidth, height: '100%', backgroundColor: C.canvas, borderLeftWidth: 1, borderColor: C.border }}>
             {selected.live ? (
-              <LivePanel session={selected} sessions={state.sessions} tab={state.panelTab} onTab={(tab) => dispatch({ type: 'panel', tab })} onSelect={select} />
+              <LivePanel session={selected} sessions={state.sessions} tab={state.panelTab} onTab={(tab) => dispatch({ type: 'panel', tab })} onSelect={select} client={client} pollMs={pollMs} previews={previews} />
             ) : (
               <DemoPanel session={selected} tab={state.panelTab} onTab={(tab) => dispatch({ type: 'panel', tab })} />
             )}
