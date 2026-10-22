@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process'
-import { watch, type FSWatcher } from 'node:fs'
+import { realpathSync, statfsSync, watch, type FSWatcher } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join, relative, sep } from 'node:path'
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { isTerminal, useGpuix, useWindowSize } from '@gpuix/react'
+import { AnimatePresence, isTerminal, motion, useGpuix, useWindowSize } from '@gpuix/react'
 import {
   copyInto,
   kindOf,
@@ -16,12 +16,15 @@ import {
   walk,
   writeClip,
   formatSize,
+  imageSize,
   type Clip,
   type Entry,
 } from './fs'
 import { fuzzyMatch, highlightRuns } from './fuzzy'
 import { ICON } from './icons'
-import { Icon, Preview } from './Preview'
+import { EntryIcon, exposureLine, Icon, Preview } from './Preview'
+import { gitInfo, type GitCode, type GitInfo } from './git'
+import { readExif } from './media'
 import { T } from './theme'
 
 export const ROW = 30
@@ -37,9 +40,21 @@ export interface YardProps {
   clipPollMs?: number
 }
 
-type Mode = { kind: 'browse' } | { kind: 'jump' } | { kind: 'rename'; target: Entry } | { kind: 'mkdir' } | { kind: 'trash'; targets: string[] }
+type Mode = { kind: 'browse' } | { kind: 'look' } | { kind: 'jump' } | { kind: 'rename'; target: Entry } | { kind: 'mkdir' } | { kind: 'trash'; targets: string[] }
 type KeyEvt = { key?: string; keyChar?: string; modifiers?: { shift?: boolean; ctrl?: boolean; alt?: boolean; cmd?: boolean }; stopPropagation?: () => void; preventDefault?: () => void }
 type Toast = { text: string; tone: 'ok' | 'err' | 'info'; at: number }
+
+const isPhoto = (e: Entry | undefined) => !!e && e.kind === 'image' && !e.name.toLowerCase().endsWith('.svg')
+const realDir = (d: string | null) => {
+  if (!d) return ''
+  try {
+    return realpathSync(d)
+  } catch {
+    return d
+  }
+}
+const GIT_COLOR: Record<GitCode, string> = { M: T.orange, A: T.green, R: T.green, '?': T.green, D: T.red }
+const GIT_LABEL: Record<GitCode, string> = { M: 'Modified', A: 'Added', R: 'Renamed', '?': 'New', D: 'Deleted' }
 
 const defaultOpen = (p: string) => spawn('open', [p], { detached: true, stdio: 'ignore' }).unref()
 
@@ -61,6 +76,7 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
   const [toast, setToast] = useState<Toast | null>(null)
   const [clip, setClip] = useState<Clip | null>(() => readClip())
   const [hover, setHover] = useState<string | null>(null)
+  const [git, setGit] = useState<GitInfo | null>(null)
   const rootRef = useRef<{ id: number } | null>(null)
   const offsets = useRef<Record<string, number>>({})
   const wheelAcc = useRef(0)
@@ -72,6 +88,26 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
   const selName = cursor[cwd]
   const idx = Math.max(0, entries.findIndex((e) => e.name === selName))
   const current = entries[idx]
+
+  const photos = useMemo(() => entries.filter(isPhoto), [entries])
+  const realCwd = useMemo(() => realDir(cwd), [cwd])
+  const realParent = useMemo(() => realDir(parent), [parent])
+  useEffect(() => {
+    let alive = true
+    gitInfo(cwd).then((g) => alive && setGit(g))
+    return () => {
+      alive = false
+    }
+  }, [cwd, version])
+  const free = useMemo(() => {
+    try {
+      const s = statfsSync(cwd)
+      return s.bavail * s.bsize
+    } catch {
+      return null
+    }
+  }, [cwd, version])
+  const totalBytes = useMemo(() => entries.reduce((n, e) => n + (e.isDir ? 0 : e.size), 0), [entries])
 
   const showParent = width >= 900 && !!parent
   const showPreview = width >= 520
@@ -137,7 +173,10 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
   const enter = (e = current) => {
     if (!e) return
     if (e.isDir) goto(e.path)
-    else {
+    else if (isPhoto(e)) {
+      select(e.name)
+      setMode({ kind: 'look' })
+    } else {
       openFile(e.path)
       flash(`Opened ${e.name}`, 'info')
     }
@@ -256,6 +295,16 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
     const ch = e.keyChar ?? ''
     const m = e.modifiers ?? {}
     if (m.ctrl && key === 'c') return quit()
+    if (mode.kind === 'look') {
+      const c = ch || key
+      const i = Math.max(0, photos.findIndex((p) => p.path === current?.path))
+      const step = (d: number) => photos.length && select(photos[(i + d + photos.length) % photos.length]!.name)
+      if (key === 'right' || key === 'down' || c === 'l' || c === 'j') step(1)
+      else if (key === 'left' || key === 'up' || c === 'h' || c === 'k') step(-1)
+      else if (key === 'escape' || key === 'enter' || key === 'space' || c === ' ' || c === 'q') close()
+      else if (c === 'o' && current) openFile(current.path)
+      return
+    }
     if (mode.kind !== 'browse') {
       if (key === 'escape') return close()
       if (key === 'enter') return submit()
@@ -307,7 +356,10 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
       setHidden((h) => !h)
       flash(hidden ? 'Hiding dotfiles' : 'Showing dotfiles', 'info')
     } else if (c === '~') goto(home)
-    else if (c === 'q') quit()
+    else if (c === 'o' && current) {
+      openFile(current.path)
+      flash(`Opened ${current.name}`, 'info')
+    } else if (c === 'q') quit()
   }
 
   const onWheel = (deltaY: number, precise: boolean | undefined) => {
@@ -367,6 +419,13 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
             )
           })}
         </div>
+        {git?.branch && (
+          <div testId="git-branch" style={{ display: 'flex', alignItems: 'center', gap: 6, height: 26, paddingLeft: 8, paddingRight: 8, flexShrink: 0 }}>
+            <svg source={ICON.branch} style={{ width: 12, height: 12, color: T.faint }} />
+            <text style={{ color: T.dim, fontSize: 12, whiteSpace: 'nowrap' }}>{git.branch.length > 28 ? git.branch.slice(0, 27) + '…' : git.branch}</text>
+            {git.status.size > 0 && <div style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: T.orange }} />}
+          </div>
+        )}
         <div
           testId="toggle-hidden"
           onClick={() => setHidden((h) => !h)}
@@ -391,6 +450,8 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
             hover={hover}
             setHover={setHover}
             flex={2}
+            git={git?.status}
+            realDir={realParent}
             onClick={(e) => (e.isDir ? goto(e.path) : parent && goto(parent, e.name))}
             onWheel={() => {}}
           />
@@ -407,20 +468,27 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
           hover={hover}
           setHover={setHover}
           flex={3}
+          git={git?.status}
+          realDir={realCwd}
           onClick={(e, i, clicks) => clickRow(e, i, clicks)}
           onAux={(e) => toggleMark(e)}
           onWheel={onWheel}
         />
         {showPreview && (
           <div style={{ display: 'flex', flexGrow: 5, flexBasis: 0, minWidth: 0 }}>
-            <Preview entry={current} width={(width * 5) / (showParent ? 10 : 8)} height={listH} showHidden={hidden} version={version} />
+            <Preview entry={current} width={(width * 5) / (showParent ? 10 : 8)} height={listH} showHidden={hidden} version={version} siblings={photos} onPick={(n) => select(n)} />
           </div>
         )}
       </div>
 
       {/* Status bar */}
       <div testId="status" style={{ display: 'flex', alignItems: 'center', height: BOTTOM, paddingLeft: 20, paddingRight: 20, gap: 16, flexShrink: 0 }}>
-        <text testId="position" style={{ color: T.faint, fontSize: 12 }}>{entries.length ? `${idx + 1}/${entries.length}` : '0/0'}</text>
+        <text testId="position" style={{ color: T.dim, fontSize: 12 }}>{entries.length ? `${idx + 1}/${entries.length}` : '0/0'}</text>
+        {!toast && !marks.size && !clip && (
+          <text testId="summary" style={{ color: T.faint, fontSize: 12, whiteSpace: 'nowrap' }}>
+            {[totalBytes ? formatSize(totalBytes) : '', free !== null ? `${formatSize(free)} available` : ''].filter(Boolean).join('  ·  ')}
+          </text>
+        )}
         {marks.size > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <svg source={ICON.check} style={{ width: 12, height: 12, color: T.green }} />
@@ -436,15 +504,25 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
           </div>
         )}
         {toast && (
+          <motion.div key={toast.at} initial={{ opacity: 0, left: -6 }} animate={{ opacity: 1, left: 0 }} transition={{ duration: 0.18, ease: 'easeOut' }} style={{ display: 'flex', position: 'relative', minWidth: 0, flexShrink: 1 }}>
           <text testId="toast" style={{ color: toast.tone === 'err' ? T.red : toast.tone === 'ok' ? T.green : T.fg, fontSize: 12, whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 }}>
             {toast.text}
           </text>
+          </motion.div>
         )}
         <div style={{ flexGrow: 1 }} />
         <Hints width={width} />
       </div>
 
-      {mode.kind !== 'browse' && (
+      <AnimatePresence>
+        {mode.kind === 'look' && current && isPhoto(current) && (
+          <Viewer key="viewer" entry={current} index={photos.findIndex((p) => p.path === current.path)} count={photos.length} width={width} height={height - chromeTop} top={chromeTop} onClose={close} onStep={(d) => {
+            const i = Math.max(0, photos.findIndex((p) => p.path === current.path))
+            select(photos[(i + d + photos.length) % photos.length]!.name)
+          }} />
+        )}
+      </AnimatePresence>
+      {mode.kind !== 'browse' && mode.kind !== 'look' && (
         <Overlay
           mode={mode}
           width={width}
@@ -487,21 +565,33 @@ function Column(props: {
   hover: string | null
   setHover: (p: string | null) => void
   flex: number
+  git?: Map<string, GitCode>
+  realDir: string
   onClick: (e: Entry, i: number, clicks: number) => void
   onAux?: (e: Entry) => void
   onWheel: (deltaY: number, precise: boolean | undefined) => void
 }) {
   const { entries, cursor, offset, visible, active, marks, hover } = props
   const rows = entries.slice(offset, offset + visible)
+  const inView = cursor >= offset && cursor < offset + visible
+  const selMarked = inView && marks.has(entries[cursor]!.path)
   return (
     <div
       testId={`col-${props.testId}`}
       onScroll={(e: { deltaY?: number; precise?: boolean }) => props.onWheel(e.deltaY ?? 0, e.precise)}
-      style={{ display: 'flex', flexDirection: 'column', flexGrow: props.flex, flexBasis: 0, minWidth: 0, paddingTop: 4, paddingLeft: 8, paddingRight: 8, backgroundColor: T.bg }}
+      style={{ display: 'flex', flexDirection: 'column', flexGrow: props.flex, flexBasis: 0, minWidth: 0, paddingTop: 4, paddingLeft: 8, paddingRight: 8, position: 'relative' }}
     >
+      {inView && (
+        <motion.div
+          initial={false}
+          animate={{ top: 4 + (cursor - offset) * ROW }}
+          transition={{ duration: 0.14, ease: [0.25, 0.8, 0.25, 1] }}
+          style={{ position: 'absolute', left: 8, right: 8, height: ROW, borderRadius: 7, backgroundColor: active ? (selMarked ? T.greenSoft : T.blueSoft) : T.raised }}
+        />
+      )}
       {entries.length === 0 && (
         <div style={{ display: 'flex', padding: 14 }}>
-          <text style={{ color: T.dim, fontSize: 13 }}>Empty folder</text>
+          <text style={{ color: T.faint, fontSize: 13 }}>Empty folder</text>
         </div>
       )}
       {rows.map((e, k) => {
@@ -511,6 +601,7 @@ function Column(props: {
         const cut = props.clipPaths?.includes(e.path)
         const solid = sel && active
         const fg = marked ? T.green : solid || sel ? T.fg : e.hidden || cut ? T.faint : active ? T.fg : T.muted
+        const g = props.git?.get(join(props.realDir, e.name))
         return (
           <div
             key={e.path}
@@ -527,13 +618,20 @@ function Column(props: {
               flexShrink: 0,
               paddingLeft: 10,
               paddingRight: 10,
-              borderRadius: 6,
+              borderRadius: 7,
               cursor: 'pointer',
-              backgroundColor: solid ? (marked ? T.greenSoft : T.blueSoft) : sel ? T.raised : hover === e.path ? '#0f1319' : T.bg,
+              backgroundColor: !sel && hover === e.path ? '#0f131a' : undefined,
+              opacity: cut ? 0.5 : 1,
             }}
           >
-            <Icon entry={e} size={15} color={solid && !e.isDir ? T.fg : undefined} />
+            <EntryIcon entry={e} size={15} color={solid && !e.isDir ? T.fg : undefined} />
             <text style={{ color: fg, fontSize: 13.5, fontWeight: solid ? 500 : 400, flexGrow: 1, flexBasis: 0, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{e.name}</text>
+            {g && (
+              <div testId={`git-${e.name}`} style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                {solid && active && <text style={{ color: GIT_COLOR[g], fontSize: 11 }}>{GIT_LABEL[g]}</text>}
+                <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: GIT_COLOR[g] }} />
+              </div>
+            )}
             {marked && <svg source={ICON.check} style={{ width: 13, height: 13, color: T.green, flexShrink: 0 }} />}
             {active && (
               <text style={{ color: solid ? T.muted : T.faint, fontSize: 12, flexShrink: 0 }}>{e.isDir ? (e.children !== undefined ? String(e.children) : '') : formatSize(e.size)}</text>
@@ -543,6 +641,51 @@ function Column(props: {
         )
       })}
     </div>
+  )
+}
+
+function Viewer(props: { entry: Entry; index: number; count: number; width: number; height: number; top: number; onClose: () => void; onStep: (d: number) => void }) {
+  const { entry, width, height } = props
+  const dims = useMemo(() => imageSize(entry.path), [entry.path])
+  const exif = useMemo(() => readExif(entry.path), [entry.path])
+  const ratio = dims ? dims.width / dims.height : 1.5
+  const maxW = width - 96
+  const maxH = height - 150
+  const w = Math.round(Math.min(maxW, maxH * ratio))
+  const h = Math.round(w / ratio)
+  const info = [exif?.camera, exposureLine(exif).replace(/ {3}/g, '  ·  ')].filter(Boolean).join('  ·  ')
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+      style={{ position: 'absolute', top: props.top, left: 0, right: 0, bottom: 0, display: 'flex' }}
+    >
+    <div
+      testId="viewer"
+      onClick={props.onClose}
+      onScroll={(e: { deltaY?: number }) => {
+        if (Math.abs(e.deltaY ?? 0) > 2) props.onStep((e.deltaY ?? 0) < 0 ? 1 : -1)
+      }}
+      style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, alignItems: 'center', justifyContent: 'center', gap: 22, backgroundColor: '#05070af5' }}
+    >
+      <motion.div key={entry.path} initial={{ opacity: 0.25 }} animate={{ opacity: 1 }} transition={{ duration: 0.22, ease: 'easeOut' }} style={{ display: 'flex' }}>
+        <img testId="viewer-image" src={entry.path} objectFit="cover" style={{ width: w, height: h, borderRadius: 12 }} />
+      </motion.div>
+      <div style={{ display: 'flex', alignItems: 'center', width: w, gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexGrow: 1, minWidth: 0 }}>
+          <text testId="viewer-title" style={{ color: T.fg, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{entry.name}</text>
+          <text style={{ color: T.dim, fontSize: 12, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{info || (dims ? `${dims.width} × ${dims.height}` : '')}</text>
+        </div>
+        <text testId="viewer-index" style={{ color: T.dim, fontSize: 12, flexShrink: 0 }}>{`${props.index + 1} of ${props.count}`}</text>
+        <div style={{ display: 'flex', gap: 14, flexShrink: 0 }}>
+          <Key k="← →" label="browse" />
+          <Key k="esc" label="close" />
+        </div>
+      </div>
+    </div>
+    </motion.div>
   )
 }
 
@@ -591,14 +734,23 @@ function Overlay(props: {
   const cardW = Math.min(640, props.width - 48)
   const title = mode.kind === 'jump' ? 'Jump to' : mode.kind === 'rename' ? `Rename ${mode.target.name}` : mode.kind === 'mkdir' ? 'New folder' : 'Move to Trash?'
   return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.14, ease: 'easeOut' }}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex' }}
+    >
     <div
       testId="overlay"
       onClick={props.close}
-      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', justifyContent: 'center', alignItems: 'start', paddingTop: 80, backgroundColor: '#0a0c10b8' }}
+      style={{ display: 'flex', flexGrow: 1, justifyContent: 'center', alignItems: 'start', paddingTop: 80, backgroundColor: '#0a0c10c8' }}
     >
-      <div
+      <motion.div
         onClick={() => {}}
-        style={{ display: 'flex', flexDirection: 'column', width: cardW, borderRadius: 12, borderWidth: 1, borderColor: T.line, backgroundColor: T.panel, boxShadow: { offsetX: 0, offsetY: 18, blurRadius: 48, spreadRadius: 0, color: '#000000aa' } }}
+        initial={{ top: -10 }}
+        animate={{ top: 0 }}
+        transition={{ duration: 0.18, ease: [0.2, 0.9, 0.3, 1] }}
+        style={{ display: 'flex', flexDirection: 'column', position: 'relative', width: cardW, borderRadius: 14, borderWidth: 1, borderColor: T.line, backgroundColor: T.panel, boxShadow: { offsetX: 0, offsetY: 18, blurRadius: 48, spreadRadius: 0, color: '#000000aa' } }}
       >
         {mode.kind === 'trash' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 18 }}>
@@ -675,7 +827,8 @@ function Overlay(props: {
             )}
           </>
         )}
-      </div>
+      </motion.div>
     </div>
+    </motion.div>
   )
 }

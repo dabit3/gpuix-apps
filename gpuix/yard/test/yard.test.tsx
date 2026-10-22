@@ -96,7 +96,7 @@ describeNative('yard in the GPU test renderer', () => {
     await press('l')
     expect(text()).toContain('Photos')
     expect(text()).toContain('city-blocks.jpg')
-    expect(text()).toContain('1200 × 800 px · JPG')
+    expect(text()).toContain('1200 × 800  ·  JPG')
     await press('j')
     expect(text()).toContain('2/6')
     await press('h')
