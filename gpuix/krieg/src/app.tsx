@@ -38,6 +38,8 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
   const held = useRef(new Set<string>())
   const drag = useRef<{ x: number; y: number; moved: number } | null>(null)
   const look = useRef({ dx: 0, dy: 0 })
+  // A click buffers one shot for 400 ms so quick taps during cooldown or between frames still fire.
+  const shot = useRef(0)
   const sz = useRef(size); sz.current = size
   const scaleRef = useRef(scale); scaleRef.current = scale
   const r = useRef(new Renderer())
@@ -58,13 +60,15 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
         inp.strafe = (k.has('d') ? 1 : 0) - (k.has('a') ? 1 : 0)
         inp.turn = (k.has('right') ? 1 : 0) - (k.has('left') ? 1 : 0) + (k.has('e') ? 1 : 0) - (k.has('q') ? 1 : 0)
         inp.look = (k.has('up') ? -1 : 0) + (k.has('down') ? 1 : 0)
-        inp.fire = k.has('f') || k.has('enter') || k.has('mouse')
+        inp.fire = k.has('f') || k.has('enter') || k.has('mouse') || shot.current > now
         inp.jump = k.has('space'); inp.crouch = k.has('c')
         w.p.sway = Math.max(-1, Math.min(1, w.p.sway - look.current.dx * 0.008 - inp.turn * dt * 3))
         w.p.angle += look.current.dx * 0.006
         w.p.pitch = Math.max(-0.35, Math.min(0.35, w.p.pitch + look.current.dy * 0.0016))
         look.current.dx = look.current.dy = 0
+        const a = w.p.ammo + w.p.rockets
         w.step(dt, inp)
+        if (w.p.ammo + w.p.rockets !== a) shot.current = 0
         for (const ev of w.events) audio.current.play(ev)
       } else if (m === 'title') {
         w.p.angle += dt * 0.18
@@ -114,6 +118,7 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
     if (modeRef.current === 'lab') return
     if (g.current.world.state !== 'play') { restart(); return }
     drag.current = { x: e.x, y: e.y, moved: 0 }
+    shot.current = performance.now() + 400
     held.current.add('mouse')
   }
   const onMouseMove = (e: any) => {
