@@ -27,6 +27,17 @@ case "key":
   sleepMs(40)
   let u = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: false); u?.flags = flags; post(u)
   let r = CGEvent(keyboardEventSource: src, virtualKey: 56, keyDown: false); r?.flags = []; post(r)
+case "hold":
+  // hold: key down, OS-style autorepeat events every 33 ms for <ms>, then key up
+  let code = CGKeyCode(Int(a[2])!), ms = Double(a[3])!
+  let d = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: true); post(d)
+  sleepMs(min(ms, 250))
+  var t = 250.0
+  while t < ms {
+    let r = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: true); r?.setIntegerValueField(.keyboardEventAutorepeat, value: 1); post(r)
+    sleepMs(33); t += 33
+  }
+  post(CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: false))
 case "move":
   glide(cur(), pt(a[2], a[3]), a.count > 4 ? Double(a[4])! : 300, .mouseMoved)
 case "click":

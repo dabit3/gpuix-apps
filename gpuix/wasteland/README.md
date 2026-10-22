@@ -36,9 +36,11 @@ Run it, split the pane (Cmd-D), and use the other pane: `wasteland log -f` follo
 | scroll / Z | zoom the map (3 levels) |
 | H / ? / F1 | field manual (all controls) |
 | 1-5 or click tabs | WRIST-LINK: Status, Items, Map, Quests, Radio |
-| 1-9 | dialogue choices |
+| up/down + Enter, or 1-9 | dialogue choices |
+| Enter | take everything from a container |
+| walk away (fresh arrow/WASD press) or Esc | close loot / trade / dialogue |
 | T | enter T.A.R.G.E.T. (combat); up/down picks a body part, left/right the enemy, Enter fires |
-| E | end turn |
+| E | end turn (a move with no AP left ends it too) |
 | Ctrl-S / Ctrl-L | save / load |
 | Tab / I | cycle tabs (toggle the WRIST-LINK menu when the pane is narrow) / jump to Items |
 | Ctrl-C | quit and restore the terminal |

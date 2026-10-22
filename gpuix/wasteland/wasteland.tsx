@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync } from 'fs'
 import { render } from '@gpuix/react'
-import { App } from './src/ui/App'
+import { App, keyBridge } from './src/ui/App'
 import { appendLog, broadcastReader, paths, readSave, sendBroadcast, writeSave } from './src/io'
 import { questList } from './src/engine/game'
 
@@ -67,6 +67,14 @@ if (cmd === '-h' || cmd === '--help' || cmd === 'help') {
       startScreen={cont || args.includes('-n') || args.includes('--new') ? 'game' : 'title'}
       io={{ save: (s) => writeSave(s), load: () => readSave(), log: (l) => appendLog(l), pollBroadcasts: broadcastReader() }}
     />,
-    { terminal: true },
+    {
+      terminal: true,
+      onKeyDown: (e, r) => {
+        if (performance.now() - keyBridge.handledAt < 50) return
+        keyBridge.handle?.current?.(e)
+        const id = keyBridge.rootId()
+        if (id !== undefined) r.focusElement?.(id)
+      },
+    },
   )
 }
