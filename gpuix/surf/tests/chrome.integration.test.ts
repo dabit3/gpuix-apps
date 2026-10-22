@@ -107,3 +107,26 @@ test('frames keep the viewport aspect after opening a tab and switching back', a
     return Math.abs(got - want) / want < 0.01
   })).toBe(true)
 }, 30000)
+
+test('overlapping resizes settle on the last requested viewport, even one Chrome already had', async () => {
+  const start = browser.viewport
+  const sizes = [{ width: 900, height: 500 }, { width: 520, height: 360 }, { width: 760, height: 430 }, { width: start.width, height: start.height }, { width: 610, height: 390 }]
+  await Promise.all(sizes.map((s) => browser.setViewport(viewportFor(s, 1))))
+  const last = sizes[sizes.length - 1]!
+  expect(browser.viewport.width).toBe(last.width)
+  expect(await browser.evaluate('innerWidth + "x" + innerHeight')).toBe(`${last.width}x${last.height}`)
+  // A → B → A while B is still applying must end at A, not B
+  const a = viewportFor({ width: 700, height: 420 }, 1), b = viewportFor({ width: 480, height: 320 }, 1)
+  await browser.setViewport(a)
+  const pb = browser.setViewport(b)
+  const pa = browser.setViewport(a)
+  await Promise.all([pb, pa])
+  expect(await browser.evaluate('innerWidth + "x" + innerHeight')).toBe('700x420')
+  await browser.evaluate("setInterval(() => document.body.style.background = document.body.style.background === 'white' ? 'ivory' : 'white', 50)")
+  expect(await until(async () => {
+    browser.frames.take()
+    await Bun.sleep(150)
+    const f = browser.frames.take()
+    return !!f && f.cssWidth === 700 && f.cssHeight === 420
+  })).toBe(true)
+}, 30000)
