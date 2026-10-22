@@ -7,7 +7,8 @@ bun install
 bun link            # puts `krieg` on PATH
 krieg               # play (Ghostty or kitty)
 krieg map           # live tactical map: run it in a split pane next to the game
-krieg size          # size budget report, exits 1 above 64 KB
+krieg size          # size budget report, exits 1 if the packed build is above 64 KB
+krieg build         # write the packed single-file build to dist/krieg.js (runs with `bun dist/krieg.js`)
 krieg --help
 ```
 
@@ -20,13 +21,13 @@ Options: `-s/--seed <n>` (deterministic level, default 1337), `-m/--mute`, `-g/-
 | move | `W A S D` |
 | look | drag with the mouse, or arrows / `q` `e` |
 | fire | click or `f` |
-| weapon | `1` `2` or scroll |
+| weapon | `1` shotgun · `2` chaingun · `3` rockets, or scroll |
 | jump / crouch | `space` / `c` |
 | texture lab | `t` (every material, rendered from its op list) |
 | toggles | `m` music · `p` perf overlay · `b` bloom · `r` resolution |
 | title / quit | `esc` / `ctrl-c` |
 
-Find the amber access key, open the key door, and reach the green exit pad. 20 enemies; the end screen shows time and kills.
+Find the amber access key, open the key door, and reach the green exit pad. 31 monsters (zombie troopers, imps and brutes) plus explosive barrels; the end screen shows time and kills. The Doom-style status bar shows ammo, health, owned weapons, kills, the key, and a face portrait that winces when you're hit, grins on kills and gets bloodier as health drops.
 
 ## Split panes
 
@@ -40,26 +41,28 @@ Press `Cmd-D` in Ghostty and run `krieg map` in the new pane. The game publishes
   ['cells', 6, 11, 0], ['level', 0.16, 0.08], ['ramp', 0x000000, 0x71b7ff], ['glow', 0.25], ['blend', 1],
   ```
 - **Level** (`src/gen/level.ts`): a seeded 4×3 room graph (DFS spanning tree plus extra loops), corridors, doors, a locked key door, pillars, crates, themed rooms, up to 3 point lights per room baked into a lightmap. Tests check it's identical per seed and that the exit is only reachable with the key.
-- **Renderer** (`src/engine/raycast.ts`): DDA walls, perspective floor/ceiling casting, baked lightmap + dynamic lights (muzzle flash, tracer impacts, rockets, explosions, sentry bolts), distance fog, emissive texels, depth-sorted billboards with hit flash and a dither dissolve on death, depth-tested bullet tracers projected from world space, an additive muzzle flare anchored on the barrel, view-model bob/kick/sway, quarter-res bright-pass bloom and a vignette that keeps the HUD readable.
-- **Sprites** (`src/gen/sprites.ts`): the crawling spider bot (walk/attack frames), floating sentry (idle/charging), pickups, projectiles, explosions and both weapons are drawn by code into small RGBA canvases.
-- **AI** (`src/game/world.ts`): idle → patrol → chase → attack, line-of-sight raycasts, a BFS flow field to the player for pathing around walls, separation steering. Spiders bite at melee range; sentries keep distance and fire dodgeable bolts.
-- **Weapons**: hitscan pulse rifle and a rocket launcher with splash damage. Each rifle shot fires a tracer from the barrel to the impact point, throws sparks (walls), ichor or shards (enemies) as bouncing particles, knocks the enemy back and opens the crosshair into a hit marker (red on a kill). Kills burst into debris; rockets add camera shake. Movement eases in and out instead of snapping. Health, ammo and rocket pickups.
-- **Audio** (`src/audio/synth.ts`): saw/square/sine/noise oscillators, ADSR, a one-pole filter and a delay line, rendered to 16-bit WAVs in `$TMPDIR` and played with macOS `/usr/bin/afplay`. A tracker song (~58 s, loops) is encoded as pattern arrays; SFX for shots, hits, deaths, steps, pickups, doors.
+- **Renderer** (`src/engine/raycast.ts`): DDA walls, perspective floor/ceiling casting, baked lightmap + dynamic lights (muzzle flash, tracer impacts, rockets, explosions, imp fireballs), distance fog, emissive texels, depth-sorted billboards lit by the lightmap with their chroma preserved (so a pink demon stays pink under blue light) and a hit flash, depth-tested bullet tracers projected from world space, an additive muzzle flare anchored on the barrel, view-model bob/kick/sway, quarter-res bright-pass bloom and a vignette that keeps the HUD readable.
+- **Monsters** (`src/gen/monsters.ts`): three Doom-style characters drawn by code from shaded ellipses, limbs and outlines into 96×96 canvases, 16 frames each: 4 walk, wind-up, attack, pain, 5 falling death frames ending in a corpse that stays on the floor, and 4 gib frames for overkills. The **zombie trooper** (green armour, helmet, red eyes) carries a rifle; the **imp** (brown hide, horns, glowing eyes) throws fireballs; the **brute** (pink, horned, toothy) charges and bites. The same file draws 12 status-bar face portraits (6 expressions × 2 health tiers), the explosive barrel, the fireball, shells and the pump shotgun with gloved hands.
+- **Sprites** (`src/gen/sprites.ts`): pickups, rockets, explosions, blood/spark particles and the chaingun and launcher view models (with sleeves and hands).
+- **AI** (`src/game/world.ts`): idle → patrol → chase → attack, line-of-sight raycasts, a BFS flow field to the player for pathing around walls, separation steering. Every attack is telegraphed by a wind-up frame: troopers fire a hitscan tracer, imps lob a glowing fireball you can sidestep, brutes charge and bite at melee range. Hits can stun a monster into its pain frame.
+- **Weapons**: pump shotgun (7 pellets per shell, the pump animates), hitscan chaingun and a rocket launcher with splash damage. Barrels explode and chain into nearby barrels and monsters. Each bullet fires a tracer from the barrel to the impact point, throws sparks (walls), ichor or shards (enemies) as bouncing particles, knocks the enemy back and opens the crosshair into a hit marker (red on a kill). Kills burst into debris; rockets add camera shake. Movement eases in and out instead of snapping. Overkill damage gibs a monster into a bloody pile. Health, shells, bullets and rocket pickups.
+- **Audio** (`src/audio/synth.ts`): saw/square/sine/noise oscillators, ADSR, a one-pole filter and a delay line, rendered to 16-bit WAVs in `$TMPDIR` and played with macOS `/usr/bin/afplay`. A tracker song (~58 s, loops) is encoded as pattern arrays; SFX for shotgun, chaingun, rockets, hits, pain, fireballs, bites, deaths, steps, pickups, doors. `afplay` is spawned from a Worker so starting a process never stalls the render loop.
 
 ## Size budget
 
-`krieg size` bundles `src/cli.ts` with `Bun.build({ minify: true })` (GPUIX and React external, they are the platform) and fails above 65,536 bytes.
+`krieg size` bundles `src/cli.ts` with `Bun.build({ minify: true })` (GPUIX and React external, they are the platform), then builds the packed single file: the minified bundle raw-deflated, base64'd and wrapped in a ~200-byte loader that inflates it and imports it (the prompt's optional Roadroller-style final pass, with zlib instead of Roadroller). The budget applies to the packed file, `dist/krieg.js`, and the command exits 1 above 65,536 bytes. The unpacked minified size is reported too: the monsters pushed it past 64 KB.
 
 ```
-krieg size budget (minified, GPUIX/React external)
+  app.tsx                  13.7 KB      game/world.ts            11.7 KB
+  engine/raycast.ts         8.5 KB      gen/monsters.ts           7.9 KB
+  gen/level.ts              6.0 KB      audio/synth.ts            5.4 KB
+  map.tsx                   5.3 KB      gen/sprites.ts            3.8 KB
+  gen/texops.ts             3.6 KB      game/scene.ts             3.1 KB
+  cli / materials / size / live / rng / boot / theme             8.5 KB
 
-  app.tsx                  12.1 KB      game/world.ts             8.6 KB
-  engine/raycast.ts         7.4 KB      gen/level.ts              6.0 KB
-  map.tsx                   5.2 KB      audio/synth.ts            5.1 KB
-  gen/sprites.ts            3.8 KB      gen/texops.ts             3.6 KB
-  gen/materials.ts          2.3 KB      cli.ts / scene / size / live / rng / boot / theme  7.5 KB
-
-  bundle (cli.ts)          ~64 KB   gzip ~26 KB   budget 64 KB   OK
+  bundle (cli.ts)          76.5 KB   gzip   30.8 KB
+  packed (dist/krieg.js)   41.3 KB
+  budget                   64.0 KB   OK (65% used)
 ```
 
 Run `krieg size` for the exact current numbers.
@@ -72,7 +75,8 @@ The prompt asked for a single offline HTML file using raw WebGL2. This version i
 - **Pointer lock → mouse drag or arrow keys**, since a terminal can't capture the pointer.
 - **Jump/crouch** move the eye height only (the raycaster has a single floor level), no stairs.
 - **WebAudio → generated WAVs played with `afplay`**. Latency is a few tens of ms and audio is macOS-only; `--mute` skips it.
-- **Single HTML file under 64 KB → minified app bundle under 64 KB**, with GPUIX/React excluded as the runtime (the way a browser is excluded for the HTML version). No Terser/Roadroller pass.
+- **Single HTML file under 64 KB → packed single-file Bun script under 64 KB** (41 KB), with GPUIX/React excluded as the runtime (the way a browser is excluded for the HTML version). The packer is zlib, not Terser + Roadroller. The unpacked minified bundle is 76.5 KB.
+- **Two enemy types (spider bot, floating sentry) → three Doom-style monsters plus barrels**, after Nader asked for characters "like you might see in doom". They're 2D billboards drawn by code, not parameterised meshes.
 - **2D canvas HUD with a pixel font → GPUIX `<text>` overlays** in Menlo, coloured from Ghostty's GitHub Dark High Contrast theme.
 - The level is one seeded floor of 12 rooms (shorter than the 5–8 minutes the prompt suggested).
 
