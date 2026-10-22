@@ -44,7 +44,6 @@ function readClipboard(): string {
   return ''
 }
 
-export function dbg(o: Record<string, unknown>) { if (process.env.SURF_KEYLOG) require('node:fs').appendFileSync(process.env.SURF_KEYLOG, JSON.stringify(o) + '\n') }
 
 const CSS_CURSOR: Record<string, CursorValue> = { pointer: 'pointer', text: 'text', 'vertical-text': 'vertical-text', crosshair: 'crosshair', grab: 'grab', grabbing: 'grabbing', move: 'move', 'col-resize': 'col-resize', 'row-resize': 'row-resize', 'ew-resize': 'ew-resize', 'ns-resize': 'ns-resize', 'not-allowed': 'not-allowed', copy: 'copy', 'context-menu': 'context-menu' }
 export const cursorFor = (css: string): CursorValue => CSS_CURSOR[css] ?? 'default'
@@ -129,7 +128,7 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
   const tab = s.tab
 
   const ui = {
-    focusOmnibox: () => { dbg({ focusOmnibox: omni.current?.id }); s.focus = 'omnibox'; s.omnibox = ''; if (omni.current) renderer?.focusElement?.(omni.current.id); setRev((r) => r + 1) },
+    focusOmnibox: () => { s.focus = 'omnibox'; s.omnibox = ''; if (omni.current) renderer?.focusElement?.(omni.current.id); setRev((r) => r + 1) },
     focusPage: () => { s.focus = 'page'; if (root.current) renderer?.focusElement?.(root.current.id); setRev((r) => r + 1) },
     focusFind: () => { s.focus = 'find'; s.findOpen = true; setRev((r) => r + 1); setTimeout(() => { if (find.current) renderer?.focusElement?.(find.current.id) }, 0) },
   }
@@ -197,7 +196,6 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
 
   // Keys: the focused element sees them first, then this root handler.
   const onKeyDown = (e: KeyEvent) => {
-    dbg({ key: e.key, keyChar: e.keyChar, modifiers: e.modifiers, focus: s.focus })
     if (shortcut(s, e, ui)) { e.preventDefault(); e.stopPropagation(); return }
     if (s.focus === 'page' && b) {
       if (e.modifiers?.ctrl && !e.modifiers.shift && (e.key === 'v' || e.keyChar === 'v')) { const text = readClipboard(); if (text) b.insertText(text); e.preventDefault(); e.stopPropagation(); return }
@@ -229,9 +227,9 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
             testId="omnibox-input"
             value={omniFocused ? s.omnibox : displayUrl(url)}
             placeholder={omniFocused ? (url && url !== 'about:blank' ? displayUrl(url) : 'Search DuckDuckGo or type a URL') : 'Search DuckDuckGo or type a URL'}
-            onChange={(e) => { dbg({ omni: e.value, focus: s.focus }); if (s.focus === 'omnibox') s.omnibox = e.value ?? '' }}
-            onFocus={() => { dbg({ omniFocus: s.focus }); if (s.focus !== 'omnibox') { s.focus = 'omnibox'; s.omnibox = ''; setRev((r) => r + 1) } }}
-            onSubmit={() => { dbg({ submit: s.omnibox }); const v = s.omnibox.trim() || url; ui.focusPage(); void s.go(v) }}
+            onChange={(e) => { if (s.focus === 'omnibox') s.omnibox = e.value ?? '' }}
+            onFocus={() => { if (s.focus !== 'omnibox') { s.focus = 'omnibox'; s.omnibox = ''; setRev((r) => r + 1) } }}
+            onSubmit={() => { const v = s.omnibox.trim() || url; ui.focusPage(); void s.go(v) }}
             style={{ flexGrow: 1, minWidth: 0, fontSize: 13, color: t.fg, fontFamily: UI }}
           />
         </div>
