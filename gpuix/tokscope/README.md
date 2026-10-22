@@ -65,6 +65,16 @@ bun sample          # regenerate sample/ (deterministic)
   ship/flag status. Toggle them to see the projected cost per task.
 - **AUDIT.md**: the report, rendered with `<markdown>`; `w` writes it to disk.
 
+## Design
+
+Monochrome and flat, after a dark devin.ai: neutral grays on the Ghostty theme's
+background, 1 px hairlines instead of cards, regular-weight numbers, mono uppercase
+micro-labels, and color only where it means something (green for projected savings,
+red for cache breaks). Segments are a gray ramp: the cached prefix sits dark at the
+bottom of each bar and what the turn added is bright. Type is Geist and Geist Mono
+from the [`geist`](https://www.npmjs.com/package/geist) package (SIL OFL), registered
+at startup with `registerFont`; `<code>` and `<markdown>` share a monochrome theme.
+
 ## How the numbers are made
 
 - Claude Code writes one JSONL line per content block. tokscope dedupes assistant blocks
@@ -119,6 +129,10 @@ aren't committed because they contain the provider's system prompt.
 - **Painted children block hover.** A `div` with a background fill swallows hover for
   the element behind it, so `onMouseEnter` on a bar made of colored segment divs never
   fired. `pointerEvents: 'none'` on the fills fixed it (covered by a test-renderer test).
+- `useGpuix()` returns `{ renderer }`, not the renderer. Passing the context object
+  to a font loader fails silently (no `registerFont` on it) and every `fontFamily`
+  quietly falls back to the system font, including mono. `registerFont` needs each
+  weight as its own file; text that named the family repaints once it's registered.
 - `KeyEvent.modifiers` is `{ shift, ctrl, alt, cmd }`. Import `KeyEvent` from
   `@gpuix/react` instead of hand-typing the handler.
 - Test renderer: mount with `createTestRoot(...).render(...)` then `renderer.flush()`.

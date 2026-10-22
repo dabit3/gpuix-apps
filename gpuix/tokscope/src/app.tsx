@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useWindowSize, type KeyEvent } from '@gpuix/react'
+import { useGpuix, useWindowSize, type KeyEvent } from '@gpuix/react'
 import { writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { repeatedCalls, sessionCost, topToolResults, totalInput, totals } from './analyze'
 import { auditMarkdown, findFixes, fmt$, fmtK, projectedCost, type Fix } from './audit'
 import { loadSessions } from './load'
 import type { PriceSheet } from './prices'
-import { C, MONO, SEG_COLOR, mix } from './theme'
+import { C, MONO, SANS, SEG_COLOR, TEXT_THEME, mix, registerFonts } from './theme'
 import { SEGMENTS, SEGMENT_LABEL, type Request, type Segment, type Session } from './types'
 
 export type AppProps = {
@@ -20,7 +19,20 @@ export type AppProps = {
 const TABS = ['Overview', 'Offenders', 'Fixes', 'AUDIT.md'] as const
 type Tab = (typeof TABS)[number]
 
-function Txt(p: { c?: string; s?: number; w?: number; mono?: boolean; children: React.ReactNode; grow?: boolean; testId?: string; nowrap?: boolean; align?: 'left' | 'right' | 'center' }) {
+type TxtProps = {
+  c?: string
+  s?: number
+  w?: number
+  mono?: boolean
+  children: React.ReactNode
+  grow?: boolean
+  testId?: string
+  nowrap?: boolean
+  align?: 'left' | 'right' | 'center'
+  minW?: number
+}
+
+function Txt(p: TxtProps) {
   return (
     <text
       testId={p.testId}
@@ -28,10 +40,11 @@ function Txt(p: { c?: string; s?: number; w?: number; mono?: boolean; children: 
         color: p.c ?? C.fg,
         fontSize: p.s ?? 13,
         fontWeight: p.w ?? 400,
-        fontFamily: p.mono ? MONO : undefined,
+        fontFamily: p.mono ? MONO : SANS,
         flexGrow: p.grow ? 1 : 0,
         flexShrink: p.grow ? 1 : 0,
         textAlign: p.align,
+        ...(p.minW ? { minWidth: p.minW } : {}),
         ...(p.nowrap ? { whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', minWidth: 0 } : {}),
       }}
     >
@@ -40,8 +53,18 @@ function Txt(p: { c?: string; s?: number; w?: number; mono?: boolean; children: 
   )
 }
 
+/** Mono uppercase micro-label. */
+function Label({ children, c }: { children: string; c?: string }) {
+  return (
+    <Txt c={c ?? C.fg3} s={11} mono>
+      {children.toUpperCase()}
+    </Txt>
+  )
+}
+
 const row = { display: 'flex', flexDirection: 'row', alignItems: 'center' } as const
 const col = { display: 'flex', flexDirection: 'column' } as const
+const hair = { height: 1, backgroundColor: C.line, flexShrink: 0 } as const
 
 function normKey(e: { key?: string; keyChar?: string }): string {
   const ch = e.keyChar
@@ -56,7 +79,12 @@ function shortPath(p: string): string {
   return p.replace(process.env.HOME ?? '~', '~')
 }
 
+const cleanPath = (s: string) => s.replace('/Users/sam/code/', '').replace(process.env.HOME ?? '#', '~')
+const pct = (a: number, b: number) => `${((a / (b || 1)) * 100).toFixed(1)}%`
+
 export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps) {
+  const { renderer } = useGpuix()
+  useEffect(() => registerFonts(renderer), [renderer])
   const win = useWindowSize()
   const width = win.width || 1200
   const height = win.height || 800
@@ -161,7 +189,7 @@ export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps
   }
 
   const live = updatedAt > 0 && now - updatedAt < 2500
-  const pad = compact ? 12 : 18
+  const padX = compact ? 16 : 28
 
   return (
     <div
@@ -169,31 +197,25 @@ export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps
       tabIndex={-1}
       autoFocus
       onKeyDown={onKey}
-      style={{ ...col, width: '100%', height: '100%', backgroundColor: C.bg, padding: pad, gap: 12 }}
+      style={{ ...col, width: '100%', height: '100%', backgroundColor: C.bg, paddingLeft: padX, paddingRight: padX, paddingTop: 18, paddingBottom: 12 }}
     >
       {/* header */}
-      <div style={{ ...row, gap: 14, flexShrink: 0 }}>
-        <div style={{ ...row, gap: 8, flexShrink: 0 }}>
-          <div style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: C.yellow }} />
-          <Txt s={16} w={700}>
-            tokscope
-          </Txt>
-        </div>
+      <div style={{ ...row, gap: 14, flexShrink: 0, height: 30 }}>
+        <Txt s={15} w={500}>
+          tokscope
+        </Txt>
         {!compact && (
-          <Txt c={C.dim} s={12} mono nowrap grow>
+          <Txt c={C.fg3} s={12} mono nowrap grow>
             {paths.map(shortPath).join('  ')}
           </Txt>
         )}
         {compact && <div style={{ flexGrow: 1 }} />}
-        {watch && (
-          <div testId="live" style={{ ...row, gap: 6, flexShrink: 0 }}>
-            <div style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: live ? C.green : mix(C.green, C.bg, 0.55) }} />
-            <Txt c={live ? C.green : C.dim} s={12}>
-              {live ? 'updated' : follow ? `watching ${data.files} files` : 'paused follow'}
-            </Txt>
-          </div>
+        {watch && !compact && (
+          <Txt testId="live" c={live ? C.fg : C.fg3} s={12} mono>
+            {live ? 'updated just now' : follow ? `watching ${data.files} files` : 'follow paused'}
+          </Txt>
         )}
-        <div style={{ ...row, gap: 2, flexShrink: 0, backgroundColor: C.panel, borderRadius: 8, padding: 3, borderWidth: 1, borderColor: C.line }}>
+        <div style={{ ...row, gap: 2, flexShrink: 0 }}>
           {TABS.map((name, i) => (
             <div
               key={name}
@@ -201,23 +223,16 @@ export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps
               onClick={() => setTab(name)}
               style={{
                 ...row,
-                gap: 6,
-                paddingLeft: compact ? 8 : 12,
-                paddingRight: compact ? 8 : 12,
-                paddingTop: 4,
-                paddingBottom: 4,
+                paddingLeft: compact ? 8 : 11,
+                paddingRight: compact ? 8 : 11,
+                height: 28,
                 borderRadius: 6,
                 cursor: 'pointer',
-                backgroundColor: tab === name ? C.panelHi : C.panel,
-                hover: { backgroundColor: C.panelHi },
+                backgroundColor: tab === name ? C.surfaceHi : C.bg,
+                hover: { backgroundColor: tab === name ? C.surfaceHi : C.surface },
               }}
             >
-              {!compact && (
-                <Txt c={C.faint} s={11} mono>
-                  {i + 1}
-                </Txt>
-              )}
-              <Txt c={tab === name ? C.fg : C.muted} s={12} w={tab === name ? 600 : 400}>
+              <Txt c={tab === name ? C.fg : C.fg3} s={13} w={tab === name ? 500 : 400}>
                 {name}
               </Txt>
             </div>
@@ -225,19 +240,28 @@ export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps
         </div>
       </div>
 
-      {/* KPIs */}
+      <div style={{ ...hair, marginTop: 14 }} />
       <Kpis t={t} tasks={tasks} after={after} activeFixes={activeFixes.length} reported={current?.reportedCostUSD} compact={compact} narrow={narrow} />
+      <div style={hair} />
 
-      <div style={{ ...row, alignItems: 'stretch', gap: 14, flexGrow: 1, minHeight: 0 }}>
+      <div style={{ ...row, alignItems: 'stretch', flexGrow: 1, minHeight: 0 }}>
         {!narrow && <Sidebar sessions={sessions} sel={sel} onSel={(id) => (setSel(id), setFollow(false), setHoverReq(null))} pulse={pulse} now={now} />}
-        <div style={{ ...col, flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 10 }}>
-          {narrow && <Switcher title={current ? current.title : `All sessions · ${sessions.length}`} sub={current ? `${current.project} · ${current.requests.length} requests` : `${t.requests} requests`} onPrev={() => step(-1)} onNext={() => step(1)} />}
+        <div style={{ ...col, flexGrow: 1, flexShrink: 1, minWidth: 0, paddingLeft: narrow ? 0 : 28, paddingTop: 20, gap: 16 }}>
+          {narrow && (
+            <Switcher
+              title={current ? current.title : `All sessions · ${sessions.length}`}
+              sub={current ? `${current.project} · ${current.requests.length} requests` : `${t.requests} requests`}
+              cost={t.cost}
+              onPrev={() => step(-1)}
+              onNext={() => step(1)}
+            />
+          )}
           {sessions.length === 0 ? (
             <Empty paths={paths} />
           ) : tab === 'Overview' ? (
-            <Overview scope={scope} t={t} hoverReq={hoverReq} setHoverReq={setHoverReq} hoverSeg={hoverSeg} setHoverSeg={setHoverSeg} compact={compact} chartH={Math.max(70, Math.min(220, height - (narrow ? 720 : 660)))} />
+            <Overview scope={scope} t={t} hoverReq={hoverReq} setHoverReq={setHoverReq} hoverSeg={hoverSeg} setHoverSeg={setHoverSeg} compact={compact} chartH={Math.max(64, Math.min(200, height - (narrow ? 640 : 580)))} />
           ) : tab === 'Offenders' ? (
-            <Offenders offenders={offenders} repeats={repeats} open={open} setOpen={setOpen} total={t.cost} />
+            <Offenders offenders={offenders} repeats={repeats} open={open} setOpen={setOpen} total={t.cost} compact={compact} />
           ) : tab === 'Fixes' ? (
             <Fixes fixes={fixes} enabled={enabled} toggle={toggleFix} cursor={fixCursor} setCursor={setFixCursor} cost={t.cost} after={after} tasks={tasks} />
           ) : (
@@ -247,20 +271,24 @@ export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps
       </div>
 
       {/* footer */}
-      <div style={{ ...row, gap: 16, flexShrink: 0, height: 18 }}>
-        {(compact ? [['1-4', 'views'], ['j/k', 'session'], ['w', 'AUDIT.md']] : [['1-4', 'views'], ['j/k', 'session'], ['a', 'all'], ['space', 'toggle fix'], ['w', 'write AUDIT.md'], ['f', follow ? 'follow on' : 'follow off'], ['ctrl-c', 'quit']]).map(([k, v]) => (
+      <div style={{ ...hair, marginBottom: 10 }} />
+      <div style={{ ...row, gap: 18, flexShrink: 0, height: 16 }}>
+        {(compact
+          ? [['1-4', 'views'], ['j k', 'session'], ['w', 'write']]
+          : [['1-4', 'views'], ['j k', 'session'], ['a', 'all'], ['space', 'toggle fix'], ['w', 'write AUDIT.md'], ['f', follow ? 'follow on' : 'follow off'], ['ctrl-c', 'quit']]
+        ).map(([k, v]) => (
           <div key={k} style={{ ...row, gap: 6 }}>
-            <Txt c={C.muted} s={11} mono>
+            <Txt c={C.fg2} s={11} mono>
               {k}
             </Txt>
-            <Txt c={C.faint} s={11}>
+            <Txt c={C.fg3} s={11}>
               {v}
             </Txt>
           </div>
         ))}
         <div style={{ flexGrow: 1 }} />
         {toast && (
-          <Txt testId="toast" c={C.green} s={12} nowrap>
+          <Txt testId="toast" c={C.fg} s={12} nowrap>
             {toast}
           </Txt>
         )}
@@ -273,27 +301,37 @@ function Kpis({ t, tasks, after, activeFixes, reported, compact, narrow }: { t: 
   const all: Array<[string, string, string, string?]> = [
     ['Cost', fmt$(t.cost), reported != null ? `harness reported ${fmt$(reported)}` : `${t.requests} requests`],
     ['Per task', fmt$(t.cost / Math.max(1, tasks)), `${tasks} task${tasks === 1 ? '' : 's'} · ${(t.requests / Math.max(1, tasks)).toFixed(1)} turns`],
-    ['Cache hit', `${(t.cacheHit * 100).toFixed(1)}%`, `${t.cacheBreaks} break${t.cacheBreaks === 1 ? '' : 's'}`, t.cacheHit > 0.8 ? C.green : t.cacheHit > 0.5 ? C.yellow : C.red],
+    ['Cache hit', `${(t.cacheHit * 100).toFixed(1)}%`, `${t.cacheBreaks} break${t.cacheBreaks === 1 ? '' : 's'}`],
     ['Input', fmtK(totalInput(t.usage)), `${fmtK(t.usage.cacheWrite)} written · ${fmtK(t.usage.input)} uncached`],
     ['Output', fmtK(t.usage.output), `${fmt$(t.segCost.output)} · ${((t.segCost.output / (t.cost || 1)) * 100).toFixed(0)}% of cost`],
-    ['With fixes', activeFixes ? fmt$(after / Math.max(1, tasks)) : '—', activeFixes ? `per task · −${(((t.cost - after) / (t.cost || 1)) * 100).toFixed(0)}% with ${activeFixes}` : 'toggle fixes in view 3', activeFixes ? C.green : C.dim],
+    ['With fixes', activeFixes ? fmt$(after / Math.max(1, tasks)) : '—', activeFixes ? `per task · −${(((t.cost - after) / (t.cost || 1)) * 100).toFixed(0)}% with ${activeFixes}` : 'toggle fixes in view 3', activeFixes ? C.green : C.fg4],
   ]
   const items = narrow ? all.filter(([label]) => label !== 'Input' && label !== 'Output') : all
   return (
-    <div style={{ ...row, flexWrap: 'wrap', gap: 10, flexShrink: 0, alignItems: 'stretch' }}>
-      {items.map(([label, value, sub, color]) => (
+    <div style={{ ...row, flexShrink: 0, alignItems: 'stretch' }}>
+      {items.map(([label, value, sub, color], i) => (
         <div
           key={label}
           testId={`kpi-${label.toLowerCase().replace(/ /g, '-')}`}
-          style={{ ...col, gap: 3, flexGrow: 1, flexBasis: compact ? 140 : 160, minWidth: compact ? 130 : 150, backgroundColor: C.panel, borderRadius: 10, borderWidth: 1, borderColor: C.line, paddingLeft: 14, paddingRight: 14, paddingTop: 10, paddingBottom: 10 }}
+          style={{
+            ...col,
+            gap: 6,
+            flexGrow: 1,
+            flexBasis: 0,
+            minWidth: 0,
+            paddingTop: 16,
+            paddingBottom: 16,
+            paddingLeft: i === 0 ? 0 : compact ? 14 : 20,
+            paddingRight: 12,
+            borderLeftWidth: i === 0 ? 0 : 1,
+            borderColor: C.line,
+          }}
         >
-          <Txt c={C.dim} s={11} w={500}>
-            {label.toUpperCase()}
-          </Txt>
-          <Txt c={color ?? C.fg} s={compact ? 20 : 24} w={600} mono>
+          <Label>{label}</Label>
+          <Txt c={color ?? C.fg} s={compact ? 22 : 26} w={400}>
             {value}
           </Txt>
-          <Txt c={C.dim} s={11} nowrap>
+          <Txt c={C.fg3} s={12} nowrap>
             {sub}
           </Txt>
         </div>
@@ -304,11 +342,16 @@ function Kpis({ t, tasks, after, activeFixes, reported, compact, narrow }: { t: 
 
 function Sidebar({ sessions, sel, onSel, pulse, now }: { sessions: Session[]; sel: string; onSel: (id: string) => void; pulse: { id: string; at: number } | null; now: number }) {
   const all = sessions.reduce((a, s) => a + sessionCost(s), 0)
-  const max = Math.max(0.0001, ...sessions.map(sessionCost))
   return (
-    <div style={{ ...col, width: 290, flexShrink: 0, backgroundColor: C.panel, borderRadius: 10, borderWidth: 1, borderColor: C.line, padding: 6, gap: 2, overflowY: 'scroll' }}>
-      <SideItem active={sel === 'all'} onClick={() => onSel('all')} title={`All sessions`} sub={`${sessions.length} transcripts`} cost={all} frac={1} testId="session-all" />
-      <div style={{ height: 1, backgroundColor: C.line, marginTop: 4, marginBottom: 4, flexShrink: 0 }} />
+    <div style={{ ...col, width: 300, flexShrink: 0, borderRightWidth: 1, borderColor: C.line, paddingTop: 20, paddingRight: 14, gap: 2, overflowY: 'scroll' }}>
+      <div style={{ ...row, paddingLeft: 10, paddingRight: 10, marginBottom: 8, flexShrink: 0 }}>
+        <Label>Sessions</Label>
+        <div style={{ flexGrow: 1 }} />
+        <Txt c={C.fg3} s={11} mono>
+          {String(sessions.length)}
+        </Txt>
+      </div>
+      <SideItem active={sel === 'all'} onClick={() => onSel('all')} title="All sessions" sub={`${sessions.length} transcripts`} cost={all} testId="session-all" />
       {sessions.map((s, i) => (
         <SideItem
           key={s.id}
@@ -316,70 +359,61 @@ function Sidebar({ sessions, sel, onSel, pulse, now }: { sessions: Session[]; se
           active={sel === s.id}
           onClick={() => onSel(s.id)}
           title={s.title}
-          sub={`${s.project} · ${s.requests.length} req · ${s.models[0]?.replace('claude-', '') ?? ''}`}
+          sub={`${s.project} · ${s.requests.length} requests`}
           cost={sessionCost(s)}
-          frac={sessionCost(s) / max}
           flash={pulse?.id === s.id && now - pulse.at < 1500}
           side={s.id.includes('/')}
-          breaks={s.requests.filter((r) => r.cacheBreak).length}
         />
       ))}
     </div>
   )
 }
 
-function SideItem(p: { active: boolean; onClick: () => void; title: string; sub: string; cost: number; frac: number; flash?: boolean; side?: boolean; breaks?: number; testId: string }) {
-  const bg = p.flash ? mix(C.green, C.panel, 0.82) : p.active ? C.panelHi : C.panel
+function SideItem(p: { active: boolean; onClick: () => void; title: string; sub: string; cost: number; flash?: boolean; side?: boolean; testId: string }) {
+  const bg = p.flash ? mix(C.fg, C.bg, 0.88) : p.active ? C.surfaceHi : C.bg
   return (
     <div
       testId={p.testId}
       onClick={p.onClick}
-      style={{ ...col, gap: 4, padding: 9, paddingLeft: p.side ? 22 : 10, borderRadius: 7, cursor: 'pointer', flexShrink: 0, backgroundColor: bg, borderWidth: 1, borderColor: p.active ? C.lineHi : bg, hover: { backgroundColor: C.panelHi } }}
+      style={{ ...col, gap: 3, paddingTop: 8, paddingBottom: 8, paddingRight: 10, paddingLeft: p.side ? 24 : 10, borderRadius: 6, cursor: 'pointer', flexShrink: 0, backgroundColor: bg, hover: { backgroundColor: p.active ? C.surfaceHi : C.surface } }}
     >
-      <div style={{ ...row, gap: 8 }}>
-        <Txt c={p.active ? C.fg : '#d5dbe2'} s={12} w={p.active ? 600 : 400} nowrap grow>
+      <div style={{ ...row, gap: 10 }}>
+        <Txt c={p.active ? C.fg : C.fg2} s={13} w={p.active ? 500 : 400} nowrap grow>
           {p.title}
         </Txt>
-        <Txt c={C.fg} s={12} mono>
+        <Txt c={p.active ? C.fg : C.fg3} s={13}>
           {fmt$(p.cost)}
         </Txt>
       </div>
-      <div style={{ ...row, gap: 8 }}>
-        <Txt c={C.dim} s={11} nowrap grow>
-          {p.sub}
-        </Txt>
-        {!!p.breaks && (
-          <Txt c={C.red} s={11}>
-            {`${p.breaks}× miss`}
-          </Txt>
-        )}
-      </div>
-      <div style={{ ...row, height: 3, borderRadius: 2, backgroundColor: C.line }}>
-        <div style={{ width: `${Math.max(2, p.frac * 100)}%`, height: 3, borderRadius: 2, backgroundColor: p.active ? C.yellow : mix(C.yellow, C.panel, 0.45) }} />
-      </div>
+      <Txt c={C.fg3} s={12} nowrap>
+        {p.sub}
+      </Txt>
     </div>
   )
 }
 
-function Switcher({ title, sub, onPrev, onNext }: { title: string; sub: string; onPrev: () => void; onNext: () => void }) {
+function Switcher({ title, sub, cost, onPrev, onNext }: { title: string; sub: string; cost: number; onPrev: () => void; onNext: () => void }) {
   const btn = (label: string, f: () => void, id: string) => (
-    <div testId={id} onClick={f} style={{ ...row, justifyContent: 'center', width: 28, height: 28, borderRadius: 6, backgroundColor: C.panelHi, cursor: 'pointer', flexShrink: 0, hover: { backgroundColor: C.lineHi } }}>
-      <Txt c={C.fg} s={14}>
+    <div testId={id} onClick={f} style={{ ...row, justifyContent: 'center', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', flexShrink: 0, borderWidth: 1, borderColor: C.line, hover: { backgroundColor: C.surfaceHi } }}>
+      <Txt c={C.fg2} s={14}>
         {label}
       </Txt>
     </div>
   )
   return (
-    <div style={{ ...row, gap: 10, flexShrink: 0, backgroundColor: C.panel, borderRadius: 10, borderWidth: 1, borderColor: C.line, padding: 8 }}>
+    <div style={{ ...row, gap: 12, flexShrink: 0 }}>
       {btn('‹', onPrev, 'prev')}
-      <div style={{ ...col, flexGrow: 1, minWidth: 0 }}>
-        <Txt c={C.fg} s={12} w={600} nowrap>
+      <div style={{ ...col, flexGrow: 1, minWidth: 0, gap: 2 }}>
+        <Txt c={C.fg} s={13} w={500} nowrap>
           {title}
         </Txt>
-        <Txt c={C.dim} s={11} nowrap>
+        <Txt c={C.fg3} s={12} nowrap>
           {sub}
         </Txt>
       </div>
+      <Txt c={C.fg2} s={12} mono>
+        {fmt$(cost)}
+      </Txt>
       {btn('›', onNext, 'next')}
     </div>
   )
@@ -388,23 +422,22 @@ function Switcher({ title, sub, onPrev, onNext }: { title: string; sub: string; 
 function Empty({ paths }: { paths: string[] }) {
   return (
     <div style={{ ...col, flexGrow: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-      <Txt c={C.fg} s={15} w={600}>
+      <Txt c={C.fg} s={15} w={500}>
         Waiting for transcripts
       </Txt>
-      <Txt c={C.dim} s={12} mono>
+      <Txt c={C.fg3} s={12} mono>
         {`watching ${paths.join(', ')} for *.jsonl`}
       </Txt>
     </div>
   )
 }
 
-function Panel({ title, right, children, grow, testId }: { title: string; right?: React.ReactNode; children: React.ReactNode; grow?: boolean; testId?: string }) {
+function Section({ title, right, children, testId }: { title: string; right?: React.ReactNode; children: React.ReactNode; testId?: string }) {
   return (
-    <div testId={testId} style={{ ...col, gap: 10, backgroundColor: C.panel, borderRadius: 10, borderWidth: 1, borderColor: C.line, padding: 14, flexShrink: grow ? 1 : 0, flexGrow: grow ? 1 : 0, minHeight: 0 }}>
-      <div style={{ ...row, gap: 10 }}>
-        <Txt c={C.muted} s={11} w={600} grow>
-          {title.toUpperCase()}
-        </Txt>
+    <div testId={testId} style={{ ...col, gap: 12, flexShrink: 0 }}>
+      <div style={{ ...row, gap: 12, height: 16 }}>
+        <Label>{title}</Label>
+        <div style={{ flexGrow: 1 }} />
         {right}
       </div>
       {children}
@@ -417,99 +450,90 @@ function Overview(p: { scope: Session[]; t: ReturnType<typeof totals>; hoverReq:
   const t = p.t
   const max = Math.max(1, ...reqs.map((r) => totalInput(r.usage) + r.usage.output))
   const hr = p.hoverReq != null ? reqs[p.hoverReq] : undefined
-  const segColor = (s: Segment) => (p.hoverSeg && p.hoverSeg !== s ? mix(SEG_COLOR[s], C.panel, 0.75) : SEG_COLOR[s])
+  const segColor = (s: Segment) => (p.hoverSeg && p.hoverSeg !== s ? mix(SEG_COLOR[s], C.bg, 0.7) : SEG_COLOR[s])
   const order: Segment[] = ['output', 'toolResults', 'context', 'history', 'tools', 'system']
+  const gap = reqs.length > 60 ? 1 : 3
   return (
-    <div style={{ ...col, gap: 10, flexGrow: 1, minHeight: 0, overflowY: 'scroll' }}>
-      <Panel title="Where the money goes" right={<Txt c={C.dim} s={11}>{`${fmt$(t.cost)} across ${fmtK(totalInput(t.usage) + t.usage.output)} tokens`}</Txt>}>
-        <div style={{ ...row, height: 14, borderRadius: 4, overflow: 'hidden', gap: 2 }}>
+    <div style={{ ...col, gap: 28, flexGrow: 1, minHeight: 0, overflowY: 'scroll' }}>
+      <Section title="Where the money goes" right={<Txt c={C.fg3} s={12}>{`${fmt$(t.cost)} across ${fmtK(totalInput(t.usage) + t.usage.output)} tokens`}</Txt>}>
+        <div style={{ ...row, height: 8, gap: 2 }}>
           {SEGMENTS.map((s) => (
-            <div key={s} style={{ height: 14, flexGrow: Math.max(0.0001, t.segCost[s]), flexBasis: 0, backgroundColor: segColor(s) }} />
+            <div key={s} style={{ height: 8, borderRadius: 2, flexGrow: Math.max(0.0001, t.segCost[s]), flexBasis: 0, backgroundColor: segColor(s) }} />
           ))}
         </div>
-        <div style={{ ...col, gap: 1 }}>
-          {SEGMENTS.map((s) => (
+        <div style={{ ...col }}>
+          {SEGMENTS.map((s, i) => (
             <div
               key={s}
               testId={`seg-${s}`}
               onMouseEnter={() => p.setHoverSeg(s)}
               onMouseLeave={() => p.setHoverSeg(null)}
-              style={{ ...row, gap: 10, paddingTop: 4, paddingBottom: 4, paddingLeft: 6, paddingRight: 6, borderRadius: 6, backgroundColor: p.hoverSeg === s ? C.panelHi : C.panel }}
+              style={{ ...row, gap: 12, height: 30, paddingLeft: 8, paddingRight: 8, borderTopWidth: i === 0 ? 0 : 1, borderColor: C.line, backgroundColor: p.hoverSeg === s ? C.surface : C.bg }}
             >
-              <div style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: SEG_COLOR[s], flexShrink: 0 }} />
-              <Txt c={C.fg} s={12} nowrap grow>
+              <div style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: SEG_COLOR[s], flexShrink: 0, borderWidth: s === 'system' ? 1 : 0, borderColor: C.lineHi }} />
+              <Txt c={p.hoverSeg === s ? C.fg : C.fg2} s={13} grow nowrap>
                 {SEGMENT_LABEL[s]}
               </Txt>
               {!p.compact && (
-                <Txt c={C.dim} s={12} mono>
-                  {`${fmtK(t.seg[s])} tok`.padStart(11)}
+                <Txt c={C.fg3} s={12} mono align="right" minW={96}>
+                  {`${fmtK(t.seg[s])} tok`}
                 </Txt>
               )}
-              <Txt c={C.fg} s={12} mono>
-                {fmt$(t.segCost[s]).padStart(7)}
+              <Txt c={C.fg} s={13} mono align="right" minW={64}>
+                {fmt$(t.segCost[s])}
               </Txt>
-              <div style={{ ...row, width: p.compact ? 60 : 120, height: 4, borderRadius: 2, backgroundColor: C.line, flexShrink: 0 }}>
-                <div style={{ height: 4, borderRadius: 2, width: `${Math.max(1, (t.segCost[s] / (t.cost || 1)) * 100)}%`, backgroundColor: SEG_COLOR[s] }} />
-              </div>
-              <Txt c={C.muted} s={12} mono>
-                {`${((t.segCost[s] / (t.cost || 1)) * 100).toFixed(1)}%`.padStart(6)}
+              <Txt c={C.fg3} s={12} mono align="right" minW={52}>
+                {pct(t.segCost[s], t.cost)}
               </Txt>
             </div>
           ))}
         </div>
-      </Panel>
+      </Section>
 
-      <Panel
+      <Section
         testId="timeline"
         title={`Every request · ${reqs.length}`}
         right={
-          <div style={{ ...row, gap: 12 }}>
-            <Legend c={C.green} l="cache read" />
-            <Legend c={C.yellow} l="cache write" />
-            <Legend c={C.red} l="cache break" />
+          <div style={{ ...row, gap: 8 }}>
+            <div style={{ width: 10, height: 2, borderRadius: 1, backgroundColor: C.red }} />
+            <Txt c={C.fg3} s={12}>
+              cache break
+            </Txt>
           </div>
         }
       >
-        <div style={{ ...row, alignItems: 'flex-end', height: p.chartH + 8, gap: reqs.length > 60 ? 1 : 3 }} onMouseLeave={() => p.setHoverReq(null)}>
-          {reqs.map((r, i) => {
-            const total = totalInput(r.usage) + r.usage.output
-            const h = (total / max) * p.chartH
-            const dim = p.hoverReq != null && p.hoverReq !== i
-            return (
-              <div
-                key={r.id + i}
-                testId={`req-${i}`}
-                onMouseMove={() => p.hoverReq !== i && p.setHoverReq(i)}
-                style={{ ...col, flexGrow: 1, flexBasis: 0, minWidth: 2, maxWidth: 34, height: p.chartH + 8, justifyContent: 'flex-end', gap: 0 }}
-              >
-                {r.cacheBreak ? <div style={{ height: 4, borderRadius: 2, backgroundColor: C.red, marginBottom: 3, flexShrink: 0, pointerEvents: 'none' }} /> : null}
-                <div style={{ ...col, height: Math.max(2, h), borderRadius: 2, overflow: 'hidden', flexShrink: 0, pointerEvents: 'none' }}>
-                  {order.map((s) => (
-                    <div key={s} style={{ flexGrow: Math.max(0, r.seg[s]), flexBasis: 0, pointerEvents: 'none', backgroundColor: dim ? mix(segColor(s), C.panel, 0.6) : segColor(s) }} />
-                  ))}
+        <div style={{ ...col, gap: 0 }}>
+          <div style={{ ...row, alignItems: 'flex-end', height: p.chartH + 8, gap }} onMouseLeave={() => p.setHoverReq(null)}>
+            {reqs.map((r, i) => {
+              const total = totalInput(r.usage) + r.usage.output
+              const h = (total / max) * p.chartH
+              const dim = p.hoverReq != null && p.hoverReq !== i
+              return (
+                <div
+                  key={r.id + i}
+                  testId={`req-${i}`}
+                  onMouseMove={() => p.hoverReq !== i && p.setHoverReq(i)}
+                  style={{ ...col, flexGrow: 1, flexBasis: 0, minWidth: 2, maxWidth: 28, height: p.chartH + 8, justifyContent: 'flex-end' }}
+                >
+                  {r.cacheBreak ? <div style={{ height: 2, borderRadius: 1, backgroundColor: C.red, marginBottom: 3, flexShrink: 0, pointerEvents: 'none' }} /> : null}
+                  <div style={{ ...col, height: Math.max(2, h), borderTopLeftRadius: 2, borderTopRightRadius: 2, overflow: 'hidden', flexShrink: 0, pointerEvents: 'none' }}>
+                    {order.map((s) => (
+                      <div key={s} style={{ flexGrow: Math.max(0, r.seg[s]), flexBasis: 0, pointerEvents: 'none', backgroundColor: dim ? mix(segColor(s), C.bg, 0.6) : segColor(s) }} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
+          <div style={hair} />
         </div>
-        <div style={{ ...row, height: 5, gap: reqs.length > 60 ? 1 : 3 }}>
-          {reqs.map((r, i) => {
-            const inp = totalInput(r.usage) || 1
-            return (
-              <div key={i} style={{ ...row, flexGrow: 1, flexBasis: 0, minWidth: 2, maxWidth: 34, height: 5, borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ height: 5, flexGrow: r.usage.cacheRead / inp, flexBasis: 0, backgroundColor: C.green }} />
-                <div style={{ height: 5, flexGrow: (r.usage.cacheWrite + r.usage.input) / inp, flexBasis: 0, backgroundColor: r.cacheBreak ? C.red : C.yellow }} />
-              </div>
-            )
-          })}
-        </div>
-        <div style={{ ...row, gap: 10, height: 18 }}>
+        <div style={{ ...row, gap: 12, height: 18 }}>
           {hr ? (
             <>
-              <Txt testId="req-readout" c={C.fg} s={12} w={600} mono>
+              <Txt testId="req-readout" c={C.fg} s={12} w={500} mono>
                 {`turn ${(p.hoverReq ?? 0) + 1}`}
               </Txt>
-              <Txt c={C.muted} s={12} mono nowrap grow>
+              <Txt c={C.fg3} s={12} mono nowrap grow>
                 {`${hr.model.replace('claude-', '')}${hr.sidechain ? ' (sub-agent)' : ''} · in ${fmtK(totalInput(hr.usage))} = ${fmtK(hr.usage.cacheRead)} read + ${fmtK(hr.usage.cacheWrite)} write · out ${fmtK(hr.usage.output)}${hr.cacheBreak ? ` · ${hr.cacheBreak.reason}` : ''}`}
               </Txt>
               <Txt c={hr.cacheBreak ? C.red : C.fg} s={12} mono>
@@ -517,176 +541,159 @@ function Overview(p: { scope: Session[]; t: ReturnType<typeof totals>; hoverReq:
               </Txt>
             </>
           ) : (
-            <Txt c={C.dim} s={12}>
+            <Txt c={C.fg3} s={12}>
               Hover a request to see what it carried. Every turn resends the prefix and all history.
             </Txt>
           )}
         </div>
-      </Panel>
+      </Section>
     </div>
   )
 }
 
-function Legend({ c, l }: { c: string; l: string }) {
+function Offenders({ offenders, repeats, open, setOpen, total, compact }: { offenders: ReturnType<typeof topToolResults>; repeats: ReturnType<typeof repeatedCalls>; open: string | null; setOpen: (s: string | null) => void; total: number; compact: boolean }) {
   return (
-    <div style={{ ...row, gap: 5 }}>
-      <div style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: c }} />
-      <Txt c={C.dim} s={11}>
-        {l}
-      </Txt>
-    </div>
-  )
-}
-
-function Offenders({ offenders, repeats, open, setOpen, total }: { offenders: ReturnType<typeof topToolResults>; repeats: ReturnType<typeof repeatedCalls>; open: string | null; setOpen: (s: string | null) => void; total: number }) {
-  const max = Math.max(0.0001, ...offenders.map((o) => o.cost))
-  return (
-    <div style={{ ...col, gap: 10, flexGrow: 1, minHeight: 0, overflowY: 'scroll' }}>
-      <Panel title="Tool results by what they cost to carry" right={<Txt c={C.dim} s={11}>size × turns resent, billed at cache rates</Txt>}>
-        <div style={{ ...col, gap: 2 }}>
-          {offenders.map((o, i) => (
-            <div key={o.uuid} style={{ ...col, flexShrink: 0 }}>
-              <div
-                testId={`off-${i}`}
-                onClick={() => setOpen(open === o.uuid ? null : o.uuid)}
-                style={{ ...row, gap: 10, padding: 6, borderRadius: 6, cursor: 'pointer', backgroundColor: open === o.uuid ? C.panelHi : C.panel, hover: { backgroundColor: C.panelHi } }}
-              >
-                <Txt c={C.faint} s={11} mono>
-                  {String(i + 1).padStart(2)}
-                </Txt>
-                <div style={{ ...row, paddingLeft: 6, paddingRight: 6, borderRadius: 4, backgroundColor: mix(C.yellow, C.panel, 0.85), flexShrink: 0 }}>
-                  <Txt c={C.yellow} s={11} mono>
+    <div style={{ ...col, gap: 28, flexGrow: 1, minHeight: 0, overflowY: 'scroll' }}>
+      <Section title="Tool results by carry cost" right={!compact ? <Txt c={C.fg3} s={12}>size × turns resent, billed at cache rates</Txt> : undefined}>
+        <div style={{ ...col }}>
+          {offenders.map((o, i) => {
+            const isOpen = open === o.uuid
+            return (
+              <div key={o.uuid} style={{ ...col, flexShrink: 0, borderTopWidth: i === 0 ? 0 : 1, borderColor: C.line }}>
+                <div
+                  testId={`off-${i}`}
+                  onClick={() => setOpen(isOpen ? null : o.uuid)}
+                  style={{ ...row, gap: 14, height: 34, paddingLeft: 8, paddingRight: 8, borderRadius: 4, cursor: 'pointer', backgroundColor: isOpen ? C.surfaceHi : C.bg, hover: { backgroundColor: isOpen ? C.surfaceHi : C.surface } }}
+                >
+                  <Txt c={C.fg3} s={12} mono minW={40}>
                     {o.tool}
                   </Txt>
+                  <Txt c={isOpen ? C.fg : C.fg2} s={12} mono nowrap grow>
+                    {cleanPath(o.label.replace(/^\S+ /, ''))}
+                  </Txt>
+                  <Txt c={C.fg3} s={12} mono align="right" minW={90}>
+                    {`${fmtK(o.tokens)} × ${o.carried}`}
+                  </Txt>
+                  <Txt c={C.fg} s={13} mono align="right" minW={60}>
+                    {fmt$(o.cost)}
+                  </Txt>
                 </div>
-                <Txt c={C.fg} s={12} mono nowrap grow>
-                  {o.label.replace(/^\S+ /, '').replace(process.env.HOME ?? '#', '~').replace('/Users/sam/code/', '')}
+                {isOpen && (
+                  <div style={{ ...col, gap: 10, marginTop: 4, marginBottom: 12, marginLeft: 8, marginRight: 8, padding: 14, borderRadius: 6, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line }}>
+                    <Txt c={C.fg3} s={12}>
+                      {`${o.session} · ${pct(o.cost, total)} of spend · fix: head/tail window, full copy on disk`}
+                    </Txt>
+                    <code code={o.preview.split('\n').slice(0, 14).join('\n')} language="ts" style={{ fontSize: 12, fontFamily: MONO, height: 14 * 17, overflow: 'hidden' }} theme={{ ...TEXT_THEME, bg: C.surface }} />
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </Section>
+      {repeats.length > 0 && (
+        <Section title="Repeated identical calls">
+          <div style={{ ...col }}>
+            {repeats.map((r, i) => (
+              <div key={r.key} testId={`rep-${i}`} style={{ ...row, gap: 14, height: 32, paddingLeft: 8, paddingRight: 8, flexShrink: 0, borderTopWidth: i === 0 ? 0 : 1, borderColor: C.line }}>
+                <Txt c={C.fg} s={12} mono minW={40}>
+                  {`${r.count}×`}
                 </Txt>
-                <Txt c={C.dim} s={12} mono>
-                  {`${fmtK(o.tokens)} × ${o.carried}`.padStart(11)}
+                <Txt c={C.fg2} s={12} mono nowrap grow>
+                  {cleanPath(r.label)}
                 </Txt>
-                <div style={{ ...row, width: 80, height: 4, borderRadius: 2, backgroundColor: C.line, flexShrink: 0 }}>
-                  <div style={{ height: 4, borderRadius: 2, width: `${(o.cost / max) * 100}%`, backgroundColor: C.yellow }} />
-                </div>
-                <Txt c={C.fg} s={12} mono>
-                  {fmt$(o.cost).padStart(7)}
+                <Txt c={C.fg3} s={12} mono>
+                  {`${fmtK(r.wastedTokens)} tok re-fetched`}
                 </Txt>
               </div>
-              {open === o.uuid && (
-                <div style={{ ...col, gap: 6, marginLeft: 30, marginBottom: 6, padding: 10, borderRadius: 8, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line }}>
-                  <Txt c={C.muted} s={11}>
-                    {`${o.session} · ${((o.cost / (total || 1)) * 100).toFixed(1)}% of spend · fix: head/tail window + full copy on disk`}
-                  </Txt>
-                  <code code={o.preview.split('\n').slice(0, 14).join('\n')} language="ts" style={{ fontSize: 11, height: 14 * 15, overflow: 'hidden' }} theme={{ bg: C.bg, text: C.fg }} />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </Panel>
-      {repeats.length > 0 && (
-        <Panel title="Repeated identical calls">
-          {repeats.map((r, i) => (
-            <div key={r.key} testId={`rep-${i}`} style={{ ...row, gap: 10, padding: 4, flexShrink: 0 }}>
-              <Txt c={C.red} s={12} mono>
-                {`${r.count}×`}
-              </Txt>
-              <Txt c={C.fg} s={12} mono nowrap grow>
-                {r.label}
-              </Txt>
-              <Txt c={C.dim} s={12} mono>
-                {`${fmtK(r.wastedTokens)} tok re-fetched`}
-              </Txt>
-            </div>
-          ))}
-        </Panel>
+            ))}
+          </div>
+        </Section>
       )}
     </div>
   )
 }
 
 function Fixes({ fixes, enabled, toggle, cursor, setCursor, cost, after, tasks }: { fixes: Fix[]; enabled: Set<string>; toggle: (id: string) => void; cursor: number; setCursor: (n: number) => void; cost: number; after: number; tasks: number }) {
-  const max = Math.max(0.0001, ...fixes.map((f) => f.savings))
   return (
-    <div style={{ ...col, gap: 10, flexGrow: 1, minHeight: 0, overflowY: 'scroll' }}>
-      <div style={{ ...row, gap: 14, flexShrink: 0, paddingLeft: 4, paddingRight: 4, flexWrap: 'wrap' }}>
-        <Txt c={C.muted} s={13}>
-          Cost per task
-        </Txt>
-        <Txt c={C.fg} s={20} w={600} mono>
-          {fmt$(cost / Math.max(1, tasks))}
-        </Txt>
-        <Txt c={C.dim} s={16}>
-          →
-        </Txt>
-        <Txt testId="fix-after" c={enabled.size ? C.green : C.dim} s={20} w={600} mono>
-          {fmt$(after / Math.max(1, tasks))}
-        </Txt>
-        <Txt c={C.dim} s={12} grow>
-          {enabled.size ? `${enabled.size} of ${fixes.length} fixes · projection from replaying transcripts, confirm with an eval` : 'space toggles the selected fix · x toggles all'}
-        </Txt>
+    <div style={{ ...col, gap: 20, flexGrow: 1, minHeight: 0, overflowY: 'scroll' }}>
+      <div style={{ ...row, alignItems: 'flex-end', gap: 36, flexShrink: 0, flexWrap: 'wrap' }}>
+        <div style={{ ...col, gap: 6 }}>
+          <Label>Cost per task</Label>
+          <Txt c={C.fg} s={26}>
+            {fmt$(cost / Math.max(1, tasks))}
+          </Txt>
+        </div>
+        <div style={{ ...col, gap: 6 }}>
+          <Label>With selected fixes</Label>
+          <Txt testId="fix-after" c={enabled.size ? C.green : C.fg4} s={26}>
+            {fmt$(after / Math.max(1, tasks))}
+          </Txt>
+        </div>
+        <div style={{ ...col, flexGrow: 1, flexShrink: 1, minWidth: 200, paddingBottom: 5 }}>
+          <Txt c={C.fg3} s={12}>
+            {enabled.size ? `${enabled.size} of ${fixes.length} fixes · projected from the recorded transcripts, confirm with an eval` : 'space toggles the selected fix · x toggles all'}
+          </Txt>
+        </div>
       </div>
-      {fixes.map((f, i) => {
-        const on = enabled.has(f.id)
-        const cur = i === cursor
-        return (
-          <div
-            key={f.id}
-            testId={`fix-${f.id}`}
-            onClick={() => (setCursor(i), toggle(f.id))}
-            style={{ ...row, alignItems: 'flex-start', gap: 12, padding: 12, borderRadius: 10, flexShrink: 0, cursor: 'pointer', backgroundColor: on ? mix(C.green, C.panel, 0.92) : C.panel, borderWidth: 1, borderColor: cur ? C.blue : on ? mix(C.green, C.panel, 0.55) : C.line, hover: { borderColor: C.lineHi } }}
-          >
-            <div style={{ ...row, justifyContent: 'center', width: 18, height: 18, marginTop: 1, borderRadius: 5, flexShrink: 0, borderWidth: 1.5, borderColor: on ? C.green : C.lineHi, backgroundColor: on ? C.green : C.panel }}>
-              {on && (
-                <Txt c={C.bg} s={12} w={700}>
-                  ✓
-                </Txt>
-              )}
-            </div>
-            <div style={{ ...col, gap: 5, flexGrow: 1, flexShrink: 1, minWidth: 0 }}>
-              <div style={{ ...row, gap: 8 }}>
-                <Txt c={C.fg} s={13} w={600} nowrap grow>
-                  {f.title}
-                </Txt>
-                <Pill c={f.ship === 'ship' ? C.green : C.blue} l={f.ship === 'ship' ? 'ship' : 'flag'} />
-                <Txt c={C.green} s={14} w={600} mono>
-                  {`−${fmt$(f.savings)}`}
-                </Txt>
+      <div style={{ ...col }}>
+        {fixes.map((f, i) => {
+          const on = enabled.has(f.id)
+          const cur = i === cursor
+          return (
+            <div
+              key={f.id}
+              testId={`fix-${f.id}`}
+              onClick={() => (setCursor(i), toggle(f.id))}
+              style={{ ...row, alignItems: 'flex-start', gap: 14, paddingTop: 14, paddingBottom: 14, paddingLeft: 12, paddingRight: 12, borderRadius: 6, flexShrink: 0, cursor: 'pointer', borderTopWidth: i === 0 ? 0 : 1, borderColor: C.line, backgroundColor: cur ? C.surfaceHi : C.bg, hover: { backgroundColor: cur ? C.surfaceHi : C.surface } }}
+            >
+              <div style={{ ...row, justifyContent: 'center', width: 16, height: 16, marginTop: 2, borderRadius: 4, flexShrink: 0, borderWidth: 1, borderColor: on ? C.fg : C.lineHi, backgroundColor: on ? C.fg : C.bg }}>
+                {on && (
+                  <Txt c={C.bg} s={11} w={600}>
+                    ✓
+                  </Txt>
+                )}
               </div>
-              <div style={{ ...row, gap: 8 }}>
-                <Txt c={C.dim} s={11} mono>
-                  {f.area.toLowerCase()}
-                </Txt>
-                <Txt c={C.faint} s={11} mono nowrap>
-                  {f.flag}
-                </Txt>
-                <div style={{ ...row, flexGrow: 1, height: 3, borderRadius: 2, backgroundColor: C.line }}>
-                  <div style={{ height: 3, borderRadius: 2, width: `${(f.savings / max) * 100}%`, backgroundColor: C.green }} />
+              <div style={{ ...col, gap: 6, flexGrow: 1, flexShrink: 1, minWidth: 0 }}>
+                <div style={{ ...row, gap: 10 }}>
+                  <Txt c={on || cur ? C.fg : C.fg2} s={14} w={500} nowrap grow>
+                    {f.title}
+                  </Txt>
+                  <Badge l={f.ship === 'ship' ? 'ship' : 'flag'} />
+                  <Txt c={C.green} s={13} mono align="right" minW={64}>
+                    {`−${fmt$(f.savings)}`}
+                  </Txt>
                 </div>
-                <Txt c={C.muted} s={11} mono>
-                  {`${((f.savings / (cost || 1)) * 100).toFixed(1)}%`}
+                <Txt c={C.fg3} s={13}>
+                  {f.change}
                 </Txt>
+                <div style={{ ...row, gap: 14 }}>
+                  <Txt c={C.fg3} s={11} mono>
+                    {f.flag}
+                  </Txt>
+                  <Txt c={C.fg4} s={11} mono>
+                    {`${f.area.toLowerCase()} · ${pct(f.savings, cost)} of spend`}
+                  </Txt>
+                </div>
+                {cur &&
+                  f.evidence.slice(0, 3).map((e, k) => (
+                    <Txt key={k} c={C.fg3} s={11} mono nowrap>
+                      {cleanPath(e)}
+                    </Txt>
+                  ))}
               </div>
-              <Txt c={C.muted} s={12}>
-                {f.change}
-              </Txt>
-              {cur && f.evidence.slice(0, 3).map((e, k) => (
-                <Txt key={k} c={C.dim} s={11} mono nowrap>
-                  {`· ${e.replace('/Users/sam/code/', '')}`}
-                </Txt>
-              ))}
             </div>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
 
-function Pill({ c, l }: { c: string; l: string }) {
+function Badge({ l }: { l: string }) {
   return (
-    <div style={{ ...row, paddingLeft: 7, paddingRight: 7, paddingTop: 1, paddingBottom: 1, borderRadius: 9, borderWidth: 1, borderColor: mix(c, C.panel, 0.5), flexShrink: 0 }}>
-      <Txt c={c} s={10} w={600}>
+    <div style={{ ...row, paddingLeft: 6, paddingRight: 6, height: 18, borderRadius: 4, borderWidth: 1, borderColor: C.lineHi, flexShrink: 0 }}>
+      <Txt c={C.fg3} s={10} mono>
         {l.toUpperCase()}
       </Txt>
     </div>
@@ -695,22 +702,23 @@ function Pill({ c, l }: { c: string; l: string }) {
 
 function Audit({ md, onWrite, path }: { md: string; onWrite: () => void; path: string }) {
   return (
-    <div style={{ ...col, gap: 10, flexGrow: 1, minHeight: 0 }}>
-      <div style={{ ...row, gap: 10, flexShrink: 0 }}>
-        <Txt c={C.dim} s={12} mono nowrap grow>
+    <div style={{ ...col, gap: 16, flexGrow: 1, minHeight: 0 }}>
+      <div style={{ ...row, gap: 12, flexShrink: 0 }}>
+        <Txt c={C.fg3} s={12} mono nowrap grow>
           {path.replace(process.cwd() + '/', './')}
         </Txt>
-        <div testId="write-audit" onClick={onWrite} style={{ ...row, gap: 6, paddingLeft: 12, paddingRight: 12, paddingTop: 5, paddingBottom: 5, borderRadius: 7, cursor: 'pointer', backgroundColor: C.blue, hover: { backgroundColor: mix(C.blue, C.fg, 0.25) } }}>
-          <Txt c={C.bg} s={12} w={600}>
+        <div testId="write-audit" onClick={onWrite} style={{ ...row, gap: 8, paddingLeft: 14, paddingRight: 14, height: 30, borderRadius: 15, cursor: 'pointer', backgroundColor: C.fg, hover: { backgroundColor: '#ffffff' } }}>
+          <Txt c={C.bg} s={13} w={500}>
             Write AUDIT.md
           </Txt>
-          <Txt c={mix(C.bg, C.blue, 0.4)} s={11} mono>
+          <Txt c={mix(C.bg, C.fg, 0.45)} s={11} mono>
             w
           </Txt>
         </div>
       </div>
-      <div style={{ ...col, flexGrow: 1, minHeight: 0, overflowY: 'scroll', backgroundColor: C.panel, borderRadius: 10, borderWidth: 1, borderColor: C.line, padding: 18 }}>
-        <markdown source={md} theme={{ bg: C.panel, text: C.fg, textMuted: C.muted, accent: C.blue, border: C.line, codeWash: C.bg }} style={{ fontSize: 13, flexShrink: 0 }} />
+      <div style={hair} />
+      <div style={{ ...col, flexGrow: 1, minHeight: 0, overflowY: 'scroll', paddingRight: 8 }}>
+        <markdown source={md} theme={TEXT_THEME} style={{ fontSize: 13, fontFamily: SANS, flexShrink: 0, width: '100%', minWidth: 0 }} />
       </div>
     </div>
   )
