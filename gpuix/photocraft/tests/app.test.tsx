@@ -72,6 +72,10 @@ describeNative('PhotoCraft in the GPU test renderer', () => {
     expect(ed.history.entries.at(-1)!.label).toBe('Opacity')
 
     await click('filter-gaussian')
+    expect(text()).toContain('Gaussian Blur')
+    expect(ed.filterPreview).not.toBeNull()
+    await click('dialog-apply')
+    expect(ed.filterPreview).toBeNull()
     expect(ed.history.entries.at(-1)!.label).toBe('Gaussian Blur')
 
     await click('add-mask')
@@ -123,5 +127,53 @@ describeNative('PhotoCraft in the GPU test renderer', () => {
 
     await click('export')
     expect(exported).toBe(1)
+
+    // Command palette: Ctrl-K, type, Enter.
+    renderer.simulateKeystrokes('ctrl-k')
+    await tick()
+    draw()
+    renderer.flush()
+    expect(text()).toContain('Search commands, tools and adjustments')
+    renderer.simulateKeystrokes('l e v')
+    await tick()
+    draw()
+    renderer.flush()
+    renderer.simulateKeystrokes('enter')
+    await tick()
+    renderer.flush()
+    expect(ed.layer!.kind === 'adjust' && ed.layer!.adjust.kind).toBe('levels')
+
+    // Menu bar: Image › Rotate 90° Clockwise.
+    await click('menu-Image')
+    await click('cmd-rot-cw')
+    expect([ed.doc.width, ed.doc.height]).toEqual([250, 400])
+
+    // Crop tool: drag a frame inside the canvas, then Crop.
+    await click('tool-crop')
+    const L2 = computeLayout(W, H)
+    const mx = L2.canvas.x + L2.canvas.w / 2
+    const my = L2.canvas.y + L2.canvas.h / 2
+    renderer.nativeSimulateMouseDown(mx - 120, my - 120, 0)
+    renderer.flush()
+    renderer.nativeSimulateMouseMove(mx + 60, my + 90, 0)
+    renderer.flush()
+    renderer.nativeSimulateMouseUp(mx + 60, my + 90, 0)
+    renderer.flush()
+    await click('crop-apply')
+    expect(ed.doc.width).toBeLessThan(250)
+    expect(ed.history.entries.at(-1)!.label).toBe('Crop')
+
+    // Type tool: click, type, Esc commits a type layer.
+    await click('tool-text')
+    renderer.nativeSimulateMouseDown(mx - 40, my, 0)
+    renderer.nativeSimulateMouseUp(mx - 40, my, 0)
+    renderer.flush()
+    expect(ed.textEdit).not.toBeNull()
+    renderer.simulateKeystrokes('h i')
+    renderer.flush()
+    renderer.simulateKeystrokes('escape')
+    renderer.flush()
+    expect(ed.textEdit).toBeNull()
+    expect((ed.layer as any).text.content).toBe('hi')
   })
 })

@@ -1,5 +1,6 @@
 import type { Adjust } from './adjust'
 import type { BlendMode } from './blend'
+import type { TextSpec } from './text'
 
 export interface LayerBase {
   id: number
@@ -15,6 +16,8 @@ export interface PixelLayer extends LayerBase {
   kind: 'pixel'
   /** Straight-alpha RGBA, doc.width × doc.height. */
   pixels: Uint8ClampedArray
+  /** Live type: pixels are re-rendered from this until the layer is painted on (rasterized). */
+  text?: TextSpec
 }
 
 export interface AdjustLayer extends LayerBase {

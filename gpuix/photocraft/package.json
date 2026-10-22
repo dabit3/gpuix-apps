@@ -17,11 +17,13 @@
     "@gpuix/native": "0.11.0",
     "@gpuix/react": "0.11.0",
     "jpeg-js": "0.4.4",
+    "opentype.js": "1.3.4",
     "pngjs": "7.0.0",
     "react": "19.3.1"
   },
   "devDependencies": {
     "@types/bun": "^1.4.3",
+    "@types/opentype.js": "^1.3.10",
     "@types/pngjs": "^6.0.5",
     "@types/react": "^19.3.0",
     "typescript": "^7.0.2"

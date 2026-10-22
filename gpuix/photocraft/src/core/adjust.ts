@@ -1,8 +1,10 @@
 // Non-destructive adjustment layers: each one maps a straight RGB color (0..1) to a new color.
 
-export type AdjustKind = 'hue-sat' | 'brightness-contrast' | 'curves' | 'exposure' | 'vibrance' | 'black-white' | 'invert' | 'threshold'
+export type AdjustKind = 'levels' | 'color-balance' | 'hue-sat' | 'brightness-contrast' | 'curves' | 'exposure' | 'vibrance' | 'black-white' | 'invert' | 'threshold'
 
 export type Adjust =
+  | { kind: 'levels'; inBlack: number; gamma: number; inWhite: number; outBlack: number; outWhite: number }
+  | { kind: 'color-balance'; cyanRed: number; magentaGreen: number; yellowBlue: number; preserveLuminosity: boolean }
   | { kind: 'hue-sat'; hue: number; saturation: number; lightness: number }
   | { kind: 'brightness-contrast'; brightness: number; contrast: number }
   | { kind: 'curves'; points: [number, number][] }
@@ -13,6 +15,8 @@ export type Adjust =
   | { kind: 'threshold'; level: number }
 
 export const ADJUST_LABELS: Record<AdjustKind, string> = {
+  levels: 'Levels',
+  'color-balance': 'Color Balance',
   'hue-sat': 'Hue / Saturation',
   'brightness-contrast': 'Brightness / Contrast',
   curves: 'Curves',
@@ -25,6 +29,10 @@ export const ADJUST_LABELS: Record<AdjustKind, string> = {
 
 export function defaultAdjust(kind: AdjustKind): Adjust {
   switch (kind) {
+    case 'levels':
+      return { kind, inBlack: 0.06, gamma: 1.1, inWhite: 0.94, outBlack: 0, outWhite: 1 }
+    case 'color-balance':
+      return { kind, cyanRed: 12, magentaGreen: 0, yellowBlue: -14, preserveLuminosity: true }
     case 'hue-sat':
       return { kind, hue: 0, saturation: 25, lightness: 0 }
     case 'brightness-contrast':
@@ -140,6 +148,31 @@ export type Adjuster = (r: number, g: number, b: number, out: number[]) => void
 export function makeAdjuster(a: Adjust): Adjuster {
   const hsl = [0, 0, 0]
   switch (a.kind) {
+    case 'levels': {
+      const lut = levelsLut(a)
+      return (r, g, b, o) => {
+        o[0] = lut[(r * 255 + 0.5) | 0]!
+        o[1] = lut[(g * 255 + 0.5) | 0]!
+        o[2] = lut[(b * 255 + 0.5) | 0]!
+      }
+    }
+    case 'color-balance': {
+      // Midtone shift: strongest at 50% luma, fading to nothing at black and white.
+      const k = [a.cyanRed / 100, a.magentaGreen / 100, a.yellowBlue / 100]
+      return (r, g, b, o) => {
+        const l0 = 0.3 * r + 0.59 * g + 0.11 * b
+        const wgt = 4 * l0 * (1 - l0) * 0.32
+        o[0] = clamp01(r + k[0]! * wgt)
+        o[1] = clamp01(g + k[1]! * wgt)
+        o[2] = clamp01(b + k[2]! * wgt)
+        if (a.preserveLuminosity) {
+          const d = l0 - (0.3 * o[0]! + 0.59 * o[1]! + 0.11 * o[2]!)
+          o[0] = clamp01(o[0]! + d)
+          o[1] = clamp01(o[1]! + d)
+          o[2] = clamp01(o[2]! + d)
+        }
+      }
+    }
     case 'hue-sat': {
       const dh = a.hue / 360
       const ds = a.saturation / 100
@@ -207,4 +240,15 @@ export function makeAdjuster(a: Adjust): Adjuster {
       }
     }
   }
+}
+
+/** Input black/white points, midtone gamma, then output range: the classic Levels transfer curve. */
+export function levelsLut(a: { inBlack: number; gamma: number; inWhite: number; outBlack: number; outWhite: number }): Float32Array {
+  const lut = new Float32Array(256)
+  const span = Math.max(1 / 255, a.inWhite - a.inBlack)
+  for (let i = 0; i < 256; i++) {
+    const t = clamp01((i / 255 - a.inBlack) / span)
+    lut[i] = clamp01(a.outBlack + Math.pow(t, 1 / Math.max(0.1, a.gamma)) * (a.outWhite - a.outBlack))
+  }
+  return lut
 }

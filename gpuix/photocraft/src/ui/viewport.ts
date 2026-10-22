@@ -11,6 +11,14 @@ export type Preview =
   | { kind: 'line'; a: { x: number; y: number }; b: { x: number; y: number } }
   | null
 
+type P = { x: number; y: number }
+/** Persistent on-canvas chrome (screen space): crop frame, transform box, text caret, clone source. */
+export type Overlay =
+  | { kind: 'crop'; a: P; b: P }
+  | { kind: 'xform'; pts: P[] }
+  | { kind: 'textbox'; a: P; b: P; caret: { x: number; y0: number; y1: number } | null }
+  | { kind: 'cross'; x: number; y: number }
+
 export class Viewport {
   w = 1
   h = 1
@@ -214,8 +222,107 @@ export class Viewport {
     }
   }
 
+  private line(ax: number, ay: number, bx: number, by: number, c: readonly number[], shadow = true) {
+    const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay)))
+    for (let i = 0; i <= n; i++) {
+      const t = i / n
+      const x = ax + (bx - ax) * t
+      const y = ay + (by - ay) * t
+      if (shadow) this.plot(x + 1, y + 1, [0, 0, 0])
+      this.plot(x, y, c)
+    }
+  }
+
+  /** Square handle: white fill, dark rim. */
+  private handle(cx: number, cy: number, r = 4) {
+    cx = Math.round(cx)
+    cy = Math.round(cy)
+    for (let dy = -r - 1; dy <= r + 1; dy++)
+      for (let dx = -r - 1; dx <= r + 1; dx++) this.plot(cx + dx, cy + dy, Math.abs(dx) > r || Math.abs(dy) > r ? [10, 12, 16] : [240, 243, 246])
+  }
+
+  private shade(x0: number, y0: number, x1: number, y1: number, k: number) {
+    x0 = Math.max(0, Math.floor(x0))
+    y0 = Math.max(0, Math.floor(y0))
+    x1 = Math.min(this.w, Math.ceil(x1))
+    y1 = Math.min(this.h, Math.ceil(y1))
+    for (let y = y0; y < y1; y++)
+      for (let x = x0; x < x1; x++) {
+        const o = (y * this.w + x) * 4
+        this.out[o] = this.out[o]! * k + 10 * (1 - k)
+        this.out[o + 1] = this.out[o + 1]! * k + 12 * (1 - k)
+        this.out[o + 2] = this.out[o + 2]! * k + 16 * (1 - k)
+      }
+  }
+
+  private overlay(o: Overlay, phase: number) {
+    const W = [240, 243, 246]
+    if (o.kind === 'crop') {
+      const x0 = Math.round(Math.min(o.a.x, o.b.x)), x1 = Math.round(Math.max(o.a.x, o.b.x)), y0 = Math.round(Math.min(o.a.y, o.b.y)), y1 = Math.round(Math.max(o.a.y, o.b.y))
+      this.shade(0, 0, this.w, y0, 0.38)
+      this.shade(0, y1, this.w, this.h, 0.38)
+      this.shade(0, y0, x0, y1, 0.38)
+      this.shade(x1, y0, this.w, y1, 0.38)
+      const thirds = [128, 133, 140]
+      for (const t of [1 / 3, 2 / 3]) {
+        this.line(x0 + (x1 - x0) * t, y0, x0 + (x1 - x0) * t, y1, thirds, false)
+        this.line(x0, y0 + (y1 - y0) * t, x1, y0 + (y1 - y0) * t, thirds, false)
+      }
+      this.line(x0, y0, x1, y0, W)
+      this.line(x1, y0, x1, y1, W)
+      this.line(x1, y1, x0, y1, W)
+      this.line(x0, y1, x0, y0, W)
+      // Bold L-shaped corner grips and edge ticks.
+      const L = Math.min(18, (x1 - x0) / 3, (y1 - y0) / 3)
+      for (const [cx, cy, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x1, y1, -1, -1], [x0, y1, 1, -1]] as const)
+        for (let k = -1; k <= 1; k++) {
+          this.line(cx + k * sx * 0, cy + sy * (k + 1), cx + sx * L, cy + sy * (k + 1), W, false)
+          this.line(cx + sx * (k + 1), cy, cx + sx * (k + 1), cy + sy * L, W, false)
+        }
+      const mx = (x0 + x1) / 2, my = (y0 + y1) / 2
+      for (let k = 0; k < 3; k++) {
+        this.line(mx - 9, y0 + k, mx + 9, y0 + k, W, false)
+        this.line(mx - 9, y1 - k, mx + 9, y1 - k, W, false)
+        this.line(x0 + k, my - 9, x0 + k, my + 9, W, false)
+        this.line(x1 - k, my - 9, x1 - k, my + 9, W, false)
+      }
+    } else if (o.kind === 'xform') {
+      const p = o.pts
+      for (let i = 0; i < 4; i++) this.line(p[i]!.x, p[i]!.y, p[(i + 1) % 4]!.x, p[(i + 1) % 4]!.y, W)
+      for (let i = 0; i < 4; i++) {
+        const a = p[i]!, b = p[(i + 1) % 4]!
+        this.handle(a.x, a.y)
+        this.handle((a.x + b.x) / 2, (a.y + b.y) / 2, 3)
+      }
+      const cx = (p[0]!.x + p[2]!.x) / 2, cy = (p[0]!.y + p[2]!.y) / 2
+      this.line(cx - 5, cy, cx + 5, cy, W)
+      this.line(cx, cy - 5, cx, cy + 5, W)
+    } else if (o.kind === 'textbox') {
+      const { a, b } = o
+      this.dashLine(a.x, a.y, b.x, a.y, phase)
+      this.dashLine(b.x, a.y, b.x, b.y, phase)
+      this.dashLine(b.x, b.y, a.x, b.y, phase)
+      this.dashLine(a.x, b.y, a.x, a.y, phase)
+      if (o.caret && phase < 4) {
+        this.line(o.caret.x, o.caret.y0, o.caret.x, o.caret.y1, W)
+        this.line(o.caret.x + 1, o.caret.y0, o.caret.x + 1, o.caret.y1, W, false)
+      }
+    } else {
+      const { x, y } = o
+      for (let t = 0; t < 32; t++) {
+        const ang = (t / 32) * Math.PI * 2
+        this.plot(x + Math.cos(ang) * 7, y + Math.sin(ang) * 7, W)
+        this.plot(x + Math.cos(ang) * 8, y + Math.sin(ang) * 8, [0, 0, 0])
+      }
+      this.line(x - 11, y, x - 4, y, W)
+      this.line(x + 4, y, x + 11, y, W)
+      this.line(x, y - 11, x, y - 4, W)
+      this.line(x, y + 4, x, y + 11, W)
+    }
+  }
+
   /** Copy base → out and draw ants, tool previews and the brush ring on top. */
-  present(phase: number, preview: Preview, ring: { x: number; y: number; r: number } | null) {
+  present(phase: number, preview: Preview, ring: { x: number; y: number; r: number } | null, overlays: Overlay[] = []) {
     this.out.set(this.base)
     const w = this.w
     for (let k = 0; k < this.edgeCount; k++) {
@@ -247,10 +354,13 @@ export class Viewport {
         const p = preview.pts
         for (let i = 1; i < p.length; i++) this.dashLine(p[i - 1]!.x, p[i - 1]!.y, p[i]!.x, p[i]!.y, phase)
       } else {
-        this.dashLine(preview.a.x, preview.a.y, preview.b.x, preview.b.y, 0, [113, 183, 255])
-        this.dashLine(preview.a.x + 1, preview.a.y, preview.b.x + 1, preview.b.y, 0, [10, 12, 16])
+        this.dashLine(preview.a.x, preview.a.y, preview.b.x, preview.b.y, 0, [240, 243, 246])
+        this.dashLine(preview.a.x + 1, preview.a.y + 1, preview.b.x + 1, preview.b.y + 1, 0, [10, 12, 16])
+        this.handle(preview.a.x, preview.a.y, 3)
+        this.handle(preview.b.x, preview.b.y, 3)
       }
     }
+    for (const o of overlays) this.overlay(o, phase)
     if (ring && ring.r >= 2) {
       const n = Math.max(24, Math.ceil(ring.r * 2 * Math.PI))
       for (let i = 0; i < n; i++) {

@@ -1,6 +1,7 @@
 import type { BlendMode } from '../core/blend'
 import { BLEND_MODES } from '../core/blend'
 import type { Editor, Tool } from '../core/editor'
+import type { Dialog } from './commands'
 
 export interface KeyLike {
   key?: string
@@ -15,7 +16,7 @@ export function normKey(e: KeyLike): string {
   return (e.key ?? '').toLowerCase()
 }
 
-export const TOOL_KEYS: Record<string, Tool> = { v: 'move', m: 'marquee', o: 'ellipse', l: 'lasso', w: 'wand', b: 'brush', e: 'eraser', k: 'fill', g: 'gradient', i: 'eyedropper', h: 'hand' }
+export const TOOL_KEYS: Record<string, Tool> = { v: 'move', m: 'marquee', o: 'ellipse', l: 'lasso', w: 'wand', b: 'brush', e: 'eraser', k: 'fill', g: 'gradient', i: 'eyedropper', h: 'hand', c: 'crop', t: 'text', s: 'clone', j: 'heal' }
 
 export interface KeyActions {
   exportPng(): void
@@ -24,6 +25,20 @@ export interface KeyActions {
   fit(): void
   zoom(f: number): void
   toggleHelp(): void
+  palette?(): void
+  dialog?(d: Dialog): void
+  actualSize?(): void
+  setTool?(t: Tool): void
+}
+
+/** The printable character a key event types, if any (terminal mode may report letters as key "space"). */
+export function typedChar(e: KeyLike): string | null {
+  const m = e.modifiers ?? {}
+  if (m.ctrl || m.cmd) return null
+  const ch = e.keyChar
+  if (ch && ch.length >= 1 && ch >= ' ' && ch !== '\x7f' && [...ch].length === 1) return ch
+  if ((e.key ?? '').toLowerCase() === 'space') return ' '
+  return null
 }
 
 const nextBlend = (m: BlendMode, d: number) => BLEND_MODES[(BLEND_MODES.indexOf(m) + d + BLEND_MODES.length) % BLEND_MODES.length]!
@@ -34,7 +49,22 @@ export function handleKey(ed: Editor, e: KeyLike, act: KeyActions): boolean {
   const m = e.modifiers ?? {}
   const ctrl = !!(m.ctrl || m.cmd)
   if (ctrl) {
-    if (k === 'z' && m.shift) ed.redo()
+    if (k === 'k') act.palette?.()
+    else if (k === 't') ed.beginTransform()
+    else if (k === 'o') act.dialog?.({ kind: 'open' })
+    else if (k === 'p' && m.shift) act.dialog?.({ kind: 'place' })
+    else if (k === 'l') ed.addAdjustment('levels')
+    else if (k === 'm') ed.addAdjustment('curves')
+    else if (k === 'u') ed.addAdjustment('hue-sat')
+    else if (k === 'b') ed.addAdjustment('color-balance')
+    else if (k === 'i' && m.alt) act.dialog?.({ kind: 'resize' })
+    else if (k === 'i' && !m.shift) ed.addAdjustment('invert')
+    else if (k === 'e' && m.alt) ed.mergeDown()
+    else if (k === 'd' && m.alt) act.dialog?.({ kind: 'feather' })
+    else if (k === ']') ed.reorder(1)
+    else if (k === '[') ed.reorder(-1)
+    else if (k === '1') act.actualSize?.()
+    else if (k === 'z' && m.shift) ed.redo()
     else if (k === 'z') ed.undo()
     else if (k === 'y') ed.redo()
     else if (k === 'j') ed.duplicateLayer()
@@ -51,9 +81,16 @@ export function handleKey(ed: Editor, e: KeyLike, act: KeyActions): boolean {
     else return false
     return true
   }
+  if (k === 'f6' && m.shift) {
+    act.dialog?.({ kind: 'feather' })
+    return true
+  }
   if (TOOL_KEYS[k]) {
-    ed.tool = TOOL_KEYS[k]!
-    ed.emit()
+    if (act.setTool) act.setTool(TOOL_KEYS[k]!)
+    else {
+      ed.tool = TOOL_KEYS[k]!
+      ed.emit()
+    }
     return true
   }
   const L = ed.layer

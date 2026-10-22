@@ -2,6 +2,8 @@ export interface Layout {
   w: number
   h: number
   top: number
+  /** Menu bar row; the tool options row sits under it, filling the rest of `top`. */
+  menu: number
   status: number
   rail: number
   panel: number
@@ -14,7 +16,8 @@ export interface Layout {
 export function computeLayout(w: number, h: number): Layout {
   w = Math.max(320, Math.floor(w))
   h = Math.max(240, Math.floor(h))
-  const top = 44
+  const menu = 34
+  const top = menu + 40
   const status = 28
   const rail = 52
   const panel = w >= 1100 ? 296 : w >= 640 ? 236 : 0
@@ -22,6 +25,7 @@ export function computeLayout(w: number, h: number): Layout {
     w,
     h,
     top,
+    menu,
     status,
     rail,
     panel,

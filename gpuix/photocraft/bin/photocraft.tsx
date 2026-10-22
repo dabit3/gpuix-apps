@@ -20,7 +20,8 @@ Options:
   -v, --version       print the version
 
 Runs inside Ghostty or kitty (kitty graphics protocol). Ctrl-C quits.
-Keys: B brush · E eraser · M/O/L/W select · K fill · G gradient · I eyedropper · [ ] size
+Keys: B brush · E eraser · S clone · J heal · C crop · T type · M/O/L/W select · K fill · G gradient
+      Ctrl-K command palette · Ctrl-T free transform · Ctrl-L levels · Ctrl-M curves · [ ] size
       Ctrl-Z/Ctrl-Shift-Z undo/redo · Ctrl-J duplicate · Q mask · +/- blend · 1-0 opacity
       Ctrl-E export PNG · Ctrl-Shift-E JPEG · Ctrl-S save .pcraft · ? all keys`
 
@@ -109,6 +110,31 @@ const actions = {
   exportJpeg() {
     writeImageFile(jpgOut, ed.flattened())
     ed.emit(`Exported ${basename(jpgOut)} · ${kb(jpgOut)}`)
+  },
+  openFile(path: string) {
+    const p = resolve(path.replace(/^~(?=\/)/, process.env.HOME ?? '~'))
+    if (!existsSync(p)) return `No such file: ${path}`
+    try {
+      if (extname(p).toLowerCase() === '.pcraft') {
+        const next = Editor.openProject(readFileSync(p))
+        ed.load(next.doc, `Opened ${basename(p)} · ${next.doc.layers.length} layers`)
+      } else {
+        const img = fitImage(readImageFile(p), max)
+        const fresh = Editor.fromImage(img, basename(p))
+        ed.load(fresh.doc, `Opened ${basename(p)}`)
+      }
+    } catch (e) {
+      return `Couldn't open ${basename(p)}: ${(e as Error).message}`
+    }
+  },
+  placeFile(path: string) {
+    const p = resolve(path.replace(/^~(?=\/)/, process.env.HOME ?? '~'))
+    if (!existsSync(p)) return `No such file: ${path}`
+    try {
+      ed.placeImage(fitImage(readImageFile(p), max), basename(p, extname(p)))
+    } catch (e) {
+      return `Couldn't place ${basename(p)}: ${(e as Error).message}`
+    }
   },
   saveProject() {
     writeFileSync(projOut, ed.saveProject())
