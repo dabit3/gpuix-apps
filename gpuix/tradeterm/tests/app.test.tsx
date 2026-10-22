@@ -153,6 +153,22 @@ describeNative('tradeterm window', () => {
     expect(await app.getByTestId('sweep-view').count()).toBe(0)
   })
 
+  it('palette switches the data source to Hyperliquid and back', async () => {
+    const pick = async () => {
+      await press('/')
+      for (const ch of 'hl data') await press(ch === ' ' ? 'space' : ch)
+      expect(await app.getByTestId('cmd-exchange').count()).toBe(1)
+      const title = await app.getByTestId('cmd-exchange').textContent()
+      await app.getByTestId('cmd-exchange').click()
+      await settle(200)
+      expect(await app.getByTestId('palette').count()).toBe(0)
+      return title
+    }
+    expect(await pick()).toContain('Use Hyperliquid data')
+    expect(await pick()).toContain('Use Binance data')
+    expect(await text('symbol')).toBe('SOL-USD')
+  })
+
   it('switches timeframe with number keys', async () => {
     await press('5')
     await settle(400)

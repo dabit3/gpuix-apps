@@ -25,7 +25,7 @@ import {
   type OscSpec,
   type View,
 } from './chart'
-import { loadBars, loadTickers, streamKlines, type Loaded } from './data/feed'
+import { loadBars, loadTickers, streamKlines, type Exchange, type Loaded } from './data/feed'
 import { findIndicator, INDICATORS, type Series } from './indicators'
 import { Canvas } from './raster'
 import { loadState, saveState, type Drawing, type DrawingKind, type State } from './store'
@@ -99,6 +99,7 @@ export type AppProps = {
   bars?: number
   offline?: boolean
   strategy?: string
+  exchange?: Exchange
   /** Inject data (tests). Skips the network and the live stream. */
   preload?: Loaded
   onQuit?: () => void
@@ -133,6 +134,7 @@ export function App(props: AppProps) {
   const [st, setSt] = useState<State>(() => {
     const s = loadState()
     if (props.strategy && STRATEGIES.some((x) => x.id === props.strategy)) s.strategy = props.strategy
+    if (props.exchange) s.exchange = props.exchange
     return s
   })
   const [view, setView] = useState<View>({ start: 0, end: 100 })
@@ -192,7 +194,7 @@ export function App(props: AppProps) {
     if (props.preload && sym === props.symbol && tf === props.timeframe) return
     let alive = true
     setLoading(true)
-    loadBars(sym, tf, props.bars ?? 3000, { offline: props.offline }).then((d) => {
+    loadBars(sym, tf, props.bars ?? 3000, { offline: props.offline, exchange: st.exchange }).then((d) => {
       if (!alive) return
       setData(d)
       setLoading(false)
@@ -202,7 +204,7 @@ export function App(props: AppProps) {
     return () => {
       alive = false
     }
-  }, [sym, tf])
+  }, [sym, tf, st.exchange])
 
   useEffect(() => {
     if (props.preload || !data || data.source === 'sample') return
@@ -214,14 +216,14 @@ export function App(props: AppProps) {
         const next = b.t === last.t ? [...d.bars.slice(0, -1), b] : [...d.bars, b]
         return { ...d, bars: next }
       })
-    })
+    }, data.source)
   }, [data?.source, sym, tf])
 
   useEffect(() => {
     if (props.preload) return
     let alive = true
     const tick = () =>
-      loadTickers(stRef.current.watchlist)
+      loadTickers(stRef.current.watchlist, stRef.current.exchange)
         .then((t) => alive && setTickers(t))
         .catch(() => {})
     tick()
@@ -230,7 +232,7 @@ export function App(props: AppProps) {
       alive = false
       clearInterval(id)
     }
-  }, [])
+  }, [st.exchange, st.watchlist.join()])
 
   // View animation: zoom, reset and trade jumps ease out over ~280 ms instead of snapping.
   const viewRef = useRef(view)
@@ -437,6 +439,8 @@ export function App(props: AppProps) {
       out.push({ id: `ind-${id}`, title: `${on ? 'Hide' : 'Show'} ${IND_NAMES[id]}`, sub: def.pane === 'own' ? 'Indicator pane' : 'Chart overlay', icon: 'wave', hint: KEY_OF_IND[id], keywords: `${def.label} ${IND_NAMES[id]} indicator ${on ? 'hide' : 'show'}`, run: () => toggleIndicator(id) })
     }
     for (const c of CHART_TYPES) out.push({ id: `chart-${c.id}`, title: c.label, sub: `Chart style${st.chart === c.id ? ' · current' : ''}`, icon: 'candles', hint: 'c', keywords: `${c.label} chart style`, run: () => setChart(c.id) })
+    const hlFirst = st.exchange === 'hyperliquid'
+    out.push({ id: 'exchange', title: hlFirst ? 'Use Binance data' : 'Use Hyperliquid data', sub: hlFirst ? 'Data source · Binance first, then Coinbase and Hyperliquid' : 'Data source · Hyperliquid perps first (HYPE, AAVE, …)', icon: 'wave', keywords: 'hyperliquid hl perp perps exchange data source feed binance', run: () => update((s) => ({ ...s, exchange: s.exchange === 'hyperliquid' ? 'auto' : 'hyperliquid' })) })
     out.push({ id: 'log', title: st.log ? 'Linear scale' : 'Log scale', sub: 'Price axis', icon: 'wave', hint: 'l', keywords: 'log linear scale axis', run: () => update((s) => ({ ...s, log: !s.log })) })
     for (const t of TOOLS) out.push({ id: `tool-${t.id}`, title: t.label, sub: 'Drawing tool', icon: t.icon, hint: t.key, keywords: `${t.label} ${t.id} draw drawing`, run: () => setTool(t.id) })
     for (const s of STRATEGIES) out.push({ id: `strat-${s.id}`, title: `Backtest ${s.label}`, sub: `Strategy · ${STRATEGY_SHORT[s.id] ?? s.label}`, icon: 'play', hint: 'n', keywords: `${s.label} ${s.id} strategy backtest`, run: () => (setStrategy(s.id), wide && setPanel(true)) })
@@ -622,8 +626,8 @@ export function App(props: AppProps) {
     }
   }
 
-  const live = data?.source === 'binance' || data?.source === 'coinbase'
-  const srcText = data?.source === 'binance' ? 'Binance · live' : data?.source === 'coinbase' ? 'Coinbase · live' : data?.source === 'cache' ? 'Cached · offline' : data ? 'Sample data' : 'Connecting…'
+  const live = data?.source === 'binance' || data?.source === 'coinbase' || data?.source === 'hyperliquid'
+  const srcText = data?.source === 'binance' ? 'Binance · live' : data?.source === 'coinbase' ? 'Coinbase · live' : data?.source === 'hyperliquid' ? 'Hyperliquid · live' : data?.source === 'cache' ? 'Cached · offline' : data ? 'Sample data' : 'Connecting…'
 
   const dayAgo = last ? bars[Math.max(0, Math.round(indexOfTime(bars, last.t - 86400)))] : undefined
   const dayChange = last && dayAgo ? last.c / dayAgo.c - 1 : NaN

@@ -27,6 +27,7 @@ tradeterm [SYMBOL] [TIMEFRAME] [options]
   TIMEFRAME   1m 5m 15m 1h 4h 1D 1W (default 1h)
   -n, --bars <count>     history to load (default 3000; 26280 ≈ 3 years of 1h)
   -s, --strategy <id>    sma | rsi | donchian
+  -x, --exchange <name>  auto | hyperliquid | binance (auto: Binance → Coinbase → Hyperliquid)
       --offline          built-in sample data, no network
       --native           open a native window instead of the terminal
   -h, --help
@@ -72,8 +73,9 @@ Built to feel like a native Mac app that happens to live in a terminal pane:
 
 1. **Binance public market data** (`data-api.binance.vision`, REST klines + a kline WebSocket for the live candle and 24h tickers for the watchlist). `api.binance.com` returns HTTP 451 from US IPs, so the `binance.vision` mirror is the default.
 2. **Coinbase Exchange** public candles as a fallback.
-3. The last successful download from the local cache.
-4. A deterministic random-walk **sample** series, clearly badged `SAMPLE DATA`, so the app always opens (also `--offline`).
+3. **Hyperliquid** (`api.hyperliquid.xyz`): `candleSnapshot` over the public info endpoint (latest 5000 candles), a `candle` WebSocket subscription for the live bar, and `metaAndAssetCtxs` for watchlist prices of coins Binance doesn't list. Pass `-x hyperliquid` (or pick **Use Hyperliquid data** in the palette) to ask Hyperliquid first. Any Hyperliquid perp works, e.g. `tradeterm HYPE 15m -x hl`.
+4. The last successful download from the local cache.
+5. A deterministic random-walk **sample** series, clearly badged `SAMPLE DATA`, so the app always opens (also `--offline`).
 
 No API keys, no accounts.
 

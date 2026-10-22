@@ -13,7 +13,7 @@ export const MONO_FILES = ['Regular', 'Medium', 'Semibold', 'Bold'].map((w) => `
 export const MONO = MONO_FILES.length ? 'SF Mono' : 'Menlo'
 
 export const NAMES: Record<string, string> = {
-  BTC: 'Bitcoin', ETH: 'Ethereum', SOL: 'Solana', XRP: 'XRP', DOGE: 'Dogecoin', LINK: 'Chainlink', ADA: 'Cardano', AVAX: 'Avalanche',
+  BTC: 'Bitcoin', ETH: 'Ethereum', SOL: 'Solana', HYPE: 'Hyperliquid', XRP: 'XRP', DOGE: 'Dogecoin', LINK: 'Chainlink', ADA: 'Cardano', AVAX: 'Avalanche',
   DOT: 'Polkadot', LTC: 'Litecoin', BNB: 'BNB', BCH: 'Bitcoin Cash', ATOM: 'Cosmos', NEAR: 'NEAR Protocol', ARB: 'Arbitrum', OP: 'Optimism',
   SUI: 'Sui', APT: 'Aptos', TRX: 'TRON', SHIB: 'Shiba Inu', PEPE: 'Pepe', UNI: 'Uniswap', AAVE: 'Aave', TON: 'Toncoin', FIL: 'Filecoin',
 }

@@ -3,7 +3,9 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { TF_SECONDS, type Bar, type Timeframe } from '../types'
 
-export type Source = 'binance' | 'coinbase' | 'cache' | 'sample'
+export type Source = 'binance' | 'coinbase' | 'hyperliquid' | 'cache' | 'sample'
+/** 'auto' tries Binance, then Coinbase, then Hyperliquid; 'hyperliquid' goes to Hyperliquid first. */
+export type Exchange = 'auto' | 'hyperliquid' | 'binance'
 export type Loaded = { bars: Bar[]; source: Source; note?: string }
 
 /** Read on every call so tests (and TRADETERM_HOME set after import) never touch ~/.tradeterm. */
@@ -12,6 +14,9 @@ export const home = () => process.env.TRADETERM_HOME ?? join(homedir(), '.tradet
 const BINANCE = process.env.TRADETERM_BINANCE ?? 'https://data-api.binance.vision'
 const BINANCE_WS = process.env.TRADETERM_BINANCE_WS ?? 'wss://data-stream.binance.vision'
 const COINBASE = 'https://api.exchange.coinbase.com'
+const HYPERLIQUID = process.env.TRADETERM_HYPERLIQUID ?? 'https://api.hyperliquid.xyz'
+const HYPERLIQUID_WS = process.env.TRADETERM_HYPERLIQUID_WS ?? 'wss://api.hyperliquid.xyz/ws'
+const HL_TF: Record<Timeframe, string> = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1D': '1d', '1W': '1w' }
 const BINANCE_TF: Record<Timeframe, string> = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1D': '1d', '1W': '1w' }
 const COINBASE_TF: Partial<Record<Timeframe, number>> = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '1D': 86400 }
 
@@ -25,6 +30,31 @@ async function getJson(url: string, timeoutMs = 6000): Promise<unknown> {
   const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { 'user-agent': 'tradeterm/0.1' } })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.json()
+}
+
+/** BTC-USD → BTC (Hyperliquid perps are named by base coin and settle in USD). */
+export function hyperliquidCoin(sym: string) {
+  return sym.split('-')[0]!
+}
+
+async function postJson(url: string, body: unknown, timeoutMs = 6000): Promise<unknown> {
+  const res = await fetch(url, { method: 'POST', body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs), headers: { 'content-type': 'application/json', 'user-agent': 'tradeterm/0.1' } })
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  return res.json()
+}
+
+type HlCandle = { t: number; o: string; h: string; l: string; c: string; v: string }
+export function parseHyperliquidCandles(rows: unknown): Bar[] {
+  if (!Array.isArray(rows)) throw new Error('unexpected candleSnapshot payload')
+  return (rows as HlCandle[]).map((r) => ({ t: Math.floor(Number(r.t) / 1000), o: +r.o, h: +r.h, l: +r.l, c: +r.c, v: +r.v }))
+}
+
+/** Hyperliquid's public info endpoint serves the most recent 5000 candles per coin and interval. */
+async function fromHyperliquid(sym: string, tf: Timeframe, count: number): Promise<Bar[]> {
+  const now = Date.now()
+  const startTime = now - Math.min(count, 5000) * TF_SECONDS[tf] * 1000
+  const rows = await postJson(`${HYPERLIQUID}/info`, { type: 'candleSnapshot', req: { coin: hyperliquidCoin(sym), interval: HL_TF[tf], startTime, endTime: now } })
+  return dedupe(parseHyperliquidCandles(rows))
 }
 
 export function parseBinanceKlines(rows: unknown): Bar[] {
@@ -73,13 +103,14 @@ function cachePath(sym: string, tf: Timeframe) {
   return join(home(), 'cache', `${sym}-${tf}.json`)
 }
 
-export async function loadBars(sym: string, tf: Timeframe, count = 3000, opts: { offline?: boolean } = {}): Promise<Loaded> {
+export async function loadBars(sym: string, tf: Timeframe, count = 3000, opts: { offline?: boolean; exchange?: Exchange } = {}): Promise<Loaded> {
   if (opts.offline || process.env.TRADETERM_OFFLINE === '1') return { bars: sampleBars(sym, tf, count), source: 'sample', note: 'offline sample data' }
   const errors: string[] = []
-  for (const [source, fn] of [
-    ['binance', fromBinance],
-    ['coinbase', fromCoinbase],
-  ] as const) {
+  const order: [Source, typeof fromBinance][] =
+    opts.exchange === 'hyperliquid'
+      ? [['hyperliquid', fromHyperliquid], ['binance', fromBinance], ['coinbase', fromCoinbase]]
+      : [['binance', fromBinance], ['coinbase', fromCoinbase], ['hyperliquid', fromHyperliquid]]
+  for (const [source, fn] of order) {
     try {
       const bars = await fn(sym, tf, count)
       if (bars.length > 10) {
@@ -101,11 +132,12 @@ export async function loadBars(sym: string, tf: Timeframe, count = 3000, opts: {
   return { bars: sampleBars(sym, tf, count), source: 'sample', note: errors.join(' · ') }
 }
 
-/** Last price and 24h change for a watchlist, in one request. */
-export async function loadTickers(syms: string[]): Promise<Record<string, { last: number; change: number }>> {
+type Tickers = Record<string, { last: number; change: number }>
+
+async function binanceTickers(syms: string[]): Promise<Tickers> {
   const list = encodeURIComponent(JSON.stringify(syms.map(binanceSymbol)))
   const rows = (await getJson(`${BINANCE}/api/v3/ticker/24hr?symbols=${list}`, 5000)) as { symbol: string; lastPrice: string; priceChangePercent: string }[]
-  const out: Record<string, { last: number; change: number }> = {}
+  const out: Tickers = {}
   for (const s of syms) {
     const r = rows.find((x) => x.symbol === binanceSymbol(s))
     if (r) out[s] = { last: +r.lastPrice, change: +r.priceChangePercent / 100 }
@@ -113,19 +145,69 @@ export async function loadTickers(syms: string[]): Promise<Record<string, { last
   return out
 }
 
+/** Mid price and change vs the previous day's price for every Hyperliquid perp, in one request. */
+export function parseHyperliquidCtxs(payload: unknown, syms: string[]): Tickers {
+  const [meta, ctxs] = payload as [{ universe: { name: string }[] }, { midPx?: string | null; markPx: string; prevDayPx: string }[]]
+  const out: Tickers = {}
+  for (const s of syms) {
+    const i = meta.universe.findIndex((u) => u.name === hyperliquidCoin(s))
+    const c = ctxs[i]
+    if (i < 0 || !c) continue
+    const last = +(c.midPx ?? c.markPx)
+    out[s] = { last, change: last / +c.prevDayPx - 1 }
+  }
+  return out
+}
+
+async function hyperliquidTickers(syms: string[]): Promise<Tickers> {
+  return parseHyperliquidCtxs(await postJson(`${HYPERLIQUID}/info`, { type: 'metaAndAssetCtxs' }, 5000), syms)
+}
+
+/** Last price and 24h change for a watchlist. Binance answers all-or-nothing, so unknown pairs are retried one by one and the rest come from Hyperliquid. */
+export async function loadTickers(syms: string[], exchange: Exchange = 'auto'): Promise<Tickers> {
+  if (exchange === 'hyperliquid') {
+    const hl = await hyperliquidTickers(syms).catch(() => ({}) as Tickers)
+    const missing = syms.filter((s) => !hl[s])
+    return missing.length ? { ...(await binanceTickers(missing).catch(() => ({}))), ...hl } : hl
+  }
+  let out: Tickers
+  try {
+    out = await binanceTickers(syms)
+  } catch {
+    const each = await Promise.all(syms.map((s) => binanceTickers([s]).catch(() => ({}) as Tickers)))
+    out = Object.assign({}, ...each)
+  }
+  const missing = syms.filter((s) => !out[s])
+  if (missing.length) Object.assign(out, await hyperliquidTickers(missing).catch(() => ({})))
+  return out
+}
+
 /** Streams the forming candle. Returns a stop function. */
-export function streamKlines(sym: string, tf: Timeframe, onBar: (b: Bar, closed: boolean) => void): () => void {
+export function streamKlines(sym: string, tf: Timeframe, onBar: (b: Bar, closed: boolean) => void, source: Source = 'binance'): () => void {
   if (process.env.TRADETERM_OFFLINE === '1' || typeof WebSocket === 'undefined') return () => {}
   let ws: WebSocket | null = null
   let stopped = false
   let retry: ReturnType<typeof setTimeout> | undefined
+  const hl = source === 'hyperliquid'
   const connect = () => {
-    ws = new WebSocket(`${BINANCE_WS}/ws/${binanceSymbol(sym).toLowerCase()}@kline_${BINANCE_TF[tf]}`)
-    ws.onmessage = (ev) => {
-      try {
-        const k = JSON.parse(String(ev.data)).k
-        if (k) onBar({ t: Math.floor(k.t / 1000), o: +k.o, h: +k.h, l: +k.l, c: +k.c, v: +k.v }, !!k.x)
-      } catch {}
+    if (hl) {
+      const sock = new WebSocket(HYPERLIQUID_WS)
+      ws = sock
+      sock.onopen = () => sock.send(JSON.stringify({ method: 'subscribe', subscription: { type: 'candle', coin: hyperliquidCoin(sym), interval: HL_TF[tf] } }))
+      sock.onmessage = (ev) => {
+        try {
+          const m = JSON.parse(String(ev.data))
+          if (m.channel === 'candle' && m.data) onBar(parseHyperliquidCandles([m.data])[0]!, Date.now() > Number(m.data.T))
+        } catch {}
+      }
+    } else {
+      ws = new WebSocket(`${BINANCE_WS}/ws/${binanceSymbol(sym).toLowerCase()}@kline_${BINANCE_TF[tf]}`)
+      ws.onmessage = (ev) => {
+        try {
+          const k = JSON.parse(String(ev.data)).k
+          if (k) onBar({ t: Math.floor(k.t / 1000), o: +k.o, h: +k.h, l: +k.l, c: +k.c, v: +k.v }, !!k.x)
+        } catch {}
+      }
     }
     ws.onclose = () => {
       if (!stopped) retry = setTimeout(connect, 3000)
@@ -144,7 +226,7 @@ export function streamKlines(sym: string, tf: Timeframe, onBar: (b: Bar, closed:
 // Offline sample data: a seeded random walk with volatility regimes and trends. Clearly labelled
 // SAMPLE in the UI; it is not real market data.
 
-const BASE_PRICE: Record<string, number> = { BTC: 64000, ETH: 3100, SOL: 150, DOGE: 0.14, XRP: 0.55, ADA: 0.45, AVAX: 28, LINK: 14 }
+const BASE_PRICE: Record<string, number> = { BTC: 64000, ETH: 3100, SOL: 150, HYPE: 40, AAVE: 160, DOGE: 0.14, XRP: 0.55, ADA: 0.45, AVAX: 28, LINK: 14 }
 
 function hash(s: string) {
   let h = 2166136261

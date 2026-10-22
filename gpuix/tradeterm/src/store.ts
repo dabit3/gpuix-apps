@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { home } from './data/feed'
+import { home, type Exchange } from './data/feed'
 
 export type Point = { t: number; p: number }
 export type DrawingKind = 'trend' | 'hline' | 'rect' | 'fib'
@@ -14,6 +14,7 @@ export type State = {
   drawings: Record<string, Drawing[]>
   watchlist: string[]
   paneSizes: Record<string, number>
+  exchange: Exchange
 }
 
 export const DEFAULT_STATE: State = {
@@ -22,8 +23,9 @@ export const DEFAULT_STATE: State = {
   log: false,
   strategy: 'sma',
   drawings: {},
-  watchlist: ['BTC-USD', 'ETH-USD', 'SOL-USD', 'XRP-USD', 'DOGE-USD', 'LINK-USD'],
+  watchlist: ['BTC-USD', 'ETH-USD', 'SOL-USD', 'HYPE-USD', 'AAVE-USD', 'LINK-USD', 'XRP-USD'],
   paneSizes: {},
+  exchange: 'auto',
 }
 
 const file = () => join(home(), 'state.json')
