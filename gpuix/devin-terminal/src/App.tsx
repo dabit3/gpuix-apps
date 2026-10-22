@@ -925,13 +925,14 @@ function PanelTabs({ tabs, tab, onTab }: { tabs: { id: string; label: string; ic
   return (
     <div style={{ ...row({ gap: 2 }), height: 48, paddingLeft: 10, paddingRight: 10, flexShrink: 0, borderBottomWidth: 1, borderColor: C.border, overflow: 'hidden' }}>
       {tabs.map((t) => {
+        const tight = tabs.length > 3
         const active = t.id === tab
         return (
           <div
             key={t.id}
             testId={`tab-${t.id}`}
             onClick={() => onTab(t.id)}
-            style={{ ...row({ gap: 6 }), height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 8, cursor: 'pointer', flexShrink: 0, backgroundColor: active ? C.selected : C.canvas, hover: { backgroundColor: active ? C.selected : C.hover } }}
+            style={{ ...row({ gap: tight ? 5 : 6 }), height: 28, paddingLeft: tight ? 8 : 10, paddingRight: tight ? 8 : 10, borderRadius: 8, cursor: 'pointer', flexShrink: 0, backgroundColor: active ? C.selected : C.canvas, hover: { backgroundColor: active ? C.selected : C.hover } }}
           >
             <Icon name={t.icon} size={14} color={active ? C.text : C.tertiary} />
             <text style={{ fontFamily: SANS, color: active ? C.text : C.tertiary, fontSize: 13, fontWeight: active ? 500 : 400, whiteSpace: 'nowrap' }}>{t.label}</text>
@@ -1001,7 +1002,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 
 function LivePanel({ session, sessions, tab, onTab, onSelect, client, pollMs, previews }: { session: Session; sessions: Session[]; tab: PanelTab; onTab: (t: PanelTab) => void; onSelect: (id: string) => void; client: DevinApi | null; pollMs: number; previews?: Omit<PreviewDeps, 'resolve'> }) {
   const live = session.live!
-  const tabs = [{ id: 'computer', label: 'Computer', icon: 'monitor' as IconName }, { id: 'details', label: 'Session', icon: 'list' as IconName }, ...live.prs.map((p, i) => ({ id: `pr-${i}`, label: `PR #${prLabel(p.url).number}`, icon: 'pr' as IconName }))]
+  const tabs = [{ id: 'computer', label: 'Computer', icon: 'monitor' as IconName }, { id: 'details', label: 'Session', icon: 'list' as IconName }, ...live.prs.map((p, i) => ({ id: `pr-${i}`, label: `#${prLabel(p.url).number}`, icon: 'pr' as IconName }))]
   const current = tabs.some((t) => t.id === tab) ? tab : 'computer'
   const children = sessions.filter((s) => s.live?.parentId === session.id)
   const pr = current.startsWith('pr-') ? live.prs[Number(current.slice(3))] : undefined
@@ -1829,6 +1830,7 @@ export function DevinApp({
     ) : view === 'settings' ? (
       <SettingsView
         key={settingsKey}
+        instance={settingsKey}
         initialPage={settingsKey >= 1000 ? 'shortcuts' : settingsKey === 0 ? initialSettingsPage : undefined}
         keySource={keySource}
         onSaveKey={onSaveKey}

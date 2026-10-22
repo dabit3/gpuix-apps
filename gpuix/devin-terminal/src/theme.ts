@@ -78,7 +78,7 @@ export const LIGHT: Palette = {
   text: '#1a1a1a',
   secondary: '#3a3a3c',
   tertiary: '#6e6e73',
-  ghost: '#8e8e93',
+  ghost: '#7d7d83',
   accent: '#2f6fde',
   accentSoft: '#2f6fde18',
   blue: '#2f6fde',

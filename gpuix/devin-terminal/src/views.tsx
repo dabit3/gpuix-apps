@@ -731,6 +731,7 @@ function SettingRow({ label, hint, children }: { label: string; hint?: string; c
 }
 
 export type SettingsProps = {
+  instance?: number
   api: DevinApi | null
   orgId: string | null
   baseUrl: string
@@ -755,7 +756,8 @@ export type SettingsProps = {
 }
 
 export function SettingsView(p: SettingsProps) {
-  const [page, setPage] = useState<string>(p.initialPage ?? 'preferences')
+  // Each open of Settings gets its own slot, so the theme toggle's remount keeps the page you were on.
+  const [page, setPage] = useSticky<string>(`settings-page-${p.instance ?? 0}`, p.initialPage ?? 'preferences')
   const [q, setQ] = useSticky('settings.q', '')
   const [check, setCheck] = useState<{ text: string; tone?: 'error' | 'ok' } | null>(null)
   const [keyDraft, setKeyDraft] = useState('')
