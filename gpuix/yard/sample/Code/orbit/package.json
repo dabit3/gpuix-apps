@@ -1,0 +1,9 @@
+{
+  "name": "orbit",
+  "version": "1.4.2",
+  "description": "Background job runner with retries and jittered backoff",
+  "type": "module",
+  "scripts": { "build": "tsc -p .", "test": "bun test" },
+  "dependencies": { "zod": "3.23.8" },
+  "devDependencies": { "typescript": "5.9.3" }
+}
