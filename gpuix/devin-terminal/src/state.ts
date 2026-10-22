@@ -10,6 +10,7 @@ export type State = {
   panelOpen: boolean
   panelTab: PanelTab
   repo: string
+  hidden?: string[]
 }
 
 export type Action =
@@ -156,16 +157,19 @@ export function reducer(state: State, action: Action): State {
       const ids = new Set(action.sessions.map((s) => s.id))
       const pending = state.sessions.filter((s) => s.id.startsWith('pending-'))
       const kept = state.sessions.filter((s) => s.id === state.selectedId && !ids.has(s.id) && !s.id.startsWith('pending-'))
-      return { ...state, sessions: [...pending, ...byRecent(action.sessions.map((s) => mergeLive(byId.get(s.id), s))), ...kept] }
+      const visible = action.sessions.filter((s) => !state.hidden?.includes(s.id))
+      return { ...state, sessions: [...pending, ...byRecent(visible.map((s) => mergeLive(byId.get(s.id), s))), ...kept] }
     }
     case 'merge': {
-      const incoming = new Map(action.sessions.map((s) => [s.id, s]))
+      const visible = action.sessions.filter((s) => !state.hidden?.includes(s.id))
+      const incoming = new Map(visible.map((s) => [s.id, s]))
       const known = new Set(state.sessions.map((s) => s.id))
       const merged = state.sessions.map((s) => (incoming.has(s.id) ? mergeLive(s, incoming.get(s.id)!) : s))
-      const added = action.sessions.filter((s) => !known.has(s.id))
+      const added = visible.filter((s) => !known.has(s.id))
       return { ...state, sessions: byRecent([...added, ...merged]) }
     }
     case 'upsert': {
+      if (state.hidden?.includes(action.session.id)) return state
       const exists = state.sessions.some((s) => s.id === action.session.id)
       return {
         ...state,
@@ -183,7 +187,7 @@ export function reducer(state: State, action: Action): State {
         sessions: state.sessions.map((s) => (s.id === action.from ? { ...mergeLive(s, action.session), id: action.session.id } : s)),
       }
     case 'remove':
-      return { ...state, sessions: state.sessions.filter((s) => s.id !== action.id), selectedId: state.selectedId === action.id ? null : state.selectedId }
+      return { ...state, hidden: [...(state.hidden ?? []), action.id], sessions: state.sessions.filter((s) => s.id !== action.id), selectedId: state.selectedId === action.id ? null : state.selectedId }
     case 'patch':
       return { ...state, sessions: state.sessions.map((s) => (s.id === action.id ? { ...s, ...action.patch } : s)) }
   }

@@ -11,10 +11,17 @@ export type Store = { run: Runner | null; file: string }
 const SERVICE = 'devin-tui'
 const ACCOUNT = 'default'
 
+// Writes go through `security -i` on stdin so the secret never appears in a process's argv.
 export const securityRunner: Runner = (args) => {
   try {
-    const p = Bun.spawnSync(['/usr/bin/security', ...args], { stdout: 'pipe', stderr: 'pipe' })
-    return { ok: p.exitCode === 0, out: p.stdout.toString().trim() }
+    const write = args[0] === 'add-generic-password'
+    const p = Bun.spawnSync(write ? ['/usr/bin/security', '-i'] : ['/usr/bin/security', ...args], {
+      stdin: write ? Buffer.from(`${args.map((a) => `"${a}"`).join(' ')}\n`) : 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    const err = p.stderr.toString()
+    return { ok: p.exitCode === 0 && !(write && err.trim()), out: p.stdout.toString().trim() }
   } catch {
     return { ok: false, out: '' }
   }
@@ -46,7 +53,8 @@ export function readKeychain(store: Store): Saved | null {
   const r = store.run(['find-generic-password', '-s', SERVICE, '-a', ACCOUNT, '-w'])
   if (!r.ok || !r.out) return null
   try {
-    const v = JSON.parse(r.out) as Partial<Saved>
+    const raw = r.out.startsWith('{') ? r.out : Buffer.from(r.out, 'base64').toString('utf8')
+    const v = JSON.parse(raw) as Partial<Saved>
     return v.apiKey && v.orgId ? (v as Saved) : null
   } catch {
     return null
@@ -64,7 +72,7 @@ export function readSaved(store: Store): { cfg: Partial<Saved>; source: 'keychai
 export function saveCredentials(c: Saved, store: Store): 'keychain' | 'file' {
   const meta: Partial<Saved> = { orgId: c.orgId, ...(c.baseUrl ? { baseUrl: c.baseUrl } : {}) }
   if (store.run) {
-    const r = store.run(['add-generic-password', '-U', '-s', SERVICE, '-a', ACCOUNT, '-l', 'Devin API key (devin-tui)', '-w', JSON.stringify(c)])
+    const r = store.run(['add-generic-password', '-U', '-s', SERVICE, '-a', ACCOUNT, '-l', 'Devin API key (devin-tui)', '-w', Buffer.from(JSON.stringify(c)).toString('base64')])
     if (r.ok) {
       writeFile(store.file, meta)
       return 'keychain'

@@ -1129,6 +1129,7 @@ export interface DevinAppProps {
   initialView?: View
   initialSettingsPage?: string
   initialToast?: string | null
+  verifyKey?: (c: { apiKey: string; orgId: string; baseUrl: string }) => Promise<unknown>
   orgId?: string | null
   baseUrl?: string
   keyHint?: string | null
@@ -1167,6 +1168,7 @@ export function DevinApp({
   initialView,
   initialSettingsPage,
   initialToast = null,
+  verifyKey,
   initialRepo,
 }: DevinAppProps) {
   const live = client !== null
@@ -1638,6 +1640,7 @@ export function DevinApp({
         keySource={keySource}
         onSaveKey={onSaveKey}
         onRemoveKey={onRemoveKey}
+        verifyKey={verifyKey}
         api={client}
         orgId={orgId}
         baseUrl={baseUrl}

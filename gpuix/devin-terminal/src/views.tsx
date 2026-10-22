@@ -111,9 +111,9 @@ export function SecretField({ value, onChange, placeholder, testId, reveal }: { 
 
 export function Toggle({ on, onChange, testId }: { on: boolean; onChange: (v: boolean) => void; testId: string }) {
   return (
-    <div testId={testId} onClick={() => onChange(!on)} style={{ ...row({ justifyContent: on ? 'flex-end' : 'flex-start' }), width: 32, height: 18, borderRadius: 9, padding: 2, cursor: 'pointer', backgroundColor: on ? C.add : C.borderStrong, flexShrink: 0 }}>
-      <div style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#ffffff' }} />
-    </div>
+    <Button testId={testId} onClick={() => onChange(!on)} style={{ ...row({ justifyContent: on ? 'flex-end' : 'flex-start' }), width: 32, height: 18, borderRadius: 9, padding: 2, cursor: 'pointer', backgroundColor: on ? C.add : C.borderStrong, flexShrink: 0 }}>
+      <div style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#ffffff', pointerEvents: 'none' }} />
+    </Button>
   )
 }
 
