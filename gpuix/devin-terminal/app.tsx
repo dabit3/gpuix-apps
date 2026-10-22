@@ -3,7 +3,9 @@ import { parseArgs } from 'util'
 import { readFileSync } from 'fs'
 import { initialSessions, MODES, type AgentMode } from './src/data'
 import { filterSessions } from './src/state'
-import { DevinClient, loadConfig } from './src/api'
+import { useMemo, useState } from 'react'
+import { DevinClient, loadConfig, type DevinConfig } from './src/api'
+import { defaultStore, removeCredentials, saveCredentials } from './src/keystore'
 import { resolveTheme } from './src/theme'
 import { loadPrefs } from './src/prefs'
 
@@ -108,20 +110,44 @@ const { applyMacCpuThrottleFromEnv, render } = await import('@gpuix/react')
 const { DevinApp, handleWindowKey } = await import('./src/App')
 
 applyMacCpuThrottleFromEnv()
+function Root() {
+  const [conn, setConn] = useState<{ config: DevinConfig | null; n: number; toast?: string }>({ config, n: 0 })
+  const cfg = conn.config
+  const live = useMemo(() => (cfg ? new DevinClient(cfg) : null), [cfg])
+  const reconnect = (toast: string) => setConn((s) => ({ config: values.demo ? null : loadConfig(), n: s.n + 1, toast }))
+  return (
+    <DevinApp
+      key={conn.n}
+      client={live}
+      sessionQuery={live && conn.n === 0 ? values.session : undefined}
+      initialSelected={live ? null : initialSelected}
+      initialMode={mode}
+      initialPrompt={conn.n === 0 ? prompt : undefined}
+      initialRepo={values.repo ?? prefs.repo}
+      orgId={cfg?.orgId ?? null}
+      baseUrl={cfg?.baseUrl ?? 'https://api.devin.ai'}
+      keyHint={cfg ? `${cfg.apiKey.slice(0, 4)}…${cfg.apiKey.slice(-4)}` : null}
+      keySource={cfg?.source ?? null}
+      initialView={conn.n ? 'settings' : undefined}
+      initialSettingsPage={conn.n ? 'api' : undefined}
+      initialToast={conn.toast ?? null}
+      onSaveKey={async (k) => {
+        const where = saveCredentials({ ...k, baseUrl: cfg?.baseUrl }, defaultStore())
+        reconnect(where === 'keychain' ? 'API key saved to the Keychain' : 'API key saved')
+        return where
+      }}
+      onRemoveKey={async () => {
+        removeCredentials(defaultStore())
+        reconnect('Saved API key removed')
+      }}
+      theme={theme}
+      userName={process.env.DEVIN_TUI_NAME ?? 'Nader Dabit'}
+    />
+  )
+}
+
 render(
-  <DevinApp
-    client={client}
-    sessionQuery={client ? values.session : undefined}
-    initialSelected={client ? null : initialSelected}
-    initialMode={mode}
-    initialPrompt={prompt}
-    initialRepo={values.repo ?? prefs.repo}
-    orgId={config?.orgId ?? null}
-    baseUrl={config?.baseUrl ?? 'https://api.devin.ai'}
-    keyHint={config ? `${config.apiKey.slice(0, 4)}…${config.apiKey.slice(-4)}` : null}
-    theme={theme}
-    userName={process.env.DEVIN_TUI_NAME ?? 'Nader Dabit'}
-  />,
+  <Root />,
   {
   title: 'Devin',
   width: 1440,

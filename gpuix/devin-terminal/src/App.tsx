@@ -1123,6 +1123,12 @@ function HomeView({ composer, kind, onKind }: { composer: ComposerProps; kind: '
 /* ───────────────────────────── App ───────────────────────────── */
 
 export interface DevinAppProps {
+  keySource?: string | null
+  onSaveKey?: (c: { apiKey: string; orgId: string }) => Promise<string>
+  onRemoveKey?: () => Promise<void>
+  initialView?: View
+  initialSettingsPage?: string
+  initialToast?: string | null
   orgId?: string | null
   baseUrl?: string
   keyHint?: string | null
@@ -1155,6 +1161,12 @@ export function DevinApp({
   orgId = null,
   baseUrl = 'https://api.devin.ai',
   keyHint = null,
+  keySource = null,
+  onSaveKey,
+  onRemoveKey,
+  initialView,
+  initialSettingsPage,
+  initialToast = null,
   initialRepo,
 }: DevinAppProps) {
   const live = client !== null
@@ -1175,14 +1187,14 @@ export function DevinApp({
   const [kind, setKind] = useState<'agent' | 'ask'>('agent')
   const [liveError, setLiveError] = useState<string | null>(null)
   const [pageSize, setPageSize] = useState(40)
-  const [view, setView] = useState<View>('home')
+  const [view, setView] = useState<View>(initialView ?? 'home')
   const viewRef = useRef(view)
   viewRef.current = view
   const [customizeTab, setCustomizeTab] = useState<'playbooks' | 'knowledge'>('playbooks')
   const [settingsKey, setSettingsKey] = useState(0)
   const [sidebarHidden, setSidebarHidden] = useState(false)
   const [renaming, setRenaming] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(initialToast)
   const [prefs, setPrefs] = useState<Prefs>(() => loadPrefs())
   const titlesRef = useRef<Record<string, string>>({})
   titlesRef.current = prefs.titles ?? {}
@@ -1622,7 +1634,10 @@ export function DevinApp({
     ) : view === 'settings' ? (
       <SettingsView
         key={settingsKey}
-        initialPage={settingsKey >= 1000 ? 'shortcuts' : undefined}
+        initialPage={settingsKey >= 1000 ? 'shortcuts' : settingsKey === 0 ? initialSettingsPage : undefined}
+        keySource={keySource}
+        onSaveKey={onSaveKey}
+        onRemoveKey={onRemoveKey}
         api={client}
         orgId={orgId}
         baseUrl={baseUrl}

@@ -1,4 +1,5 @@
 // Minimal client for the Devin v3 API (https://docs.devin.ai/api-reference). Auth: a personal access token or service-user key.
+import { defaultStore, readSaved, type KeySource, type Store } from './keystore'
 export type ApiStatus = 'new' | 'claimed' | 'running' | 'exit' | 'error' | 'suspended' | 'resuming'
 
 export type ApiSession = {
@@ -46,7 +47,7 @@ export type CreateSessionOpts = { mode?: string; repos?: string[]; tags?: string
 
 type Page<T> = { items: T[]; end_cursor?: string | null; has_next_page?: boolean }
 
-export type DevinConfig = { apiKey: string; orgId: string; baseUrl?: string; fetch?: typeof fetch }
+export type DevinConfig = { apiKey: string; orgId: string; baseUrl?: string; fetch?: typeof fetch; source?: KeySource }
 
 export interface DevinApi {
   listSessions(first?: number, after?: string): Promise<{ items: ApiSession[]; hasMore: boolean; cursor?: string | null }>
@@ -227,16 +228,13 @@ export function timeAgo(unix: number, now = Date.now() / 1000): string {
 }
 
 /** Env vars win; otherwise `~/.config/devin-tui/config.json` ({ "apiKey": "...", "orgId": "org-..." }, chmod 600). */
-export function loadConfig(env: Record<string, string | undefined> = process.env, file?: string): DevinConfig | null {
-  let fromFile: Partial<DevinConfig> = {}
-  const path = file ?? `${env.HOME ?? ''}/.config/devin-tui/config.json`
-  try {
-    fromFile = JSON.parse(require('fs').readFileSync(path, 'utf8')) as Partial<DevinConfig>
-  } catch {}
-  const apiKey = env.DEVIN_API_KEY ?? fromFile.apiKey
-  const orgId = env.DEVIN_ORG_ID ?? fromFile.orgId
+export function loadConfig(env: Record<string, string | undefined> = process.env, file?: string, store?: Store): DevinConfig | null {
+  const s = store ?? { ...defaultStore(env), ...(file ? { file } : {}) }
+  const { cfg, source } = readSaved(s)
+  const apiKey = env.DEVIN_API_KEY ?? cfg.apiKey
+  const orgId = env.DEVIN_ORG_ID ?? cfg.orgId
   if (!apiKey || !orgId) return null
-  return { apiKey, orgId, baseUrl: env.DEVIN_API_BASE ?? fromFile.baseUrl }
+  return { apiKey, orgId, baseUrl: env.DEVIN_API_BASE ?? cfg.baseUrl, source: env.DEVIN_API_KEY ? 'env' : (source ?? 'file') }
 }
 
 /** Human summary of a schedule:recurring RRULE ("Daily at 13:00 UTC"), or the trigger's event type. */

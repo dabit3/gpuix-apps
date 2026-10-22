@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, type StyleDesc } from '@gpuix/react'
 import { Icon, type IconName } from './icons'
 import { C } from './theme'
-import { describeTrigger, SCHEDULE_PRESETS, timeAgo, type ApiAutomation, type ApiNote, type ApiPlaybook, type ApiSecret, type ApiTemplate, type DevinApi } from './api'
+import { DevinClient, describeTrigger, SCHEDULE_PRESETS, timeAgo, type ApiAutomation, type ApiNote, type ApiPlaybook, type ApiSecret, type ApiTemplate, type DevinApi } from './api'
 import type { Session } from './data'
 
 export type View = 'home' | 'automations' | 'security' | 'review' | 'customize' | 'settings' | 'notifications'
@@ -85,6 +85,27 @@ export function Field({ value, onChange, placeholder, testId, multiline, mono }:
     <textarea testId={testId} value={value} placeholder={placeholder} minRows={3} maxRows={8} onChange={(e) => onChange(e.value ?? '')} style={{ ...style, paddingTop: 8, paddingBottom: 8 }} theme={theme} />
   ) : (
     <input testId={testId} value={value} placeholder={placeholder} onChange={(e) => onChange(e.value ?? '')} style={{ ...style, height: 32 }} theme={theme} />
+  )
+}
+
+export function SecretField({ value, onChange, placeholder, testId, reveal }: { value: string; onChange: (v: string) => void; placeholder: string; testId: string; reveal: boolean }) {
+  const masked = !reveal && value.length > 0
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      <input
+        testId={testId}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.value ?? '')}
+        style={{ width: '100%', height: 32, fontSize: 13.5, color: masked ? C.card : C.text, backgroundColor: C.card, fontFamily: MONO, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingLeft: 10, paddingRight: 10 }}
+        theme={{ caret: C.text, textMuted: C.ghost }}
+      />
+      {masked && (
+        <div style={{ position: 'absolute', left: 11, top: 0, bottom: 0, ...row(), pointerEvents: 'none' }}>
+          <T testId={`${testId}-mask`} mono size={13} color={C.text}>{'•'.repeat(Math.min(value.length, 40))}</T>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -711,12 +732,22 @@ export type SettingsProps = {
   renamedCount: number
   narrow?: boolean
   initialPage?: string
+  keySource?: string | null
+  onSaveKey?: (c: { apiKey: string; orgId: string }) => Promise<string>
+  onRemoveKey?: () => Promise<void>
+  verifyKey?: (c: { apiKey: string; orgId: string; baseUrl: string }) => Promise<unknown>
 }
 
 export function SettingsView(p: SettingsProps) {
   const [page, setPage] = useState<string>(p.initialPage ?? 'preferences')
   const [q, setQ] = useState('')
   const [check, setCheck] = useState<{ text: string; tone?: 'error' | 'ok' } | null>(null)
+  const [keyDraft, setKeyDraft] = useState('')
+  const [orgDraft, setOrgDraft] = useState(p.orgId ?? '')
+  const [reveal, setReveal] = useState(false)
+  const [keyBusy, setKeyBusy] = useState(false)
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  const [keyMsg, setKeyMsg] = useState<{ text: string; tone?: 'error' | 'ok' } | null>(null)
   const needle = q.trim().toLowerCase()
   const click = (it: NavItem) => {
     if (it.go) return p.onNavigate(it.go[0], it.go[1])
@@ -798,8 +829,28 @@ export function SettingsView(p: SettingsProps) {
       </Page>
     )
   } else if (page === 'api') {
+    const source = p.keySource
+    const sourceLabel = source === 'env' ? 'Environment variable (DEVIN_API_KEY)' : source === 'keychain' ? 'macOS Keychain' : source === 'file' ? '~/.config/devin-tui/config.json (only you can read it)' : 'Not configured'
+    const draft = { apiKey: keyDraft.trim(), orgId: orgDraft.trim() }
+    const draftOk = draft.apiKey.length >= 8 && draft.orgId.startsWith('org-')
+    const verify = p.verifyKey ?? (async (c: { apiKey: string; orgId: string; baseUrl: string }) => new DevinClient(c).listSessions(1))
+    const runKey = async (save: boolean) => {
+      setKeyBusy(true)
+      setKeyMsg({ text: save ? 'Checking the key, then saving…' : 'Checking…' })
+      try {
+        await verify({ ...draft, baseUrl: p.baseUrl })
+        if (!save || !p.onSaveKey) return setKeyMsg({ text: 'This key works for that organization', tone: 'ok' })
+        const where = await p.onSaveKey(draft)
+        setKeyDraft('')
+        setKeyMsg({ text: `Saved to ${where === 'keychain' ? 'the macOS Keychain' : 'a private config file'}`, tone: 'ok' })
+      } catch (e) {
+        setKeyMsg({ text: `That key didn't work: ${(e as Error).message}`, tone: 'error' })
+      } finally {
+        setKeyBusy(false)
+      }
+    }
     body = (
-      <Page testId="settings-api" narrow={p.narrow} title="Devin API" subtitle="devin-tui talks to the Devin v3 API with your personal access token.">
+      <Page testId="settings-api" narrow={p.narrow} title="Devin API" subtitle="devin-tui talks to the Devin v3 API with a personal access token. Save one here instead of exporting environment variables.">
         <div style={col()}>
           <SettingRow label="Status">
             <T testId="api-status" size={13} color={p.api ? C.add : C.orange}>{p.api ? 'Live' : 'Demo data (no key)'}</T>
@@ -810,16 +861,50 @@ export function SettingsView(p: SettingsProps) {
           <SettingRow label="Endpoint">
             <T mono size={12.5} color={C.secondary}>{`${p.baseUrl}/v3`}</T>
           </SettingRow>
-          <SettingRow label="Token" hint="From DEVIN_API_KEY or ~/.config/devin-tui/config.json. Never shown in full.">
-            <T mono size={12.5} color={C.secondary}>{p.keyHint ?? '—'}</T>
+          <SettingRow label="Token" hint="Never shown in full.">
+            <T testId="api-key-hint" mono size={12.5} color={C.secondary}>{p.keyHint ?? '—'}</T>
+          </SettingRow>
+          <SettingRow label="Stored in">
+            <T testId="api-key-source" size={13} color={C.secondary}>{sourceLabel}</T>
           </SettingRow>
         </div>
         <div style={row({ gap: 8 })}>
-          <Btn testId="api-test" primary label="Test connection" onClick={testConnection} />
-          <Btn label="Manage keys on web" icon="share" onClick={() => openUrl(`${WEB}/settings/api-keys`)} />
+          <Btn testId="api-test" label="Test connection" onClick={testConnection} />
+          <Btn label="Create a token on web" icon="share" onClick={() => openUrl(`${WEB}/settings/api-keys`)} />
           <Btn label="API docs" icon="share" onClick={() => openUrl('https://docs.devin.ai/api-reference/overview')} />
         </div>
         {check && <Notice text={check.text} tone={check.tone} />}
+        <div style={{ ...col({ gap: 10 }), padding: 16, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card }}>
+          <T size={14} weight={600}>{source ? 'Replace API key' : 'Add an API key'}</T>
+          {source === 'env' && <Notice text="DEVIN_API_KEY is set in this shell and overrides a saved key. Unset it to use the saved one." />}
+          <T size={12.5} color={C.tertiary}>Organization ID</T>
+          <Field testId="api-org-input" value={orgDraft} onChange={setOrgDraft} placeholder="org-…" mono />
+          <T size={12.5} color={C.tertiary}>Personal access token</T>
+          <div style={row({ gap: 8 })}>
+            <div style={{ flexGrow: 1 }}>
+              <SecretField testId="api-key-input" value={keyDraft} onChange={setKeyDraft} placeholder="Paste your token" reveal={reveal} />
+            </div>
+            <Btn small testId="api-key-reveal" label={reveal ? 'Hide' : 'Show'} onClick={() => setReveal((r) => !r)} />
+          </div>
+          <div style={row({ gap: 8 })}>
+            <Btn testId="api-key-save" primary label={keyBusy ? 'Saving…' : 'Save key'} disabled={!draftOk || keyBusy || !p.onSaveKey} onClick={() => runKey(true)} />
+            <Btn testId="api-key-verify" label="Test this key" disabled={!draftOk || keyBusy} onClick={() => runKey(false)} />
+            {p.onRemoveKey && (source === 'keychain' || source === 'file') && (
+              <Btn
+                testId="api-key-remove"
+                danger
+                label={confirmRemove ? 'Click again to remove' : 'Remove saved key'}
+                onClick={() => {
+                  if (!confirmRemove) return setConfirmRemove(true)
+                  setConfirmRemove(false)
+                  p.onRemoveKey?.().catch((e: Error) => setKeyMsg({ text: e.message, tone: 'error' }))
+                }}
+              />
+            )}
+          </div>
+          {keyMsg && <Notice text={keyMsg.text} tone={keyMsg.tone} />}
+          <T size={12} color={C.ghost}>The key is checked against the API before it's saved. On macOS it goes to the Keychain (service “devin-tui”); elsewhere to ~/.config/devin-tui/config.json with 0600 permissions. Environment variables still take priority.</T>
+        </div>
       </Page>
     )
   } else {
