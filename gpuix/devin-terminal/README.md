@@ -4,7 +4,7 @@ The Devin web app (app.devin.ai), rebuilt in React and painted by [GPUIX](https:
 
 ![devin-tui in Ghostty: a live session on the left, a second instance in light mode on the right](media/screenshot.png)
 
-Demo video: [`media/demo.mp4`](media/demo.mp4), real time and real input, no overlays. Ghostty (`theme = GitHub Dark High Contrast`) opens on the prompt, `devin-tui` loads the account's real sessions sorted by activity (child sessions stay collapsed under their parents), ⌘K search opens the real `TryDevin.ai` session (transcript, PR tabs) and then `Build iPhone Duo Apps`, a new prompt starts a real Devin session whose reply streams in, Cmd-D splits the pane and `devin-tui -t light -s duo` opens a second instance in light mode, the divider is dragged so both reflow, the split is zoomed, and Ctrl-C returns each pane to its prompt.
+Demo video: [`media/demo.mp4`](media/demo.mp4), real time and real input, no overlays. Ghostty (`theme = GitHub Dark High Contrast`) opens on the prompt, `devin-tui` loads the account's real sessions sorted by activity (child sessions stay collapsed under their parents) with the API key read from the macOS Keychain, ⌘K search opens the real `TryDevin.ai` session, then the sidebar opens the live Automations list and Customize, where a playbook expands and stays open through a light/dark toggle. Settings → Devin API shows the key stored in the Keychain and runs Test connection against the API. A new prompt starts a real Devin session whose reply streams in, Cmd-D splits the pane and `devin-tui -t light -s duo` opens a second instance in light mode, the divider is dragged so both reflow, the split is zoomed, and Ctrl-C returns each pane to its prompt.
 
 ## Run
 
