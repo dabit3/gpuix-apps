@@ -130,3 +130,56 @@ test('overlapping resizes settle on the last requested viewport, even one Chrome
     return !!f && f.cssWidth === 700 && f.cssHeight === 420
   })).toBe(true)
 }, 30000)
+
+test('page zoom re-lays the page out, frames keep the pane size, and clicks land on the zoomed page', async () => {
+  await browser.setViewport(viewportFor({ width: 640, height: 400 }, 1))
+  await browser.navigate(`http://127.0.0.1:${server.port}/`)
+  expect(await until(async () => (await browser.evaluate('document.readyState')) === 'complete')).toBe(true)
+  expect(await browser.setZoom(2)).toBe(2)
+  expect(browser.active?.zoom).toBe(2)
+  expect(await browser.evaluate('innerWidth + "x" + innerHeight + "@" + devicePixelRatio')).toBe('320x200@2')
+  await browser.evaluate("setInterval(() => document.body.style.background = document.body.style.background === 'white' ? 'ivory' : 'white', 50)")
+  let f: ReturnType<typeof browser.frames.take> = null
+  expect(await until(async () => {
+    browser.frames.take()
+    await Bun.sleep(150)
+    f = browser.frames.take()
+    return !!f && f.cssWidth === 320
+  })).toBe(true)
+  // a device-pixel frame (crisp), not the 320 px CSS-size screencast frame
+  expect(f!.width).toBe(640)
+  expect(f!.zoom).toBe(2)
+  // #go is at CSS (100,80) 200x60, so on screen at 2x it spans (200,160)-(600,280) of the pane
+  const box = { x: 12, y: 120, width: f!.cssWidth * f!.zoom, height: f!.cssHeight * f!.zoom }
+  const p = mapPoint(12 + 400, 120 + 220, box, { width: f!.cssWidth, height: f!.cssHeight })
+  expect(p).toEqual({ x: 200, y: 110 })
+  const before = Number(String(await browser.evaluate("document.getElementById('go').textContent")).replace(/\D/g, '') || 0)
+  browser.mouse({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', buttons: 1, clickCount: 1 })
+  browser.mouse({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', buttons: 0, clickCount: 1 })
+  expect(await until(async () => (await browser.evaluate("document.getElementById('go').textContent")) === `clicked ${before + 1}`)).toBe(true)
+  // zoom is per tab: a new tab starts at 100%, and the zoomed tab keeps 200%
+  // a zoomed tab keeps painting after it navigates away mid-capture
+  await browser.evaluate("let h = 0; setInterval(() => { document.body.style.background = 'hsl(' + (h += 7) + ',60%,50%)' }, 16)")
+  await Bun.sleep(400)
+  await browser.evaluate(`location.href = 'http://localhost:${server.port}/long'`)
+  expect(await until(async () => (await browser.evaluate('document.readyState+location.pathname')) === 'complete/long')).toBe(true)
+  await Bun.sleep(300)
+  browser.frames.take()
+  await browser.evaluate("document.body.style.background = 'rgb(255, 0, 0)'")
+  expect(await until(async () => !!browser.frames.take())).toBe(true)
+  const zoomed = browser.activeId
+  await browser.newTab('about:blank')
+  expect(browser.active?.zoom).toBe(1)
+  expect(await browser.evaluate('innerWidth')).toBe(640)
+  await browser.closeTab()
+  await browser.activate(zoomed)
+  expect(await browser.evaluate('innerWidth')).toBe(320)
+  expect(await browser.setZoom(0.5)).toBe(0.5)
+  expect(await until(async () => (await browser.evaluate('innerWidth + "@" + devicePixelRatio')) === '1280@0.5')).toBe(true)
+  // rapid steps while zoomed-in captures are running: the last one wins
+  await Promise.all([1.1, 1.25, 1.5, 1.75].map((z) => browser.setZoom(z)))
+  await Bun.sleep(300)
+  expect(await browser.evaluate('innerWidth + "@" + devicePixelRatio')).toBe('366@1.75')
+  expect(await browser.setZoom(1)).toBe(1)
+  expect(await until(async () => (await browser.evaluate('innerWidth + "@" + devicePixelRatio')) === '640@1')).toBe(true)
+}, 30000)

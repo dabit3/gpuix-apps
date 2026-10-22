@@ -4,7 +4,7 @@ import { Browser, type Tab } from './browser'
 import { launchChrome, removeProfile, type ChromeProcess } from './chrome'
 import { serve, type Handler } from './ipc'
 import { resolveInput } from './omnibox'
-import { viewportFor, type Box } from './input'
+import { parseZoom, viewportFor, zoomStep, type Box } from './input'
 
 export type Focus = 'page' | 'omnibox' | 'find'
 
@@ -90,6 +90,31 @@ export class Session {
     this.ping()
   }
 
+  /** When the zoom last changed, so the UI can flash the level. */
+  zoomedAt = 0
+  private wheelZoom = 0
+
+  /** Zooms the active tab: `in`/`out` step through Chrome's levels, `reset` goes back to 100%, a number sets the factor. */
+  async zoom(to: 'in' | 'out' | 'reset' | number): Promise<number> {
+    const b = this.browser, t = b?.active
+    if (!b || !t) return 1
+    const z = to === 'in' ? zoomStep(t.zoom, 1) : to === 'out' ? zoomStep(t.zoom, -1) : to === 'reset' ? 1 : to
+    this.zoomedAt = performance.now()
+    const r = await b.setZoom(z, t.id)
+    this.ping()
+    return r
+  }
+
+  /** Ctrl-scroll: accumulate wheel px so one notch or a short trackpad swipe is one zoom step. `dy` > 0 is wheel up = zoom in. */
+  zoomWheel(dy: number) {
+    if (Math.sign(dy) !== Math.sign(this.wheelZoom)) this.wheelZoom = 0
+    this.wheelZoom += dy
+    if (Math.abs(this.wheelZoom) < 50) return
+    const dir = this.wheelZoom > 0 ? 'in' : 'out'
+    this.wheelZoom = 0
+    void this.zoom(dir)
+  }
+
   info() {
     const b = this.browser, t = b?.active
     return {
@@ -100,6 +125,7 @@ export class Session {
       tabs: b?.tabs.length ?? 0,
       viewport: b ? `${b.viewport.width}x${b.viewport.height}@${b.viewport.deviceScaleFactor}x` : '',
       fps: b ? b.fps.rate() : 0,
+      zoom: `${Math.round((t?.zoom ?? 1) * 100)}%`,
       latencyMs: b ? Math.round(b.latency) : 0,
       dropped: b?.frames.dropped ?? 0,
     }
@@ -128,6 +154,7 @@ export class Session {
         writeFileSync(path, png)
         return { path, bytes: png.length }
       },
+      zoom: async ([arg]) => { const t = need().active; if (!t) throw new Error('no tab'); const z = arg ? await this.zoom(parseZoom(arg, t.zoom)) : t.zoom; return `${Math.round(z * 100)}%` },
       find: async ([q]) => { this.findOpen = true; await this.runFind(q ?? '', { fromStart: true }); return { query: q, count: this.findCount, index: this.findIndex } },
     }
   }

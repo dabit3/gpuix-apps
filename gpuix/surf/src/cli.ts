@@ -16,6 +16,7 @@ Commands:
   tabs                list tabs                 tab <n>         switch to tab n
   close [n]           close a tab               find <text>     find in page
   eval <js>           print a JS expression     shot <file.png> [--full]   save a screenshot
+  zoom [in|out|reset|150%]   page zoom of the current tab (no argument: print it)
   info                url, title, fps, latency  ls              list running surf windows
 
 Options:
@@ -28,9 +29,10 @@ Options:
   -v, --version         print the version
 
 Keys: Ctrl-L omnibox · Ctrl-T new tab · Ctrl-W close · Ctrl-Tab next tab · Ctrl-R reload · Ctrl-F find
-      Alt-←/→ back/forward · Ctrl-1..9 tab · Esc back to the page · Ctrl-C quit`
+      Ctrl-= / Ctrl-- zoom in/out · Ctrl-0 reset zoom · Alt-←/→ back/forward · Ctrl-1..9 tab
+      Esc back to the page · Ctrl-C quit`
 
-const COMMANDS = new Set(['open', 'go', 'back', 'forward', 'reload', 'tabs', 'tab', 'close', 'find', 'eval', 'shot', 'info', 'ls'])
+const COMMANDS = new Set(['open', 'go', 'back', 'forward', 'reload', 'tabs', 'tab', 'close', 'find', 'eval', 'shot', 'info', 'ls', 'zoom'])
 const argv = process.argv.slice(2)
 const sub = argv[0] && COMMANDS.has(argv[0]) ? argv.shift()! : undefined
 const { values, positionals } = parseArgs({

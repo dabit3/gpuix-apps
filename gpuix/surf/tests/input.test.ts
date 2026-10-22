@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { cdpButton, cdpButtons, cdpModifiers, keyEvents, mapPoint, printable, viewportFor, wheelDelta } from '../src/input'
+import { cdpButton, cdpButtons, cdpModifiers, clampZoom, keyEvents, mapPoint, parseZoom, printable, viewportFor, wheelDelta, zoomedMetrics, zoomStep } from '../src/input'
 
 describe('mapPoint', () => {
   const box = { x: 12, y: 120, width: 700, height: 400 }
@@ -84,5 +84,41 @@ describe('key mapping', () => {
   })
   test('keys with no page meaning are dropped', () => {
     expect(keyEvents({ key: 'shift' })).toBeNull()
+  })
+})
+
+describe('zoom', () => {
+  test('steps through Chrome zoom levels and stops at the ends', () => {
+    expect(zoomStep(1, 1)).toBe(1.1)
+    expect(zoomStep(1, -1)).toBe(0.9)
+    expect(zoomStep(1.25, 1)).toBe(1.5)
+    expect(zoomStep(1.3, -1)).toBe(1.25)
+    expect(zoomStep(5, 1)).toBe(5)
+    expect(zoomStep(0.25, -1)).toBe(0.25)
+  })
+  test('clamps to 25%-500% and rejects junk', () => {
+    expect(clampZoom(9)).toBe(5)
+    expect(clampZoom(0.1)).toBe(0.25)
+    expect(clampZoom(NaN)).toBe(1)
+  })
+  test('zoomed metrics shrink the CSS viewport and keep the device pixel size', () => {
+    expect(zoomedMetrics({ width: 1280, height: 720, deviceScaleFactor: 1 }, 2)).toEqual({ width: 640, height: 360, deviceScaleFactor: 2 })
+    expect(zoomedMetrics({ width: 1000, height: 600, deviceScaleFactor: 2 }, 0.5)).toEqual({ width: 2000, height: 1200, deviceScaleFactor: 1 })
+    expect(zoomedMetrics({ width: 1280, height: 720, deviceScaleFactor: 1 }, 1)).toEqual({ width: 1280, height: 720, deviceScaleFactor: 1 })
+  })
+  test('parses CLI zoom arguments', () => {
+    expect(parseZoom('in', 1)).toBe(1.1)
+    expect(parseZoom('out', 1)).toBe(0.9)
+    expect(parseZoom('reset', 2)).toBe(1)
+    expect(parseZoom('150%', 1)).toBe(1.5)
+    expect(parseZoom('150', 1)).toBe(1.5)
+    expect(parseZoom('2', 1)).toBe(2)
+    expect(parseZoom('1000%', 1)).toBe(5)
+    expect(() => parseZoom('huge', 1)).toThrow()
+  })
+  test('clicks on a 200% frame map to half-size CSS coordinates', () => {
+    // pane 700x400 at 200%: Chrome renders a 350x200 CSS viewport into a 700x400 frame
+    const box = { x: 12, y: 120, width: 700, height: 400 }
+    expect(mapPoint(12 + 300, 120 + 100, box, { width: 350, height: 200 })).toEqual({ x: 150, y: 50 })
   })
 })
