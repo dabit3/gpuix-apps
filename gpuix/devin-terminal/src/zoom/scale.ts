@@ -42,6 +42,10 @@ export function scaleProps<P extends Record<string, unknown> | null | undefined>
   const s = props.style
   if (s && typeof s === 'object') next = { ...props, style: scaleStyle(s) }
   else if (typeof s === 'function') next = { ...props, style: (...a: unknown[]) => scaleStyle((s as (...x: unknown[]) => unknown)(...a)) }
-  if (typeof props.sideOffset === 'number') next = { ...(next ?? props), sideOffset: (props.sideOffset as number) * zoom }
+  for (const k of ['sideOffset', 'gap', 'snapMargin'] as const) {
+    if (typeof props[k] === 'number') next = { ...(next ?? props), [k]: (props[k] as number) * zoom }
+  }
+  const o = props.offset as { x?: number; y?: number } | undefined
+  if (o && typeof o === 'object') next = { ...(next ?? props), offset: { x: (o.x ?? 0) * zoom, y: (o.y ?? 0) * zoom } }
   return (next ?? props) as P
 }

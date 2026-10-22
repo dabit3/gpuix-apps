@@ -1968,7 +1968,7 @@ export function DevinApp({
         )}
       </div>
       {selected && view === 'home' && !compact && (
-        <motion.div initial={false} animate={{ width: state.panelOpen ? panelWidth : 0 }} transition={{ duration: 0.25, ease: 'easeOut' }} style={{ height: '100%', overflow: 'hidden', flexShrink: 0 }}>
+        <motion.div initial={false} animate={{ width: state.panelOpen ? panelWidth * zoom : 0 }} transition={{ duration: 0.25, ease: 'easeOut' }} style={{ height: '100%', overflow: 'hidden', flexShrink: 0 }}>
           <div style={{ ...col(), width: panelWidth, height: '100%', backgroundColor: C.canvas, borderLeftWidth: 1, borderColor: C.border }}>
             {selected.live ? (
               <LivePanel session={selected} sessions={state.sessions} tab={state.panelTab} onTab={(tab) => dispatch({ type: 'panel', tab })} onSelect={select} client={client} pollMs={pollMs} previews={previews} />
