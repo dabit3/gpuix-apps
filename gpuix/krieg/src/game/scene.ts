@@ -51,11 +51,11 @@ export function scene(w: World, s: SpriteSet, t: number) {
     if (tail >= head) continue
     const a = tail / r.len, b = head / r.len
     tr.push({ ax: r.x0 + (r.x1 - r.x0) * a, ay: r.y0 + (r.y1 - r.y0) * a, az: r.z0 + (r.z1 - r.z0) * a, bx: r.x0 + (r.x1 - r.x0) * b, by: r.y0 + (r.y1 - r.y0) * b, bz: r.z0 + (r.z1 - r.z0) * b })
-    if (head >= r.len) dyn.push({ x: r.x1, y: r.y1, r: 0.9, g: 0.6, b: 0.3, radius: 1.3 })
+    if (head >= r.len) dyn.push({ x: r.x1, y: r.y1, r: 0.5, g: 0.35, b: 0.18, radius: 0.9 })
   }
   if (p.flash > 0) {
     const dx = Math.cos(p.angle), dy = Math.sin(p.angle)
-    dyn.push({ x: p.x + dx * 0.4, y: p.y + dy * 0.4, r: 1.1 * p.flash, g: 0.8 * p.flash, b: 0.45 * p.flash, radius: 3.2 })
+    dyn.push({ x: p.x + dx * 0.4, y: p.y + dy * 0.4, r: 0.6 * p.flash, g: 0.42 * p.flash, b: 0.22 * p.flash, radius: 2.2 })
   }
   const vm: Viewmodel = {
     img: p.weapon === 0 ? s.rifle : s.launcher,
