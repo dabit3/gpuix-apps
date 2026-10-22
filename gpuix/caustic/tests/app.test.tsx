@@ -5,6 +5,7 @@ import { App, controls, keyName } from '../src/app'
 import type { FromEngine, ToEngine } from '../src/protocol'
 import type { Source } from '../src/source'
 import { fallbackTheme } from '../src/theme'
+import { DEFAULT_SETTINGS } from '../src/scene'
 
 function fakeSource() {
   const sent: ToEngine[] = []
@@ -58,7 +59,7 @@ describeNative('caustic UI in the GPU test renderer', () => {
     expect(down.u).toBeCloseTo(0, 1)
     expect(down.v).toBeCloseTo(-80 / (H / 2), 1)
 
-    emit({ type: 'stats', stats: { fps: 59.6, simMs: 0.1, causticsMs: 2, renderMs: 6, frameMs: 16.7, w: 840, h: 532, sim: 128, photons: 82944, caustics: 192, workers: 6, steps: 60, peak: 4.2 }, settings: { quality: 'lite', rain: true, ball: false, shafts: true, paused: false, sunElev: 64, sunAz: 28, depth: 1, breeze: true }, hover: 'water', drag: null })
+    emit({ type: 'stats', stats: { fps: 59.6, simMs: 0.1, causticsMs: 2, renderMs: 6, frameMs: 16.7, w: 840, h: 532, sim: 128, photons: 82944, caustics: 192, workers: 6, steps: 60, peak: 4.2 }, settings: { ...DEFAULT_SETTINGS, rain: true, ball: false }, hover: 'water', drag: null })
     draw()
     expect(text()).toContain('60')
     expect(text()).toContain('840×532 → 1200×760')
@@ -75,4 +76,33 @@ describeNative('caustic UI in the GPU test renderer', () => {
     expect(all).toContain('Rain')
     expect(all).not.toContain('drag deck')
   })
+
+  test('scenes and the sandbox: keys 3-6 pick a scene, T opens sliders, arrows and track drags tune them', async () => {
+    const { source, sent } = fakeSource()
+    const W = 1200, H = 760
+    const { render, renderer } = createTestRoot({ width: W, height: H })
+    render(<App source={source} theme={fallbackTheme()} size={{ width: W, height: H }} />)
+    await connectTest(renderer)
+    const sets = () => sent.flatMap((m) => (m.type === 'set' ? [m.settings] : []))
+    expect(renderer.getAllText().join('\n')).toContain('lagoon')
+    controls.current!.key({ key: '6' })
+    expect(sets().at(-1)).toMatchObject({ look: 'night', sunElev: 70 })
+    controls.current!.key({ key: 'space', keyChar: 'n' })
+    expect(sets().at(-1)).toMatchObject({ look: 'pool' })
+    controls.current!.key({ key: 'space', keyChar: 't' })
+    await new Promise((r) => setTimeout(r, 30))
+    const all = renderer.getAllText().join('\n')
+    expect(all).toContain('Sandbox')
+    expect(all).toContain('refraction (IOR)')
+    // Arrow keys move through the rows instead of orbiting while the panel is open.
+    const before = sent.length
+    controls.current!.key({ key: 'right' })
+    expect(sets().at(-1)).toMatchObject({ sunElev: 66 })
+    controls.current!.key({ key: 'down' })
+    controls.current!.key({ key: 'left' })
+    expect(sets().at(-1)).toMatchObject({ sunAz: 18 })
+    expect(sent.slice(before).some((m) => m.type === 'orbit')).toBe(false)
+    controls.current!.key({ key: 'escape' })
+  })
 })
+

@@ -5,7 +5,8 @@ import { encodePng } from '../src/png'
 import type { FromEngine } from '../src/protocol'
 import { QUALITY } from '../src/quality'
 import { frameOf, renderRows } from '../src/render'
-import { Scene, WATER_LEVEL } from '../src/scene'
+import { Scene, WATER_LEVEL, clampTunable, lookSettings } from '../src/scene'
+import { LOOKS, type LookName } from '../src/looks'
 import { dot, norm, refract, type V3 } from '../src/vec'
 import { Water } from '../src/water'
 
@@ -38,7 +39,7 @@ describe('water height field', () => {
   })
 
   test('switching quality resamples the waves instead of resetting them', () => {
-    const s = new Scene({ quality: 'lite', breeze: false })
+    const s = new Scene({ quality: 'lite', breeze: false, swell: 0 })
     s.drop(0.4, 0.4, 0.12, 0.05)
     const mean = () => s.water.volume() / (s.water.n * s.water.n)
     const before = mean()
@@ -104,7 +105,7 @@ describe('optics', () => {
 
 describe('scene', () => {
   test('picking hits the water, the ball and the deck', () => {
-    const s = new Scene({ breeze: false })
+    const s = new Scene({ breeze: false, swell: 0 })
     expect(s.pick(0, -0.05, 1.6).kind).not.toBe('none')
     expect(s.pick(-0.99, 0.99, 1.6).kind).toBe('none')
     // Project the ball centre to the screen, then pick there.
@@ -118,7 +119,7 @@ describe('scene', () => {
   })
 
   test('the ball rides the waves: a ripple next to it pushes it away', () => {
-    const s = new Scene({ breeze: false })
+    const s = new Scene({ breeze: false, swell: 0 })
     const x0 = s.ball.x, z0 = s.ball.z
     for (let i = 0; i < 90; i++) s.advance(1 / 60)
     expect(Math.hypot(s.ball.x - x0, s.ball.z - z0)).toBeLessThan(1e-4)
@@ -128,7 +129,7 @@ describe('scene', () => {
   })
 
   test('the ray tracer paints the pool, and ripples change the pixels', () => {
-    const s = new Scene({ breeze: false })
+    const s = new Scene({ breeze: false, swell: 0 })
     const W = 160, H = 100
     const a = new Uint8Array(W * H * 4), b = new Uint8Array(W * H * 4)
     s.advance(1 / 60)
@@ -177,3 +178,55 @@ describe('engine (workers + pipeline)', () => {
     expect(got.some((m) => m.type === 'ripples')).toBe(true)
   })
 })
+
+describe('sandbox + scenes', () => {
+  test('wind swell adds a fine caustic web without touching the sim heights', () => {
+    const calm = new Scene({ breeze: false, swell: 0, ball: false }), windy = new Scene({ breeze: false, swell: 1, ball: false })
+    for (const s of [calm, windy]) { for (let i = 0; i < 30; i++) s.advance(1 / 60); s.caustics.compute(s.water, WATER_LEVEL, 1, s.light, s.ball) }
+    expect(Math.max(...windy.water.h.map(Math.abs))).toBeLessThan(1e-6)
+    expect(windy.caustics.max()).toBeGreaterThan(calm.caustics.max() + 0.5)
+    expect(windy.caustics.mean()).toBeCloseTo(calm.caustics.mean(), 1)
+  })
+
+  test('IOR slider: stronger refraction focuses the same ripple harder (up to its focal depth); IOR 1 casts no caustics', () => {
+    const peak = (ior: number) => {
+      const s = new Scene({ breeze: false, swell: 0, ball: false, ior })
+      s.drop(0, 0, 0.12, 0.05)
+      for (let i = 0; i < 20; i++) s.advance(1 / 60)
+      s.caustics.compute(s.water, WATER_LEVEL, 1, s.light, s.ball, ior)
+      return s.caustics.max()
+    }
+    expect(peak(1.0)).toBeLessThan(peak(1.333) * 0.6)
+    // Past ~1.4 this ripple focuses above the floor and the peak falls again, so compare below that.
+    expect(peak(1.333)).toBeGreaterThan(peak(1.15))
+  })
+
+  test('wave speed and life feed the solver; presets set the sun, swell and depth; sliders clamp', () => {
+    const s = new Scene({ breeze: false, waveSpeed: 2, life: 0 })
+    expect(s.water.stepsPerSecond).toBeCloseTo(2 * 120 * (s.water.n / 256))
+    const shortLived = s.water.damping
+    s.settings.life = 1; s.applyWater()
+    expect(s.water.damping).toBeGreaterThan(shortLived)
+    expect(lookSettings('sunset')).toMatchObject({ look: 'sunset', sunElev: LOOKS.sunset.elev, depth: LOOKS.sunset.depth })
+    expect(clampTunable('ior', 9)).toBe(1.8)
+    expect(clampTunable('sunAz', -10)).toBe(350)
+  })
+
+  test('every scene renders a distinct image (night is darker, golden hour is warmer)', () => {
+    const W = 160, H = 100
+    const shot = (look: LookName) => {
+      const s = new Scene({ breeze: false, ...lookSettings(look) })
+      s.caustics.compute(s.water, WATER_LEVEL, s.settings.depth, s.light, s.ball, s.settings.ior)
+      const out = new Uint8Array(W * H * 4)
+      renderRows(frameOf(s, W / H, [10, 12, 16]), out, W, H, 0, H)
+      let r = 0, g = 0, b = 0
+      for (let k = 0; k < out.length; k += 4) { b += out[k]!; g += out[k + 1]!; r += out[k + 2]! }
+      return { r, g, b, lum: r + g + b }
+    }
+    const pool = shot('pool'), night = shot('night'), sunset = shot('sunset'), lagoon = shot('lagoon')
+    expect(night.lum).toBeLessThan(pool.lum)
+    expect(sunset.r / sunset.b).toBeGreaterThan(pool.r / pool.b)
+    expect(lagoon.lum).not.toBe(pool.lum)
+  })
+})
+

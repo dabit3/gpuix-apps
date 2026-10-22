@@ -1,6 +1,8 @@
 import { Caustics, type Ball, type Light } from './caustics'
 import { QUALITY, type Quality, type QualityName } from './quality'
 import { Water } from './water'
+import { IOR } from './quality'
+import { LOOKS, type LookName } from './looks'
 
 export const WATER_LEVEL = -0.14
 export const BALL_R = 0.19
@@ -30,9 +32,44 @@ export interface Settings {
   depth: number
   /** Faint wind ripples so the caustics never go still. */
   breeze: boolean
+  /** Scene preset (lighting, water colour, floor); see looks.ts. */
+  look: LookName
+  /** Sandbox: index of refraction, wave speed ×, wave life 0..1, absorption ×, wind swell 0..1, shaft gain ×. */
+  ior: number
+  waveSpeed: number
+  life: number
+  murk: number
+  swell: number
+  shaftGain: number
 }
 
-export const DEFAULT_SETTINGS: Settings = { quality: 'lite', rain: false, ball: true, shafts: true, paused: false, sunElev: 64, sunAz: 28, depth: 1, breeze: true }
+/** Sandbox slider ranges (and the HUD panel order). */
+export const TUNABLES = [
+  { key: 'sunElev', label: 'sun elevation', min: 20, max: 88, step: 2, fmt: (v: number) => `${v.toFixed(0)}°` },
+  { key: 'sunAz', label: 'sun azimuth', min: 0, max: 360, step: 10, fmt: (v: number) => `${v.toFixed(0)}°` },
+  { key: 'depth', label: 'water depth', min: 0.45, max: 1.6, step: 0.05, fmt: (v: number) => `${(v * 2).toFixed(1)} m` },
+  { key: 'ior', label: 'refraction (IOR)', min: 1.0, max: 1.8, step: 0.02, fmt: (v: number) => v.toFixed(2) },
+  { key: 'swell', label: 'wind swell', min: 0, max: 1, step: 0.05, fmt: (v: number) => `${Math.round(v * 100)}%` },
+  { key: 'waveSpeed', label: 'wave speed', min: 0.3, max: 2, step: 0.1, fmt: (v: number) => `${v.toFixed(1)}×` },
+  { key: 'life', label: 'wave life', min: 0, max: 1, step: 0.05, fmt: (v: number) => `${Math.round(v * 100)}%` },
+  { key: 'murk', label: 'absorption', min: 0.2, max: 2.5, step: 0.1, fmt: (v: number) => `${v.toFixed(1)}×` },
+  { key: 'shaftGain', label: 'light shafts', min: 0, max: 3, step: 0.1, fmt: (v: number) => `${v.toFixed(1)}×` },
+] as const satisfies readonly { key: keyof Settings; label: string; min: number; max: number; step: number; fmt: (v: number) => string }[]
+export type TunableKey = (typeof TUNABLES)[number]['key']
+
+export function clampTunable(key: TunableKey, v: number) {
+  const t = TUNABLES.find((t) => t.key === key)!
+  if (key === 'sunAz') return ((v % 360) + 360) % 360
+  return Math.max(t.min, Math.min(t.max, v))
+}
+
+/** Settings a scene preset sets (sun, swell, depth); the rest of the sandbox stays as the user left it. */
+export function lookSettings(name: LookName): Partial<Settings> {
+  const L = LOOKS[name]
+  return { look: name, sunElev: L.elev, sunAz: L.az, swell: L.swell, depth: L.depth }
+}
+
+export const DEFAULT_SETTINGS: Settings = { quality: 'lite', rain: false, ball: true, shafts: true, paused: false, sunElev: 64, sunAz: 28, depth: 1, breeze: true, look: 'pool', ior: IOR, waveSpeed: 1, life: 0.71, murk: 1, swell: 0.55, shaftGain: 1 }
 
 /** Everything the simulation owns: water, ball, light, camera, caustics. Rendering reads it (see render.ts). */
 export class Scene {
@@ -56,6 +93,7 @@ export class Scene {
     this.q = QUALITY[this.settings.quality]
     this.water = new Water(this.q.sim)
     this.caustics = new Caustics(this.q.caustics, this.q.photons, this.q.dispersion)
+    this.applyWater()
     this.ball.on = this.settings.ball
     let s = seed >>> 0 || 1
     this.rng = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296)
@@ -69,8 +107,12 @@ export class Scene {
     this.q = QUALITY[name]
     this.water = new Water(this.q.sim)
     this.water.resampleFrom(old)
+    this.applyWater()
     this.caustics = new Caustics(this.q.caustics, this.q.photons, this.q.dispersion)
   }
+
+  /** Push the sandbox's wave speed and life into the solver. */
+  applyWater() { this.water.speed = this.settings.waveSpeed; this.water.setLife(this.settings.life) }
 
   updateLight() {
     const e = (this.settings.sunElev * Math.PI) / 180, a = (this.settings.sunAz * Math.PI) / 180
@@ -112,6 +154,7 @@ export class Scene {
     }
     if (steps === 8) this.acc = 0
     w.updateNormals()
+    w.swell(this.time, this.settings.swell)
     return steps
   }
 

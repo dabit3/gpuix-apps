@@ -46,6 +46,7 @@ export class Engine {
         if (next.quality !== s.settings.quality) s.setQuality(next.quality)
         s.settings = { ...next }
         s.updateLight()
+        s.applyWater()
         break
       }
       case 'orbit': s.orbit(m.dyaw, m.dpitch); break
@@ -154,7 +155,7 @@ export class Engine {
       if (!spare || spare.c !== q.caustics || spare.p !== q.photons || spare.dispersion !== q.dispersion) spare = new Caustics(q.caustics, q.photons, q.dispersion)
       this.spare = s.caustics
       s.caustics = spare
-      s.caustics.compute(s.water, WATER_LEVEL, s.settings.depth, s.light, s.ball)
+      s.caustics.compute(s.water, WATER_LEVEL, s.settings.depth, s.light, s.ball, s.settings.ior)
       const t2 = performance.now()
       const frame = frameOf(s, this.aspect, this.bg)
       const snap = this.snapshot(k & 1, s)

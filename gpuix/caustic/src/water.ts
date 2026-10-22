@@ -13,6 +13,9 @@ export class Water {
   gx: Float32Array
   gz: Float32Array
   damping: number
+  /** Wave speed multiplier (more sim steps per second, so the scheme stays stable). */
+  speed = 1
+  private swellT: Float32Array[] = []
 
   constructor(n: number) {
     this.n = n
@@ -24,8 +27,44 @@ export class Water {
     this.damping = Math.pow(0.995, 256 / n)
   }
 
+  /** Wave life 0..1 → per-step velocity damping, normalised for grid size (0.71 ≈ the old 0.995 at 256²). */
+  setLife(life: number) { this.damping = Math.pow(0.985 + 0.0138 * Math.max(0, Math.min(1, life)), 256 / this.n) }
+
+  /**
+   * Wind swell: a fixed set of short directional waves added to the gradients only (the sim heights stay untouched),
+   * so the floor always shows the fine caustic web even when nobody touches the water. cos(a+b) is split into
+   * per-column and per-row tables, so the cost is n² multiply-adds per wave.
+   */
+  swell(time: number, amp: number) {
+    if (amp <= 0) return
+    const { n, gx, gz } = this
+    if (!this.swellT.length) for (let k = 0; k < 4; k++) this.swellT.push(new Float32Array(n))
+    const [ca, sa, cb, sb] = this.swellT as [Float32Array, Float32Array, Float32Array, Float32Array]
+    for (const w of SWELL) {
+      const kx = Math.cos(w.dir) * w.k, kz = Math.sin(w.dir) * w.k
+      const om = Math.sqrt(9.8 * w.k) * 0.32
+      const A = (amp * w.slope) / w.k
+      for (let i = 0; i < n; i++) {
+        const x = -1 + ((i + 0.5) * 2) / n
+        const a = kx * x - om * time + w.phase
+        ca[i] = Math.cos(a); sa[i] = Math.sin(a)
+        const b = kz * x
+        cb[i] = Math.cos(b); sb[i] = Math.sin(b)
+      }
+      const ax = A * kx, az = A * kz
+      for (let j = 0; j < n; j++) {
+        const cbj = cb[j]!, sbj = sb[j]!, row = j * n
+        for (let i = 0; i < n; i++) {
+          const c = ca[i]! * cbj - sa[i]! * sbj
+          gx[row + i]! += ax * c
+          gz[row + i]! += az * c
+        }
+      }
+    }
+  }
+
   /** Steps per second that keep wave speed the same in world units at any grid size. */
-  get stepsPerSecond() { return 120 * (this.n / 256) }
+  get stepsPerSecond() { return 120 * (this.n / 256) * this.speed }
 
   clear() { this.h.fill(0); this.v.fill(0); this.gx.fill(0); this.gz.fill(0) }
 
@@ -102,3 +141,13 @@ export function sampleGrid(f: Float32Array, n: number, x: number, z: number) {
   const b = f[k + n]! + (f[k + n + 1]! - f[k + n]!) * tx
   return a + (b - a) * tz
 }
+
+/** Wavenumbers (rad per world unit), directions and slopes of the wind swell; the pool is 2 units wide. */
+const SWELL = [
+  { k: 13.0, dir: 0.3, slope: 0.05, phase: 0 },
+  { k: 17.5, dir: 1.9, slope: 0.042, phase: 1.3 },
+  { k: 22.0, dir: -0.8, slope: 0.036, phase: 2.1 },
+  { k: 29.0, dir: 2.7, slope: 0.03, phase: 4.0 },
+  { k: 36.0, dir: 0.95, slope: 0.024, phase: 5.2 },
+  { k: 45.0, dir: -2.2, slope: 0.018, phase: 0.7 },
+]

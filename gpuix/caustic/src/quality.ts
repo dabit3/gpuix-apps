@@ -23,3 +23,5 @@ export const QUALITY: Record<QualityName, Quality> = {
 
 export const IOR = 1.333
 export const IOR_RGB = [1.31, 1.333, 1.36] as const
+/** Dispersion offsets from the base IOR for R/G/B (so the IOR slider keeps the spread). */
+export const IOR_SPREAD = [IOR_RGB[0] - IOR, 0, IOR_RGB[2] - IOR] as const

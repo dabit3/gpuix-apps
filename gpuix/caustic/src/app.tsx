@@ -3,7 +3,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { isTerminal, render, useWindowSize } from '@gpuix/react'
 import type { EngineStats, FromEngine, Ripple } from './protocol'
 import { QUALITY } from './quality'
-import { DEFAULT_SETTINGS, type PickKind, type Settings } from './scene'
+import { DEFAULT_SETTINGS, TUNABLES, clampTunable, lookSettings, type PickKind, type Settings, type TunableKey } from './scene'
+import { LOOKS, LOOK_NAMES, type LookName } from './looks'
 import type { Source } from './source'
 import { alpha, type Theme } from './theme'
 
@@ -46,6 +47,13 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
   const [perf, setPerf] = useState(true)
   const [help, setHelp] = useState(false)
   const [linked, setLinked] = useState(0)
+  const [tune, setTune] = useState(false)
+  const [row, setRowState] = useState(0)
+  const rowRef = useRef(0)
+  const setRow = (f: number | ((r: number) => number)) => { rowRef.current = typeof f === 'function' ? f(rowRef.current) : f; setRowState(rowRef.current) }
+  const slide = useRef<TunableKey | null>(null)
+  const tuneRef = useRef(tune)
+  tuneRef.current = tune
   const frames = useRef(0)
   const settingsRef = useRef(settings)
   settingsRef.current = settings
@@ -80,6 +88,22 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
     source.post({ type: 'pointer', phase, ...uv(e) })
   }
 
+  const scene = (name: LookName) => { set(lookSettings(name)); say(`Scene · ${LOOKS[name].label}`) }
+  const nextScene = (d: number) => scene(LOOK_NAMES[(LOOK_NAMES.indexOf(settingsRef.current.look) + d + LOOK_NAMES.length) % LOOK_NAMES.length]!)
+  const nudge = (i: number, dir: number) => {
+    const T = TUNABLES[i]!
+    set({ [T.key]: +clampTunable(T.key, (settingsRef.current[T.key] as number) + dir * T.step).toFixed(3) })
+  }
+  /** Sandbox slider geometry: the panel hugs the right edge, so the track's window x is fixed by W. */
+  const TRACK_W = 132
+  const trackLeft = (W: number) => W - 14 - 13 - TRACK_W
+  const slideTo = (key: TunableKey, x: number) => {
+    const T = TUNABLES.find((t) => t.key === key)!
+    const f = Math.max(0, Math.min(1, (x - trackLeft(size.width)) / TRACK_W))
+    const raw = T.min + f * (T.max - T.min)
+    set({ [key]: +clampTunable(key, Math.round(raw / T.step) * T.step).toFixed(3) })
+  }
+
   const screenshot = () => source.post({ type: 'screenshot', path: join(shotDir, `caustic-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`) })
   const toggle = (k: 'rain' | 'ball' | 'shafts' | 'paused') => set({ [k]: !settingsRef.current[k] })
   const quality = (q: Settings['quality']) => { if (q !== settingsRef.current.quality) { set({ quality: q }); say(q === 'full' ? 'FULL · dispersion + light shafts' : 'LITE · fast path') } }
@@ -91,6 +115,12 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
       const k = keyName(e)
       const s = settingsRef.current
       switch (k) {
+        case 't': setTune((x) => !x); return true
+        case 'n': nextScene(1); return true
+        case '3': scene('pool'); return true
+        case '4': scene('lagoon'); return true
+        case '5': scene('sunset'); return true
+        case '6': scene('night'); return true
         case '1': case 'l': quality('lite'); return true
         case '2': case 'f': quality('full'); return true
         case 'q': quality(s.quality === 'lite' ? 'full' : 'lite'); return true
@@ -108,11 +138,11 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
         case '.': set({ sunAz: s.sunAz + 8 }); return true
         case '-': set({ depth: Math.max(0.45, +(s.depth - 0.1).toFixed(2)) }); say(`Depth ${(settingsRef.current.depth).toFixed(1)} m`); return true
         case '=': case '+': set({ depth: Math.min(1.6, +(s.depth + 0.1).toFixed(2)) }); say(`Depth ${(settingsRef.current.depth).toFixed(1)} m`); return true
-        case 'left': source.post({ type: 'orbit', dyaw: 0.12, dpitch: 0 }); return true
-        case 'right': source.post({ type: 'orbit', dyaw: -0.12, dpitch: 0 }); return true
-        case 'up': source.post({ type: 'orbit', dyaw: 0, dpitch: 0.06 }); return true
-        case 'down': source.post({ type: 'orbit', dyaw: 0, dpitch: -0.06 }); return true
-        case 'escape': setHelp(false); return true
+        case 'left': if (tuneRef.current) { nudge(rowRef.current, -1); return true } source.post({ type: 'orbit', dyaw: 0.12, dpitch: 0 }); return true
+        case 'right': if (tuneRef.current) { nudge(rowRef.current, 1); return true } source.post({ type: 'orbit', dyaw: -0.12, dpitch: 0 }); return true
+        case 'up': if (tuneRef.current) { setRow((r) => (r + TUNABLES.length - 1) % TUNABLES.length); return true } source.post({ type: 'orbit', dyaw: 0, dpitch: 0.06 }); return true
+        case 'down': if (tuneRef.current) { setRow((r) => (r + 1) % TUNABLES.length); return true } source.post({ type: 'orbit', dyaw: 0, dpitch: -0.06 }); return true
+        case 'escape': setHelp(false); setTune(false); return true
       }
       return false
     },
@@ -128,7 +158,7 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
   const mono = 'Menlo'
 
   return (
-    <div testId="app-root" tabIndex={-1} autoFocus onKeyDown={(e: KeyLike & { stopPropagation?: () => void }) => { if (controls.current?.key(e)) e.stopPropagation?.() }} style={{ width: W, height: H, backgroundColor: t.bg, position: 'relative', overflow: 'hidden', display: 'flex' }}>
+    <div testId="app-root" tabIndex={-1} autoFocus onKeyDown={(e: KeyLike & { stopPropagation?: () => void }) => { if (controls.current?.key(e)) e.stopPropagation?.() }} onMouseMove={(e: { x?: number }) => { if (slide.current) slideTo(slide.current, e.x ?? 0) }} onMouseUp={() => { slide.current = null }} style={{ width: W, height: H, backgroundColor: t.bg, position: 'relative', overflow: 'hidden', display: 'flex' }}>
       <div
         testId="pool"
         onMouseDown={pointer('down')}
@@ -168,9 +198,50 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
               <Pill t={t} id="shafts" on={settings.shafts && q.shafts} dim={!q.shafts} label="Shafts" k="V" onClick={() => toggle('shafts')} />
               <Pill t={t} id="pause" on={settings.paused} label={settings.paused ? 'Paused' : 'Pause'} k="␣" onClick={() => toggle('paused')} />
               <Pill t={t} id="snap" on={false} label="Snap" k="S" onClick={screenshot} />
+              <Pill t={t} id="tune" on={tune} label="Tune" k="T" onClick={() => setTune((x) => !x)} />
             </div>
           ) : null}
         </div>
+        {!tiny ? (
+          <div testId="scenes" style={{ ...panel, display: 'flex', flexDirection: 'row', padding: 3, gap: 2 }}>
+            {LOOK_NAMES.map((name, i) => (
+              <div key={name} testId={`scene-${name}`} onClick={() => scene(name)} style={{ display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', paddingLeft: 10, paddingRight: 10, paddingTop: 5, paddingBottom: 5, borderRadius: 7, cursor: 'pointer', backgroundColor: settings.look === name ? alpha(t.accent, 0.22) : alpha(t.bg, 0), hover: { backgroundColor: settings.look === name ? alpha(t.accent, 0.28) : alpha(t.fg, 0.08) } }}>
+                <text style={{ fontSize: 12, fontWeight: 600, color: settings.look === name ? t.accent : t.dim }}>{LOOKS[name].label}</text>
+                <text style={{ fontSize: 10, color: t.faint, fontFamily: 'Menlo' }}>{String(i + 3)}</text>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {tune && !tiny ? (
+          <div testId="tune" style={{ ...panel, backgroundColor: alpha(t.bg, 0.86), width: 300, padding: 13, paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
+              <text style={{ fontSize: 12, fontWeight: 700, color: t.fg }}>Sandbox</text>
+              <text style={{ fontSize: 11, color: t.faint }}>↑↓ pick · ←→ adjust · drag</text>
+            </div>
+            {TUNABLES.map((T, i) => {
+              const v = settings[T.key] as number
+              const f = (v - T.min) / (T.max - T.min)
+              const sel = i === row
+              return (
+                <div key={T.key} testId={`tune-${T.key}`} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 18 }}>
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: 6, width: 142 }}>
+                    <text style={{ fontSize: 11, fontWeight: sel ? 700 : 400, color: sel ? t.fg : t.dim }}>{T.label}</text>
+                    <text style={{ fontSize: 11, color: sel ? t.accent : t.faint, fontFamily: 'Menlo' }}>{T.fmt(v)}</text>
+                  </div>
+                  <div
+                    testId={`track-${T.key}`}
+                    onMouseDown={(e: { x?: number; button?: number | null }) => { if (e.button != null && e.button !== 0) return; slide.current = T.key; setRow(i); slideTo(T.key, e.x ?? 0) }}
+                    style={{ width: TRACK_W, height: 18, display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }}
+                  >
+                    <div style={{ position: 'absolute', left: 0, top: 7, width: TRACK_W, height: 4, borderRadius: 2, backgroundColor: alpha(t.fg, 0.14), pointerEvents: 'none' }} />
+                    <div style={{ position: 'absolute', left: 0, top: 7, width: Math.max(4, f * TRACK_W), height: 4, borderRadius: 2, backgroundColor: sel ? t.accent : alpha(t.accent, 0.6), pointerEvents: 'none' }} />
+                    <div style={{ position: 'absolute', left: Math.max(0, Math.min(TRACK_W - 12, f * TRACK_W - 6)), top: 3, width: 12, height: 12, borderRadius: 6, backgroundColor: sel ? t.fg : alpha(t.fg, 0.75), pointerEvents: 'none' }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
       </div>
 
       {perf ? (
@@ -183,13 +254,13 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
           <Row t={t} k="caustics" v={`${stats.causticsMs.toFixed(1)} ms · peak ${stats.peak.toFixed(1)}×`} />
           <Row t={t} k="wave sim" v={`${stats.simMs.toFixed(2)} ms · ${stats.steps} steps/s`} />
           <Row t={t} k="pixels" v={`${stats.w}×${stats.h} → ${Math.round(W)}×${Math.round(H)}`} />
-          {!narrow ? <Row t={t} k="sun · depth" v={`${settings.sunElev}° · ${settings.depth.toFixed(1)} m`} /> : null}
+          {!narrow ? <Row t={t} k="scene" v={`${LOOKS[settings.look].label} · sun ${settings.sunElev}°`} /> : null}
         </div>
       ) : null}
 
       {!narrow ? (
         <div style={{ position: 'absolute', right: 16, bottom: 16, display: 'flex', flexDirection: 'row', gap: 14, pointerEvents: 'none' }}>
-          {[['drag water', 'ripples'], ['drag ball', 'push'], ['drag deck', 'orbit'], ['scroll', 'zoom'], ['H', 'keys']].map(([a, b]) => (
+          {[['drag water', 'ripples'], ['drag ball', 'push'], ['drag deck', 'orbit'], ['scroll', 'zoom'], ['3-6', 'scenes'], ['T', 'sandbox'], ['H', 'keys']].map(([a, b]) => (
             <div key={a} style={{ display: 'flex', flexDirection: 'row', gap: 5 }}>
               <text style={{ fontSize: 11, fontWeight: 600, color: t.fg }}>{a!}</text>
               <text style={{ fontSize: 11, color: t.faint }}>{b!}</text>
@@ -232,7 +303,7 @@ function Row({ t, k, v }: { t: Theme; k: string; v: string }) {
 const HELP: [string, string][] = [
   ['drag on water', 'drop a trail of ripples'], ['drag the ball', 'push it through the water'], ['drag the deck · arrows', 'orbit the camera'], ['scroll', 'zoom'],
   ['1 / 2 · L / F · Q', 'LITE / FULL quality'], ['R', 'rain'], ['B', 'ball on / off'], ['V', 'light shafts (FULL)'], ['space · P', 'pause the water'],
-  ['[  ]', 'sun height'], [',  .', 'sun direction'], ['-  =', 'water depth'], ['C', 'calm the water'], ['S', 'save a full-res PNG'], ['G', 'perf overlay'], ['Ctrl-C', 'quit'],
+  ['3 4 5 6 · N', 'scene: pool, lagoon, golden hour, night'], ['T', 'sandbox sliders (↑↓ ←→ or drag)'], ['[  ]', 'sun height'], [',  .', 'sun direction'], ['-  =', 'water depth'], ['C', 'calm the water'], ['S', 'save a full-res PNG'], ['G', 'perf overlay'], ['Ctrl-C', 'quit'],
 ]
 
 function Help({ t, W, H, panel }: { t: Theme; W: number; H: number; panel: Record<string, unknown> }) {

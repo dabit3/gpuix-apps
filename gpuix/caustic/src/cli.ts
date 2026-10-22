@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 import { parseArgs } from 'node:util'
+import { lookSettings } from './scene'
+import type { LookName } from './looks'
 
 const HELP = `caustic: real-time water caustics in your terminal, drawn by GPUIX
 
@@ -9,6 +11,7 @@ Usage: caustic [options]
 
 Options:
   -q, --quality <lite|full>  start quality (default lite)
+  -s, --scene <name>         pool | lagoon | sunset | night (default pool)
   -r, --rain                 start with rain on
       --no-ball              start without the floating ball
       --sun <deg>            sun elevation, 30-88 (default 64)
@@ -22,7 +25,7 @@ Options:
 
 Runs inside Ghostty or kitty (kitty graphics protocol). Ctrl-C quits.
 Mouse: drag water = ripples · drag ball = push · drag deck = orbit · scroll = zoom
-Keys: 1/2 LITE/FULL · R rain · B ball · V shafts · space pause · [ ] sun · - = depth · S snapshot · H help`
+Keys: 1/2 LITE/FULL · 3-6 scenes · T sandbox · R rain · B ball · V shafts · space pause · [ ] sun · - = depth · S snapshot · H help`
 
 const argv = process.argv.slice(2)
 
@@ -52,6 +55,7 @@ const { values } = parseArgs({
   args: argv,
   options: {
     quality: { type: 'string', short: 'q' },
+    scene: { type: 'string', short: 's' },
     rain: { type: 'boolean', short: 'r' },
     'no-ball': { type: 'boolean' },
     sun: { type: 'string' },
@@ -68,6 +72,7 @@ const { values } = parseArgs({
 
 if (values.help) { console.log(HELP); process.exit(0) }
 if (values.version) { console.log('caustic 0.1.0 (gpuix 0.11.0)'); process.exit(0) }
+if (values.scene && !['pool', 'lagoon', 'sunset', 'night'].includes(values.scene)) { console.error('caustic: --scene must be pool, lagoon, sunset or night'); process.exit(2) }
 if (values.quality && values.quality !== 'lite' && values.quality !== 'full') { console.error(`caustic: --quality must be lite or full`); process.exit(2) }
 
 const terminal = !values.window
@@ -95,6 +100,7 @@ const { start } = await import('./app')
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
 const initial = {
   quality: (values.quality ?? 'lite') as 'lite' | 'full',
+  ...(values.scene ? lookSettings(values.scene as LookName) : {}),
   rain: !!values.rain,
   ball: !values['no-ball'],
   ...(values.sun ? { sunElev: clamp(Number(values.sun), 30, 88) } : {}),

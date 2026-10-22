@@ -1,4 +1,4 @@
-import { IOR } from './quality'
+import { LAMPS, LOOKS, type Look } from './looks'
 import { BALL_R, DECK, WATER_LEVEL, type Basis, type Scene } from './scene'
 
 /** Plain data the per-pixel tracer reads; a Scene produces it each frame. */
@@ -18,6 +18,10 @@ export interface Frame {
   basis: Basis
   /** Background (terminal theme) as 0..255 RGB, painted outside the pool so the app blends into Ghostty. */
   bg: [number, number, number]
+  look: Look
+  ior: number
+  murk: number
+  shaftGain: number
 }
 
 export function frameOf(s: Scene, aspect: number, bg: [number, number, number]): Frame {
@@ -31,6 +35,7 @@ export function frameOf(s: Scene, aspect: number, bg: [number, number, number]):
     shafts: s.q.shafts && s.settings.shafts,
     basis: s.basis(aspect),
     bg,
+    look: LOOKS[s.settings.look], ior: s.settings.ior, murk: s.settings.murk, shaftGain: s.settings.shaftGain,
   }
 }
 
@@ -87,7 +92,16 @@ export function renderRows(F: Frame, out: Uint8Array, W: number, H: number, y0: 
   const bgR = F.bg[0], bgG = F.bg[1], bgB = F.bg[2]
   const ballOn = F.ball, bx = F.bx, by = F.by, bz = F.bz, br = BALL_R, br2 = br * br
   const cosSpin = Math.cos(F.spin), sinSpin = Math.sin(F.spin)
-  const eta = 1 / IOR
+  const eta = 1 / F.ior
+  const LK = F.look
+  const sunR = LK.sun[0], sunG = LK.sun[1], sunB = LK.sun[2]
+  const amb = LK.ambient, sand = LK.floor === 'sand', lane = LK.floor === 'tiles' && LK.lamps === 0
+  const flR = LK.floorTint[0], flG = LK.floorTint[1], flB = LK.floorTint[2]
+  const wlR = LK.wallTint[0], wlG = LK.wallTint[1], wlB = LK.wallTint[2]
+  const zR = LK.skyZenith[0], zG = LK.skyZenith[1], zB = LK.skyZenith[2]
+  const hR = LK.skyHorizon[0], hG = LK.skyHorizon[1], hB = LK.skyHorizon[2]
+  const lamps = LK.lamps > 0 ? LAMPS : []
+  const nL = lamps.length
   // Sun direction refracted through flat water: what lights the floor and walls.
   let R0x: number, R0y: number, R0z: number
   {
@@ -101,8 +115,26 @@ export function renderRows(F: Frame, out: Uint8Array, W: number, H: number, y0: 
   const sunUx = -lx, sunUy = -ly, sunUz = -lz
   const shafts = F.shafts
   // Absorption per unit distance (water eats red first) and in-scatter colour.
-  const aR = 1.05, aG = 0.34, aB = 0.21
-  const sR = 0.010, sG = 0.07, sB = 0.10
+  const aR = LK.absorb[0] * F.murk, aG = LK.absorb[1] * F.murk, aB = LK.absorb[2] * F.murk
+  const sR = LK.scatter[0], sG = LK.scatter[1], sB = LK.scatter[2]
+  const sunLum = (sunR + sunG + sunB) / 3
+
+  let lR = 0, lG = 0, lB = 0
+  /** Night lamps: light reaching (x,y,z) with normal (nx,ny,nz) from the wall lamps, through the water. */
+  const lampLight = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => {
+    lR = 0; lG = 0; lB = 0
+    for (let i = 0; i < nL; i++) {
+      const Lp = lamps[i]!
+      let dx = Lp.x - x, dy = Lp.y - y, dz = Lp.z - z
+      const d2 = dx * dx + dy * dy + dz * dz, d = Math.sqrt(d2) + 1e-6
+      dx /= d; dy /= d; dz /= d
+      // The lamp faces into the pool (opposite its wall's outward normal).
+      const face = Math.max(0, -(dx * Lp.x + dz * Lp.z))
+      const ndl = Math.max(0, nx * dx + ny * dy + nz * dz)
+      const k = (ndl * (0.2 + face * face) * 0.3) / (0.05 + d2)
+      lR += Lp.c[0] * k * Math.exp(-aR * d); lG += Lp.c[1] * k * Math.exp(-aG * d); lB += Lp.c[2] * k * Math.exp(-aB * d)
+    }
+  }
 
   const causAt = (x: number, z: number, a: Float32Array) => {
     let fx = ((x + 1) / 2) * C - 0.5, fz = ((z + 1) / 2) * C - 0.5
@@ -124,14 +156,15 @@ export function renderRows(F: Frame, out: Uint8Array, W: number, H: number, y0: 
     let aR2: number, aG2: number, aB2: number
     if (cap) { aR2 = 0.9; aG2 = 0.9; aB2 = 0.9 } else if (seg === 0) { aR2 = 0.86; aG2 = 0.46; aB2 = 0.03 } else { aR2 = 0.92; aG2 = 0.92; aB2 = 0.9 }
     const ndl = Math.max(0, nx * sunUx + ny * sunUy + nz * sunUz)
-    const lit = under ? 0.15 + 0.6 * ndl : 0.16 + 1.15 * ndl
+    const lit = under ? amb * 3 + 0.6 * ndl : amb * 4 + 1.15 * ndl
     // Blinn-ish highlight toward the camera.
     let vx = ex - hx, vy = ey - hy, vz = ez - hz
     const vl = Math.hypot(vx, vy, vz); vx /= vl; vy /= vl; vz /= vl
     let hx2 = vx + sunUx, hy2 = vy + sunUy, hz2 = vz + sunUz
     const hl = Math.hypot(hx2, hy2, hz2); hx2 /= hl; hy2 /= hl; hz2 /= hl
     const sp = under ? 0 : Math.pow(Math.max(0, nx * hx2 + ny * hy2 + nz * hz2), 60) * 1.6
-    cR = aR2 * lit + sp; cG = aG2 * lit + sp; cB = aB2 * lit + sp
+    cR = aR2 * lit * sunR + sp * sunR; cG = aG2 * lit * sunG + sp * sunG; cB = aB2 * lit * sunB + sp * sunB
+    if (nL) { lampLight(hx, hy, hz, nx, ny, nz); cR += aR2 * lR * 0.5; cG += aG2 * lG * 0.5; cB += aB2 * lB * 0.5 }
   }
 
   const sphereT = (ox: number, oy: number, oz: number, dx: number, dy: number, dz: number) => {
@@ -163,7 +196,7 @@ export function renderRows(F: Frame, out: Uint8Array, W: number, H: number, y0: 
         const face = tile(x0 + 4, z0 + 4, 0.165, 0.05)
         const coping = m < 1.07 ? 1 : 0
         const base = coping ? 0.2 : 0.032 * tileK
-        const lit = 0.55 + 0.45 * sunUy
+        const lit = (0.55 + 0.45 * sunUy) * (0.35 + 0.65 * Math.min(1, sunLum))
         r = base * lit * (0.75 + 0.25 * face); g = (base * 1.04) * lit * (0.75 + 0.25 * face); b = base * 1.12 * lit * (0.75 + 0.25 * face)
         const fade = Math.min(1, (DECK - m) / 0.16)
         const fr = tm(r), fg = tm(g), fb = tm(b)
@@ -192,7 +225,7 @@ export function renderRows(F: Frame, out: Uint8Array, W: number, H: number, y0: 
         const lit = Math.abs(qx) < 1 && Math.abs(qz) < 1 ? ndl : 0
         const band = py > -0.06 ? 0.35 : 1
         const a = (0.55 + 0.25 * face) * tileK * band
-        r = a * 0.62 * (0.12 + 0.9 * lit); g = a * 0.74 * (0.12 + 0.9 * lit); b = a * 0.86 * (0.12 + 0.9 * lit)
+        r = a * wlR * (amb * 3 + 0.9 * lit * sunR); g = a * wlG * (amb * 3 + 0.9 * lit * sunG); b = a * wlB * (amb * 3 + 0.9 * lit * sunB)
       } else {
         const px = ex + dx * tw, pz = ez + dz * tw
         // Surface sample.
@@ -216,9 +249,9 @@ export function renderRows(F: Frame, out: Uint8Array, W: number, H: number, y0: 
         const sd = Math.max(0, rdx * sunUx + rdy * sunUy + rdz * sunUz)
         const sd2 = sd * sd, sd4 = sd2 * sd2, sd16 = sd4 * sd4 * sd4 * sd4, sd64 = sd16 * sd16 * sd16 * sd16
         const sun = sd64 * sd64 * sd64 * sd64 * 30 + sd16 * 0.05
-        let refR = 0.10 + (0.012 - 0.10) * up + sun
-        let refG = 0.13 + (0.02 - 0.13) * up + sun * 0.96
-        let refB = 0.19 + (0.035 - 0.19) * up + sun * 0.88
+        let refR = hR + (zR - hR) * up + sun * sunR
+        let refG = hG + (zG - hG) * up + sun * sunG
+        let refB = hB + (zB - hB) * up + sun * sunB
         // Refraction into the water.
         const kk = 1 - eta * eta * (1 - cosi * cosi)
         const ss = eta * cosi - Math.sqrt(kk > 0 ? kk : 0)
@@ -238,14 +271,22 @@ export function renderRows(F: Frame, out: Uint8Array, W: number, H: number, y0: 
           wr = cR; wg = cG; wb = cB
         } else if (t === uf) {
           const hx = px + qx * t, hz = pz + qz * t
-          const face = tile(hx + 4, hz + 4, 0.165, 0.045)
-          const a = (0.6 + 0.4 * face) * tileK
-          const kr = causAt(hx, hz, cr), lr = 0.04 + floorNdl * kr * (0.3 + 0.62 * kr)
-          const kg = causAt(hx, hz, cg), lg = 0.04 + floorNdl * kg * (0.3 + 0.62 * kg)
-          const kb = causAt(hx, hz, cb), lb = 0.04 + floorNdl * kb * (0.3 + 0.62 * kb)
-          // Lane line down the middle of the floor, theme blue.
-          const lane = Math.abs(hx) < 0.035 && Math.abs(hz) < 0.72 ? 1 : 0
-          wr = (lane ? 0.08 : 0.74 * a) * lr; wg = (lane ? 0.22 : 0.84 * a) * lg; wb = (lane ? 0.55 : 0.9 * a) * lb
+          let a: number
+          if (sand) {
+            // Wind-rippled sand: two crossed ridge sets with a little grain.
+            const rip = Math.sin(hx * 19 + Math.sin(hz * 5.3) * 1.6) * 0.5 + Math.sin(hz * 27 - hx * 6 + Math.sin(hx * 7) * 1.2) * 0.25
+            a = 0.86 + 0.09 * rip + 0.06 * (hash((hx * 500) | 0, (hz * 500) | 0) - 0.5)
+          } else {
+            const face = tile(hx + 4, hz + 4, 0.165, 0.045)
+            a = (0.6 + 0.4 * face) * tileK
+          }
+          // Caustic response is superlinear (k² dominates) so focused lines read as bright, sharp filaments.
+          const kr = causAt(hx, hz, cr), lr = amb + floorNdl * kr * (0.1 + 0.55 * kr) * sunR
+          const kg = causAt(hx, hz, cg), lg = amb + floorNdl * kg * (0.1 + 0.55 * kg) * sunG
+          const kb = causAt(hx, hz, cb), lb = amb + floorNdl * kb * (0.1 + 0.55 * kb) * sunB
+          const ln = lane && Math.abs(hx) < 0.035 && Math.abs(hz) < 0.72 ? 1 : 0
+          wr = (ln ? 0.06 : flR * a) * lr; wg = (ln ? 0.2 : flG * a) * lg; wb = (ln ? 0.55 : flB * a) * lb
+          if (nL) { lampLight(hx, floorY, hz, 0, 1, 0); wr += flR * a * lR; wg += flG * a * lG; wb += flB * a * lB }
         } else {
           const hx = px + qx * t, hy = py + qy * t, hz = pz + qz * t
           const onX = ux < uz
@@ -259,8 +300,19 @@ export function renderRows(F: Frame, out: Uint8Array, W: number, H: number, y0: 
           const inside = Math.abs(sx2) < 1 && Math.abs(sz2) < 1
           const shimmer = inside ? 0.45 + 0.55 * causAt(sx2 * 0.96, sz2 * 0.96, cg) : 0
           const a = (0.58 + 0.3 * face) * tileK
-          const l = 0.07 + 1.1 * ndl * shimmer + 0.05
-          wr = a * 0.66 * l; wg = a * 0.78 * l; wb = a * 0.88 * l
+          const l = amb * 2 + 1.1 * ndl * shimmer
+          wr = a * wlR * (amb * 2 + 1.1 * ndl * shimmer * sunR); wg = a * wlG * (amb * 2 + 1.1 * ndl * shimmer * sunG); wb = a * wlB * (amb * 2 + 1.1 * ndl * shimmer * sunB)
+          void l
+          if (nL) {
+            lampLight(hx, hy, hz, wnx, 0, wnz)
+            wr += a * wlR * lR; wg += a * wlG * lG; wb += a * wlB * lB
+            // The lamp lenses themselves.
+            for (let i = 0; i < nL; i++) {
+              const Lp = lamps[i]!
+              const dd = Math.hypot(hx - Lp.x, hy - Lp.y, hz - Lp.z)
+              if (dd < 0.075) { const e = 7 * (1 - (dd / 0.075) ** 4); wr += Lp.c[0] * e; wg += Lp.c[1] * e; wb += Lp.c[2] * e }
+            }
+          }
         }
         const er = Math.exp(-aR * t), eg = Math.exp(-aG * t), eb = Math.exp(-aB * t)
         wr = wr * er + sR * (1 - eg); wg = wg * eg + sG * (1 - eg); wb = wb * eb + sB * (1 - eg)
@@ -275,14 +327,29 @@ export function renderRows(F: Frame, out: Uint8Array, W: number, H: number, y0: 
             const fxp = px + qx * ts + R0x * f, fzp = pz + qz * ts + R0z * f
             const depthFrac = (WL - sy) / (WL + D)
             const c = fxp > -1 && fxp < 1 && fzp > -1 && fzp < 1 ? causAt(fxp, fzp, cg) : 0
-            acc += (1 + (c - 1) * Math.min(1, depthFrac * 1.4)) * Math.exp(-0.9 * ts)
+            // Only focused light (c above the mean) makes a visible shaft; uniform light would just veil the floor.
+            acc += (c > 0.8 ? c - 0.8 : 0) * Math.min(1, depthFrac * 1.6) * Math.exp(-0.9 * ts)
           }
           // Henyey–Greenstein, g = 0.55, relative to isotropic.
           const ct = qx * R0x + qy * R0y + qz * R0z
           const g2 = 0.3025
           const hg = (1 - g2) / Math.pow(1 + g2 - 1.1 * ct, 1.5)
-          const amt = (acc / K) * t * hg * 0.022
-          wr += amt * 0.55; wg += amt * 0.9; wb += amt
+          const amt = (acc / K) * t * hg * 0.11 * F.shaftGain
+          // Scattered light is tinted by absorption along a typical path: half the view ray plus the sun ray down to it.
+          const path = 0.5 * t + (0.5 * (WL + D)) / -R0y
+          wr += amt * sunR * Math.exp(-aR * path); wg += amt * sunG * Math.exp(-aG * path); wb += amt * sunB * Math.exp(-aB * path)
+        }
+        if (nL) {
+          // Lamp glow: in-scatter along the underwater ray, evaluated at its closest approach to each lamp.
+          for (let i = 0; i < nL; i++) {
+            const Lp = lamps[i]!
+            const ox = Lp.x - px, oy = Lp.y - py, oz = Lp.z - pz
+            let tc = ox * qx + oy * qy + oz * qz
+            tc = tc < 0 ? 0 : tc > t ? t : tc
+            const cx = ox - qx * tc, cy = oy - qy * tc, cz = oz - qz * tc
+            const g = (0.018 * LK.lamps) / (0.012 + cx * cx + cy * cy + cz * cz) * Math.exp(-0.8 * tc)
+            wr += Lp.c[0] * g * 0.35; wg += Lp.c[1] * g; wb += Lp.c[2] * g
+          }
         }
         const T = 1 - fres
         r = wr * T + refR * fres; g = wg * T + refG * fres; b = wb * T + refB * fres

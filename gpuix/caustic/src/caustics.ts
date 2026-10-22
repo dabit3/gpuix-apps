@@ -1,5 +1,5 @@
 import { f32 } from './shared'
-import { IOR, IOR_RGB } from './quality'
+import { IOR, IOR_SPREAD } from './quality'
 import type { Water } from './water'
 
 export interface Light { x: number; y: number; z: number }
@@ -33,10 +33,10 @@ export class Caustics {
     this.tmp = f32(c * c)
   }
 
-  compute(w: Water, waterLevel: number, depth: number, L: Light, ball: Ball) {
+  compute(w: Water, waterLevel: number, depth: number, L: Light, ball: Ball, ior = IOR) {
     const { c, p } = this
     const chans = this.dispersion ? [this.r, this.g, this.b] : [this.g]
-    const etas = this.dispersion ? IOR_RGB.map((i) => 1 / i) : [1 / IOR]
+    const etas = this.dispersion ? IOR_SPREAD.map((d) => 1 / (ior + d)) : [1 / ior]
     for (const a of chans) a.fill(0)
     const n = w.n, h = w.h, gx = w.gx, gz = w.gz
     const weight = (c / p) * (c / p)
@@ -110,7 +110,7 @@ export class Caustics {
     for (const a of chans) this.blur(a)
   }
 
-  /** Separable [1 2 1] / 4 blur, once each way. */
+  /** Separable [1 2 1] / 4 blur, once each way: just enough to hide the photon grid, keeps the lines crisp. */
   private blur(a: Float32Array) {
     const { c, tmp } = this
     for (let j = 0; j < c; j++) {
