@@ -82,10 +82,34 @@ function Favicon({ t, tab }: { t: Theme; tab: Tab }) {
   const host = hostOf(tab.url)
   if (tab.loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: alpha(t.accent, 0.35), flexShrink: 0 }}><div style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: t.accent }} /></div>
   if (!host || !/^https?:/.test(tab.url)) return <div style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: t.raised, flexShrink: 0 }} />
-  return <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`} style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0 }} />
+  const icon = useFavicon(host)
+  if (!icon) return <div style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: t.raised, flexShrink: 0 }} />
+  return <img src={icon} style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0 }} />
 }
 
-function TabStrip({ s, t, width, onNew }: { s: Session; t: Theme; width: number; onNew: () => void }) {
+/** Fetched here rather than by `<img src=https…>`, which paints "img: load failed" text when a site has no icon. */
+const favicons = new Map<string, Promise<string | null>>()
+function faviconFor(host: string) {
+  let p = favicons.get(host)
+  if (!p) {
+    p = fetch(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`, { signal: AbortSignal.timeout(5000) })
+      .then(async (r) => {
+        const type = r.headers.get('content-type') ?? ''
+        if (!r.ok || !type.startsWith('image/')) return null
+        return `data:${type};base64,${Buffer.from(await r.arrayBuffer()).toString('base64')}`
+      })
+      .catch(() => null)
+    favicons.set(host, p)
+  }
+  return p
+}
+function useFavicon(host: string) {
+  const [icon, setIcon] = useState<{ host: string; src: string | null } | null>(null)
+  useEffect(() => { let live = true; void faviconFor(host).then((src) => { if (live) setIcon({ host, src }) }); return () => { live = false } }, [host])
+  return icon?.host === host ? icon.src : null
+}
+
+function TabStrip({ s, t, width, onNew, onSelect }: { s: Session; t: Theme; width: number; onNew: () => void; onSelect: (id: string) => void }) {
   const b = s.browser
   const tabs = b?.tabs ?? []
   const tabW = Math.max(64, Math.min(230, (width - 60) / Math.max(1, tabs.length)))
@@ -94,7 +118,7 @@ function TabStrip({ s, t, width, onNew }: { s: Session; t: Theme; width: number;
       {tabs.map((tab, i) => {
         const active = tab.id === b?.activeId
         return (
-          <div key={tab.id} testId={`tab-${i + 1}`} onClick={() => b && void b.activate(tab.id)} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, width: tabW, height: TAB_H - 6, paddingLeft: 10, paddingRight: 4, borderTopLeftRadius: 9, borderTopRightRadius: 9, backgroundColor: active ? t.panel : 'transparent', cursor: 'pointer', flexShrink: 0, hover: active ? {} : { backgroundColor: alpha(t.panel, 0.55) } }}>
+          <div key={tab.id} testId={`tab-${i + 1}`} onClick={() => onSelect(tab.id)} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, width: tabW, height: TAB_H - 6, paddingLeft: 10, paddingRight: 4, borderTopLeftRadius: 9, borderTopRightRadius: 9, backgroundColor: active ? t.panel : 'transparent', cursor: 'pointer', flexShrink: 0, hover: active ? {} : { backgroundColor: alpha(t.panel, 0.55) } }}>
             <Favicon t={t} tab={tab} />
             <Txt c={active ? t.fg : t.dim} s={12} w={active ? 600 : 400} grow>{tab.crashed ? 'Crashed' : tab.title || displayUrl(tab.url) || 'New Tab'}</Txt>
             {tabW > 90 || active ? (
@@ -213,7 +237,7 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
 
   return (
     <div ref={root} testId="surf-root" tabIndex={-1} autoFocus onKeyDown={onKeyDown} style={{ display: 'flex', flexDirection: 'column', width: size.width, height: size.height, backgroundColor: t.bg, overflow: 'hidden' }}>
-      <TabStrip s={s} t={t} width={size.width} onNew={() => b && void b.newTab('about:blank').then(() => ui.focusOmnibox())} />
+      <TabStrip s={s} t={t} width={size.width} onNew={() => b && void b.newTab('about:blank').then(() => ui.focusOmnibox())} onSelect={(id) => { if (!b) return; void b.activate(id); if (s.focus === 'omnibox') ui.focusPage() }} />
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 4, height: TOOL_H, paddingLeft: 8, paddingRight: 10, backgroundColor: t.panel, flexShrink: 0 }}>
         <IconButton t={t} testId="nav-back" label="←" disabled={!tab?.canBack} onClick={() => b && void b.back()} />
         <IconButton t={t} testId="nav-forward" label="→" disabled={!tab?.canForward} onClick={() => b && void b.forward()} />
@@ -229,7 +253,7 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
             placeholder={omniFocused ? (url && url !== 'about:blank' ? displayUrl(url) : 'Search DuckDuckGo or type a URL') : 'Search DuckDuckGo or type a URL'}
             onChange={(e) => { if (s.focus === 'omnibox') s.omnibox = e.value ?? '' }}
             onFocus={() => { if (s.focus !== 'omnibox') { s.focus = 'omnibox'; s.omnibox = ''; setRev((r) => r + 1) } }}
-            onSubmit={() => { const v = s.omnibox.trim() || url; ui.focusPage(); void s.go(v) }}
+            onSubmit={() => { if (s.focus !== 'omnibox') return; const v = s.omnibox.trim() || url; ui.focusPage(); void s.go(v) }}
             style={{ flexGrow: 1, minWidth: 0, fontSize: 13, color: t.fg, fontFamily: UI }}
           />
         </div>

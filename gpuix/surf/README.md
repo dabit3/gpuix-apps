@@ -84,4 +84,6 @@ bun run typecheck
 - Cmd-V is Ghostty's paste and doesn't reach the app as a key, so Ctrl-V reads the system clipboard (`pbpaste` / `wl-paste` / `xclip`) and calls `Input.insertText`.
 - `[gpuix]` INFO lines print under the prompt after exit unless `RUST_LOG=error` is in the process env, so the CLI re-execs itself with it and filters `[gpuix]` console lines.
 - The first click into an unfocused Ghostty split only focuses the split; it doesn't reach the app.
+- A remote `<img src="https://…">` that fails to load paints the text `img: load failed` in place of the image, so favicons are fetched in Bun and passed as data URLs only when they exist.
+- If the omnibox `<input>` still had focus (after `+`, then switching tabs), the first page click was lost and the page reloaded, probably because the input submitted as focus moved away. Tab clicks now return focus to the page, and the omnibox `onSubmit` is ignored unless the omnibox is focused.
 - Headless Chrome's screencast frame size is capped by the browser window size, not just `maxWidth/maxHeight`; `Browser.setWindowBounds` lifts the cap.

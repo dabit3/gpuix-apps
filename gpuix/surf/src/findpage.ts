@@ -39,7 +39,7 @@ const SCRIPT = `(q, back, fresh) => {
   } else st.i = (st.i + (back ? -1 : 1) + n) % n
   const cur = st.m[st.i]
   if (H) { H.set('surf-find', new Highlight(...st.m.map((m) => m[2]))); H.set('surf-find-current', new Highlight(cur[2])) }
-  s.removeAllRanges(); s.addRange(cur[2].cloneRange())
+  if (H) s.removeAllRanges(); else s.addRange(cur[2].cloneRange())
   const b = cur[2].getBoundingClientRect()
   if (b.top < 0 || b.bottom > innerHeight) cur[0].parentElement.scrollIntoView({ block: 'center' })
   return { count: n, found: true, index: st.i + 1 }

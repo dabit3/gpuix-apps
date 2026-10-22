@@ -82,7 +82,7 @@ test('find skips hidden text and scrolls the match into view', async () => {
   expect(await browser.evaluate('scrollY')).toBe(0)
   const r = await browser.find('needle', { fromStart: true })
   expect(r).toEqual({ count: 1, found: true, index: 1 })
-  expect(await browser.evaluate('String(getSelection())')).toBe('needle')
+  expect(await browser.evaluate("String(CSS.highlights.get('surf-find-current').values().next().value)")).toBe('needle')
   expect(await browser.evaluate('scrollY')).toBeGreaterThan(2500)
   expect(await browser.evaluate("CSS.highlights.get('surf-find-current').size")).toBe(1)
   expect(await browser.find('needle')).toEqual({ count: 1, found: true, index: 1 })
