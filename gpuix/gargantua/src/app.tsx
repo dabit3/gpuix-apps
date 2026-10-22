@@ -179,7 +179,7 @@ export function App({ source, theme: t, initial, size: fixed, onProbes, peers, s
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, pointerEvents: 'none' }}>
           <text style={{ fontSize: 15, fontWeight: 700, color: t.fg, pointerEvents: 'none' }}>GARGANTUA</text>
           <text style={{ fontSize: 15, fontWeight: 300, color: t.accent, pointerEvents: 'none' }}>//</text>
-          <text testId="scene-name" style={{ fontSize: 15, fontWeight: 600, color: t.dim, pointerEvents: 'none' }}>{settings.scene === 'gargantua' ? 'INTERSTELLAR' : sc.label.toUpperCase()}</text>
+          <text testId="scene-name" style={{ fontSize: 15, fontWeight: 600, color: t.dim, pointerEvents: 'none' }}>{settings.scene === 'gargantua' ? (settings.look === 'physical' ? 'PHYSICAL' : 'INTERSTELLAR') : sc.label.toUpperCase()}</text>
         </div>
         <text testId="subtitle" style={{ fontSize: 11, color: t.dim, pointerEvents: 'none' }}>
           {`${settings.lens ? 'Schwarzschild geodesics' : 'flat space'} · ${settings.look === 'physical' ? 'Physical' : 'Interstellar look'} · ${settings.quality.toUpperCase()}`}
