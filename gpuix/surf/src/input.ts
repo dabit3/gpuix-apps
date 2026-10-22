@@ -34,6 +34,42 @@ export function viewportFor(box: { width: number; height: number }, dpr: number)
   return { width, height, deviceScaleFactor: scale, frameWidth: Math.round(width * scale), frameHeight: Math.round(height * scale) }
 }
 
+/** Chrome's zoom steps (25%–500%). */
+export const ZOOM_LEVELS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5]
+export const MIN_ZOOM = ZOOM_LEVELS[0]!
+export const MAX_ZOOM = ZOOM_LEVELS[ZOOM_LEVELS.length - 1]!
+
+/** Next Chrome zoom step above (dir 1) or below (dir -1) `z`. */
+export function zoomStep(z: number, dir: 1 | -1): number {
+  if (dir > 0) return ZOOM_LEVELS.find((l) => l > z + 1e-3) ?? MAX_ZOOM
+  return [...ZOOM_LEVELS].reverse().find((l) => l < z - 1e-3) ?? MIN_ZOOM
+}
+
+export function clampZoom(z: number): number {
+  return Number.isFinite(z) && z > 0 ? Math.round(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z)) * 100) / 100 : 1
+}
+
+/**
+ * Page zoom the way Chrome does it: the CSS viewport shrinks by the zoom and each CSS px covers `zoom`× more device px,
+ * so the page reflows to the narrower width and frames keep the pane's pixel size.
+ */
+export function zoomedMetrics(v: { width: number; height: number; deviceScaleFactor: number }, zoom: number) {
+  const z = clampZoom(zoom)
+  return { width: Math.max(1, Math.round(v.width / z)), height: Math.max(1, Math.round(v.height / z)), deviceScaleFactor: v.deviceScaleFactor * z }
+}
+
+/** `in`, `out`, `reset`, `150%`, `150` (percent) or `1.5` (factor) → a zoom factor. */
+export function parseZoom(arg: string, current: number): number {
+  const a = arg.trim().toLowerCase()
+  if (a === 'in' || a === '+') return zoomStep(current, 1)
+  if (a === 'out' || a === '-') return zoomStep(current, -1)
+  if (a === 'reset' || a === '0' || a === '100%') return 1
+  const pct = a.endsWith('%')
+  const n = Number(pct ? a.slice(0, -1) : a)
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`bad zoom "${arg}": use in, out, reset, or a level like 150%`)
+  return clampZoom(pct || n > MAX_ZOOM ? n / 100 : n)
+}
+
 export type CdpButton = 'none' | 'left' | 'middle' | 'right'
 /** GPUIX reports left as 0, middle 1, right 2 (0 is a real button, not "none"). */
 export function cdpButton(b: number | null | undefined): CdpButton {

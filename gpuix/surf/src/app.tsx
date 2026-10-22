@@ -31,6 +31,9 @@ export function shortcut(s: Session, e: KeyLike, ui: { focusOmnibox: () => void;
   // Ghostty turns Option-←/→ into Alt-b / Alt-f (word motion), so accept both
   if (m.alt && (e.key === 'left' || k === 'b')) { void b.back(); return true }
   if (m.alt && (e.key === 'right' || k === 'f')) { void b.forward(); return true }
+  if (mod && (k === '=' || k === '+' || e.key === 'plus' || e.key === 'equal')) { void s.zoom('in'); return true }
+  if (mod && (k === '-' || k === '_' || e.key === 'minus')) { void s.zoom('out'); return true }
+  if (mod && k === '0') { void s.zoom('reset'); return true }
   if (mod && /^[1-9]$/.test(k)) { const t = k === '9' ? b.tabs.at(-1) : b.tabs[Number(k) - 1]; if (t) void b.activate(t.id); return true }
   if (e.key === 'escape' && s.focus !== 'page') { if (s.focus === 'find') { s.findOpen = false; void b.find('') } ui.focusPage(); return true }
   return false
@@ -50,6 +53,26 @@ export const cursorFor = (css: string): CursorValue => CSS_CURSOR[css] ?? 'defau
 
 function Txt({ c, s = 13, w, f = UI, children, grow }: { c: string; s?: number; w?: number; f?: string; children: React.ReactNode; grow?: boolean }) {
   return <text style={{ color: c, fontSize: s, fontWeight: w as never, fontFamily: f, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', flexShrink: 1, minWidth: 0, flexGrow: grow ? 1 : 0 }}>{children}</text>
+}
+
+const pct = (z: number) => `${Math.round(z * 100)}%`
+
+/** Toolbar zoom: − / level / +, the level resets to 100%. Narrow panes only show the level, and only when it isn't 100%. */
+function ZoomControl({ t, zoom, compact, onZoom }: { t: Theme; zoom: number; compact: boolean; onZoom: (to: 'in' | 'out' | 'reset') => void }) {
+  const zoomed = Math.abs(zoom - 1) > 1e-3
+  const level = (
+    <div testId="zoom-level" onClick={() => onZoom('reset')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 50, height: 26, paddingLeft: 6, paddingRight: 6, borderRadius: 13, flexShrink: 0, cursor: 'pointer', backgroundColor: zoomed ? t.raised : 'transparent', hover: { backgroundColor: t.raised } }}>
+      <text style={{ color: zoomed ? t.fg : t.dim, fontSize: 12, fontFamily: MONO }}>{pct(zoom)}</text>
+    </div>
+  )
+  if (compact) return zoomed ? level : null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 6, flexShrink: 0 }}>
+      <IconButton t={t} testId="zoom-out" label="−" size={16} onClick={() => onZoom('out')} />
+      {level}
+      <IconButton t={t} testId="zoom-in" label="+" size={16} onClick={() => onZoom('in')} />
+    </div>
+  )
 }
 
 function IconButton({ t, label, title, onClick, disabled, testId, size = 15 }: { t: Theme; label: string; title?: string; onClick: () => void; disabled?: boolean; testId?: string; size?: number }) {
@@ -145,8 +168,9 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
   const [, setRev] = useState(0)
   const [cursor, setCursor] = useState<CursorValue>('default')
   const [hasFrame, setHasFrame] = useState(false)
-  // CSS size of the frame on screen: the image is drawn 1:1 at that size and clicks map against it, so a frame from before a resize is never stretched
-  const [shown, setShown] = useState<{ width: number; height: number } | null>(null)
+  // The frame on screen: drawn at its own pixel size (width/height, logical px) and clicks map onto the CSS viewport it was rendered at,
+  // so a frame from before a resize or zoom change is never stretched and clicks land where they look
+  const [shown, setShown] = useState<{ width: number; height: number; cssWidth: number; cssHeight: number } | null>(null)
   const shownRef = useRef(shown)
   const lastCursor = useRef({ at: 0, x: -1, y: -1 })
   const meter = useRef(paint ?? new RateMeter())
@@ -178,7 +202,8 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
       const t0 = performance.now()
       img.current.setImage(f.bytes)
       const cur = shownRef.current
-      if (!cur || cur.width !== f.cssWidth || cur.height !== f.cssHeight) { shownRef.current = { width: f.cssWidth, height: f.cssHeight }; setShown(shownRef.current) }
+      const w = f.cssWidth * f.zoom, h = f.cssHeight * f.zoom
+      if (!cur || cur.width !== w || cur.height !== h || cur.cssWidth !== f.cssWidth || cur.cssHeight !== f.cssHeight) { shownRef.current = { width: w, height: h, cssWidth: f.cssWidth, cssHeight: f.cssHeight }; setShown(shownRef.current) }
       s.paintMs = performance.now() - t0
       s.painted++
       meter.current.tick()
@@ -193,8 +218,11 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
   useEffect(() => { if (b && s.focus === 'page') ui.focusPage() }, [b])
 
   const pageX = (e: EventPayload) => {
-    const v = shownRef.current ?? b?.viewport ?? { width: 1, height: 1 }
-    return mapPoint(e.x ?? 0, e.y ?? 0, { x: s.box.x, y: s.box.y, width: v.width, height: v.height }, v)
+    const f = shownRef.current
+    const v = b?.viewport ?? { width: 1, height: 1 }
+    const z = b?.active?.zoom ?? 1
+    if (!f) return mapPoint(e.x ?? 0, e.y ?? 0, { x: s.box.x, y: s.box.y, width: v.width, height: v.height }, { width: v.width / z, height: v.height / z })
+    return mapPoint(e.x ?? 0, e.y ?? 0, { x: s.box.x, y: s.box.y, width: f.width, height: f.height }, { width: f.cssWidth, height: f.cssHeight })
   }
 
   const onMouseDown = (e: EventPayload) => {
@@ -221,9 +249,12 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
   }
   const onScroll = (e: EventPayload) => {
     if (!b) return
+    if (e.modifiers?.ctrl || e.modifiers?.cmd) { s.zoomWheel((e.deltaY ?? 0) * (e.precise ? 1 : 40)); return }
     const p = pageX(e)
+    // wheel px are screen px; at 200% one screen px is half a CSS px
+    const z = b.active?.zoom ?? 1
     const d = wheelDelta(e.deltaX ?? 0, e.deltaY ?? 0, e.precise)
-    b.wheel(p.x, p.y, d.deltaX, d.deltaY, cdpModifiers(e.modifiers))
+    b.wheel(p.x, p.y, d.deltaX / z, d.deltaY / z, cdpModifiers(e.modifiers))
   }
 
   // Keys: the focused element sees them first, then this root handler.
@@ -242,6 +273,8 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
   const narrow = size.width < 640
   const omniFocused = s.focus === 'omnibox'
   const url = tab?.url ?? ''
+  const zoom = tab?.zoom ?? 1
+  const zoomFlash = b && performance.now() - s.zoomedAt < 1200
 
   return (
     <div ref={root} testId="surf-root" tabIndex={-1} autoFocus onKeyDown={onKeyDown} style={{ display: 'flex', flexDirection: 'column', width: size.width, height: size.height, backgroundColor: t.bg, overflow: 'hidden' }}>
@@ -265,6 +298,7 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
             style={{ flexGrow: 1, minWidth: 0, fontSize: 13, color: t.fg, fontFamily: UI }}
           />
         </div>
+        <ZoomControl t={t} zoom={zoom} compact={narrow} onZoom={(to) => void s.zoom(to)} />
       </div>
       <div style={{ height: 2, backgroundColor: t.panel, flexShrink: 0 }}>
         <div testId="progress" style={{ width: Math.round(size.width * progress), height: 2, backgroundColor: progress ? t.accent : 'transparent' }} />
@@ -276,6 +310,13 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
       >
         <img ref={img} testId="page-img" style={{ position: 'absolute', left: 0, top: 0, width: shown ? shown.width : vp ? vp.width : '100%', height: shown ? shown.height : vp ? vp.height : '100%' }} />
         <div testId="page-input" onMouseDown={onMouseDown} onMouseUp={onMouseUp} onMouseMove={onMouseMove} onScroll={onScroll} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, cursor }} />
+        {zoomFlash ? (
+          <div style={{ position: 'absolute', top: 12, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+            <div testId="zoom-flash" style={{ display: 'flex', alignItems: 'center', height: 34, paddingLeft: 16, paddingRight: 16, borderRadius: 17, backgroundColor: t.panel, borderWidth: 1, borderColor: t.line, boxShadow: [{ offsetX: 0, offsetY: 6, blurRadius: 18, spreadRadius: 0, color: 'rgba(0,0,0,0.45)' }] }}>
+              <text style={{ color: t.fg, fontSize: 14, fontWeight: 600 as never, fontFamily: MONO }}>{pct(zoom)}</text>
+            </div>
+          </div>
+        ) : null}
         {!hasFrame ? (
           <div testId="splash" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: t.bg, pointerEvents: 'none' }}>
             <text style={{ color: t.fg, fontSize: 34, fontWeight: 700 as never, fontFamily: UI }}>surf</text>
