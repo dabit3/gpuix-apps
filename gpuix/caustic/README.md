@@ -153,7 +153,7 @@ separates R from B.
 | drag-to-orbit, rain toggle, screenshot button, perf overlay | all kept (snapshot writes a PNG, the HUD shows fps and per-stage ms) |
 | static site on GitHub Pages | a CLI, `caustic`, that draws in your terminal; split panes share ripples |
 
-Cut: WebGPU path, cylinder pool, light colour/absorption/IOR sliders, bloom, grain and vignette, wall caustics, the GPU
+Cut: WebGPU path, cylinder pool, a free light-colour picker (the scene presets set it), bloom, grain and vignette, wall caustics, the GPU
 auto-benchmark. The 60 fps-on-an-RTX-3070-at-1440p acceptance criterion doesn't apply: everything runs on the CPU,
 and GPUIX only composites the finished image.
 
@@ -175,6 +175,9 @@ Headless (no terminal) the pipelined engine measured 60.7 fps LITE and 59.5 fps 
 
 ## GPUIX findings (0.11.0, terminal mode)
 
+- Mouse moves during a held drag go to the element under the cursor, not to the element that got the mouse-down,
+  and a parent's `onMouseMove` didn't fire while the cursor was over a child track. Sliders keep a `slide` ref set on
+  mouse-down and handle move/up on the track, the panel, the pool and the root.
 - `<img>` + `setImagePixels(w, h, bytes, { format: 'bgra' })` is fast enough to push ~1 MP at 60 fps from a worker's
   `SharedArrayBuffer`. Tracing below pane resolution with `objectFit="fill"` is a cheap quality knob.
 - Keys arrive twice if both a focused root `<div onKeyDown>` and a window-level handler listen. Toggles flipped
