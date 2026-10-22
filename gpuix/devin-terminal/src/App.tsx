@@ -1065,6 +1065,11 @@ function ComputerPanel({ session, client, pollMs, previews }: { session: Session
     }
   }, [shot?.attachment_id, client])
   const go = (i: number) => setPick(i >= n - 1 ? -1 : Math.max(0, i))
+  // app.devin.ai attachment links need a web-app login cookie, so open a fresh presigned URL instead.
+  const openOriginal = (s: Shot) => {
+    if (!client?.attachmentUrl) return openUrl(session.live?.url ?? s.url)
+    client.attachmentUrl(s).then(openUrl, () => openUrl(session.live?.url ?? s.url))
+  }
   const ready = preview && shot && preview.id === shot.attachment_id ? preview : null
   if (error && !shots) return <Empty text={error.slice(0, 80)} />
   if (!shots) return <Empty text="Loading Devin's screenshots…" />
@@ -1089,7 +1094,7 @@ function ComputerPanel({ session, client, pollMs, previews }: { session: Session
       </div>
       <Button
         testId="computer-stage"
-        onClick={() => openUrl(shot.url)}
+        onClick={() => openOriginal(shot)}
         style={{ ...col({ alignItems: 'center', justifyContent: 'center' }), position: 'relative', flexGrow: 1, minHeight: 200, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden', cursor: 'pointer' }}
       >
         {ready?.path ? (
@@ -1114,7 +1119,7 @@ function ComputerPanel({ session, client, pollMs, previews }: { session: Session
             <Btn label="Jump to latest" testId="computer-latest" small onClick={() => setPick(-1)} />
           </div>
         )}
-        <Btn label="Open" icon="link" testId="computer-open" small onClick={() => openUrl(shot.url)} />
+        <Btn label="Open" icon="link" testId="computer-open" small onClick={() => openOriginal(shot)} />
       </div>
       <div style={{ ...col({ gap: 1 }), flexShrink: 0 }}>
         {recent.map(({ s, i }) => (

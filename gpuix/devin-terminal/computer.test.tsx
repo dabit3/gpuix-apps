@@ -125,7 +125,8 @@ describeNative("Devin's computer panel", () => {
     expect(await textOf('computer-name')).toBe('deployed.png')
 
     await app.getByTestId('computer-open').click()
-    expect(opened.at(-1)).toBe('https://app.devin.ai/attachments/a4/deployed.png')
+    await until(async () => opened.length > 0, 'open')
+    expect(opened.at(-1)).toBe('https://s3.example/a4')
 
     await app.getByTestId('tab-details').click()
     await until(async () => (await app.getByTestId('detail-status').count()) === 1, 'session details')
