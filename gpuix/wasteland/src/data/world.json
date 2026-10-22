@@ -1,0 +1,167 @@
+{
+  "start": { "x": 5, "y": 28 },
+  "enemies": [
+    { "id": "rat1", "type": "rat", "x": 18, "y": 17, "group": "station" },
+    { "id": "rat2", "type": "rat", "x": 21, "y": 15, "group": "station" },
+    { "id": "rat3", "type": "rat", "x": 23, "y": 18, "group": "station" },
+    { "id": "rat4", "type": "rat", "x": 20, "y": 19, "group": "station" },
+    { "id": "hound1", "type": "hound", "x": 19, "y": 25, "group": "crater" },
+    { "id": "hound2", "type": "hound", "x": 23, "y": 28, "group": "crater" },
+    { "id": "scout1", "type": "wrecker", "x": 31, "y": 29, "group": "scouts", "name": "Wrecker Scout" },
+    { "id": "scout2", "type": "wrecker", "x": 35, "y": 30, "group": "scouts", "name": "Wrecker Scout" },
+    { "id": "dutch", "type": "dutch", "x": 34, "y": 6, "group": "camp", "neutral": true, "npc": "dutch" },
+    { "id": "camp1", "type": "wrecker", "x": 31, "y": 7, "group": "camp", "neutral": true },
+    { "id": "camp2", "type": "wrecker", "x": 37, "y": 6, "group": "camp", "neutral": true },
+    { "id": "camp3", "type": "wrecker", "x": 35, "y": 8, "group": "camp", "neutral": true }
+  ],
+  "containers": [
+    { "id": "locker", "name": "Shelter Locker", "x": 8, "y": 26, "items": [["canned_beans", 2], ["patch_kit", 1]], "caps": 10 },
+    { "id": "row_crate", "name": "Splintered Crate", "x": 9, "y": 7, "items": [["bell_clapper", 1]], "caps": 25 },
+    { "id": "row_safe", "name": "Brownstone Safe", "x": 6, "y": 6, "items": [["leather_jacket", 1], ["clean_water", 1]], "caps": 15, "lock": { "stat": "wits", "dc": 6 } },
+    { "id": "station_crate", "name": "Union Crate", "x": 24, "y": 19, "items": [["signal_valve", 1], ["scrap_rifle", 1], ["repair_kit", 1]], "caps": 0 },
+    { "id": "car_trunk", "name": "Taxi Trunk", "x": 14, "y": 16, "items": [["service_revolver", 1]], "caps": 30 },
+    { "id": "crater_cache", "name": "Con Ed Toolbox", "x": 20, "y": 27, "items": [["rad_flush", 1], ["hazmat_poncho", 1], ["road_plate", 1]], "caps": 20 },
+    { "id": "stash", "name": "Wrecker Stash", "x": 38, "y": 5, "items": [["nail_shotgun", 1], ["rail_bolter", 1]], "caps": 120 },
+    { "id": "poor_box", "name": "Poor Box", "x": 24, "y": 1, "items": [["patch_kit", 1], ["rad_flush", 1]], "caps": 5 },
+    { "id": "lot_fridge", "name": "Rusted Fridge", "x": 38, "y": 30, "items": [["canned_beans", 1], ["rebar_club", 1]], "caps": 12 }
+  ],
+  "trader": { "npc": "rosa", "caps": 400, "stock": [["patch_kit", 3], ["rad_flush", 2], ["repair_kit", 2], ["clean_water", 3], ["road_plate", 1], ["arc_pistol", 1], ["ion_carbine", 1]] },
+  "npcs": [
+    { "id": "ada", "name": "Overseer Ada Vance", "x": 7, "y": 28, "faction": "shelter", "look": { "hair": "bun", "skin": 0.7, "age": 0.6, "glasses": 1 },
+      "dialogue": {
+        "starts": [
+          { "req": ["q:overpass=resolved"], "node": "finale" },
+          { "req": ["q:clean_water=got"], "node": "filter" },
+          { "req": ["q:clean_water=none"], "node": "intro" },
+          { "node": "busy" }
+        ],
+        "nodes": {
+          "intro": { "text": "You're up. Good. The purifier is coughing brown, and we have maybe a week of clean water left. The Subway Union under Bleecker St keeps spare filter cartridges. Get me one.",
+            "options": [
+              { "text": "I'll get you that filter.", "effects": ["q:clean_water=active", "xp:10"], "next": "advice" },
+              { "text": "Let me look at the purifier first.", "check": { "stat": "wits", "dc": 6 }, "next": "tinker", "fail": "tinker_fail" },
+              { "text": "Why me?", "next": "why" }
+            ] },
+          "why": { "text": "Because you're the only one down here who can still run a mile. Everyone else drank the water.", "options": [ { "text": "Fine. Where's the Union?", "effects": ["q:clean_water=active"], "next": "advice" } ] },
+          "tinker": { "text": "You clear the intake and buy us a few extra days. Smart. It still needs a cartridge.", "options": [ { "text": "On my way.", "effects": ["q:clean_water=active", "xp:25", "flag:tinkered"], "next": "advice" } ] },
+          "tinker_fail": { "text": "You poke at it until it hisses at you. Leave it to me. Just get the cartridge.", "options": [ { "text": "Right.", "effects": ["q:clean_water=active"], "next": "advice" } ] },
+          "advice": { "text": "North past Rosa's bodega, then east to the station. Talk to Marcus Bell. Doc Hollis has patch kits if you get hurt. And take the pistol.", "options": [ { "text": "Leave.", "end": true } ] },
+          "busy": { "text": "Water first, everything else after.", "options": [ { "text": "Leave.", "end": true } ] },
+          "filter": { "text": "Is that... a real cartridge? Give it here.",
+            "options": [ { "text": "Hand over the filter cartridge.", "effects": ["take:filter_cartridge", "q:clean_water=done", "xp:100", "caps:+50", "q:overpass=active"], "next": "overpass" } ] },
+          "overpass": { "text": "Clean water, finally. Now the bad news: Dutch Malloy's Wreckers hold the old overpass and tax every runner who carries water past it. Deal with him, and this district breathes again.",
+            "options": [ { "text": "I'll handle Dutch.", "end": true } ] },
+          "finale": { "text": "So. The overpass is settled. Tell me how it went.",
+            "options": [ { "text": "It's over.", "effects": ["q:overpass=done", "xp:150", "ending"], "end": true } ] }
+        } } },
+    { "id": "hollis", "name": "Doc Hollis", "x": 3, "y": 28, "faction": "shelter", "look": { "hair": "bald", "skin": 0.45, "age": 0.8, "beard": 1 },
+      "dialogue": { "starts": [ { "node": "hi" } ], "nodes": {
+        "hi": { "text": "Hold still, let me look at you. Twenty caps and I'll stitch you up properly.",
+          "options": [
+            { "text": "Patch me up. (20 caps)", "req": ["caps>=20"], "effects": ["caps:-20", "heal", "log:Doc Hollis patches you up."], "next": "done" },
+            { "text": "You wouldn't charge a neighbor.", "check": { "stat": "charm", "dc": 6 }, "effects": ["heal"], "next": "done", "fail": "no" },
+            { "text": "Maybe later.", "end": true }
+          ] },
+        "done": { "text": "There. Try not to bleed on my floor again.", "options": [ { "text": "Thanks, Doc.", "end": true } ] },
+        "no": { "text": "Caps keep the antiseptic coming, kid.", "options": [ { "text": "Fair.", "end": true } ] }
+      } } },
+    { "id": "rosa", "name": "Rosa Quintero", "x": 4, "y": 17, "faction": "none", "look": { "hair": "long", "skin": 0.5, "age": 0.4, "earring": 1 },
+      "dialogue": { "starts": [ { "req": ["q:parcel=none"], "node": "first" }, { "node": "shop" } ], "nodes": {
+        "first": { "text": "Shelter kid! You look thirsty. Buy something, or carry something. Old Tom by the overpass is waiting on a parcel and my knees are done with that walk.",
+          "options": [
+            { "text": "I'll take the parcel.", "effects": ["q:parcel=active", "give:sealed_parcel"], "next": "shop" },
+            { "text": "Not now.", "next": "shop" }
+          ] },
+        "shop": { "text": "Patch kits, Rad-Flush, a few things that go bang. Caps only.",
+          "options": [ { "text": "Let's trade.", "effects": ["barter"], "end": true }, { "text": "Where's the Union?", "next": "union" }, { "text": "Leave.", "end": true } ] },
+        "union": { "text": "Bleecker St Station, east across the avenue. Mind the rats on the platform.", "options": [ { "text": "Thanks.", "next": "shop" } ] }
+      } } },
+    { "id": "marcus", "name": "Marcus Bell", "x": 17, "y": 13, "faction": "union", "look": { "hair": "buzz", "skin": 0.3, "age": 0.55, "beard": 1, "scar": 1 },
+      "dialogue": { "starts": [ { "req": ["q:clean_water=got"], "node": "after" }, { "req": ["q:clean_water=done"], "node": "after" }, { "req": ["q:clean_water=union", "dead:station"], "node": "cleared" }, { "req": ["q:clean_water=union"], "node": "terms" }, { "node": "intro" } ], "nodes": {
+        "intro": { "text": "Union ground. State your business, shelter rat.",
+          "options": [
+            { "text": "Shelter 34 needs a filter cartridge.", "req": ["q:clean_water=active"], "effects": ["q:clean_water=union"], "next": "terms" },
+            { "text": "Just passing through.", "end": true }
+          ] },
+        "terms": { "text": "Cartridges are worth more than you are. But tunnel rats took our platform. Clear them and it's yours. Or pay.",
+          "options": [
+            { "text": "I'll clear the platform.", "end": true },
+            { "text": "Pay 150 caps.", "req": ["caps>=150"], "effects": ["caps:-150", "give:filter_cartridge", "q:clean_water=got"], "next": "deal" },
+            { "text": "Your generator's misfiring. I can fix it.", "check": { "stat": "wits", "dc": 6 }, "effects": ["give:filter_cartridge", "q:clean_water=got", "rep:union:+10", "xp:40"], "next": "fixed", "fail": "nofix" }
+          ] },
+        "cleared": { "text": "The platform's quiet. You actually did it. Here, take the cartridge, and the Union's thanks.",
+          "options": [ { "text": "Pleasure.", "effects": ["give:filter_cartridge", "q:clean_water=got", "rep:union:+15", "xp:50"], "end": true } ] },
+        "fixed": { "text": "Listen to that hum. Fine, a deal's a deal. Union remembers people who fix things.", "options": [ { "text": "Leave.", "end": true } ] },
+        "nofix": { "text": "Stop touching that before you blow us all up.", "options": [ { "text": "Sorry.", "next": "terms" } ] },
+        "deal": { "text": "Pleasure doing business.", "options": [ { "text": "Leave.", "end": true } ] },
+        "after": { "text": "Dutch's Wreckers bleed us dry at the overpass. Whatever you do up there, the Union's watching.", "options": [ { "text": "Leave.", "end": true } ] }
+      } } },
+    { "id": "tess", "name": "Tess Okafor", "x": 20, "y": 13, "faction": "union", "look": { "hair": "mohawk", "skin": 0.25, "age": 0.3, "goggles": 1 },
+      "dialogue": { "starts": [ { "node": "hi" } ], "nodes": {
+        "hi": { "text": "Rats come up the stairs at night. Hit them in the legs, they can't chase you. Head shots if you're feeling lucky.", "options": [ { "text": "Good tip.", "end": true } ] }
+      } } },
+    { "id": "odile", "name": "Sister Odile", "x": 19, "y": 6, "faction": "congregation", "look": { "hair": "veil", "skin": 0.65, "age": 0.5 },
+      "dialogue": { "starts": [ { "req": ["q:bell=got"], "node": "return" }, { "req": ["q:bell=none"], "node": "ask" }, { "node": "bless" } ], "nodes": {
+        "ask": { "text": "The Bellwether Congregation keeps time for this district. But our bell has no clapper: scavengers hauled it to the Bleecker Row ruins. Bring it back?",
+          "options": [ { "text": "I'll find it.", "effects": ["q:bell=active"], "next": "bless" }, { "text": "Not my problem.", "end": true } ] },
+        "return": { "text": "You found it! The bell will ring at dusk again. Take this vest; Brother Amos won't miss it.",
+          "options": [ { "text": "Hand over the clapper.", "effects": ["take:bell_clapper", "q:bell=done", "give:riot_vest", "rep:congregation:+20", "xp:60"], "end": true } ] },
+        "bless": { "text": "Walk in the light, child.", "options": [ { "text": "Leave.", "end": true } ] }
+      } } },
+    { "id": "amos", "name": "Brother Amos", "x": 22, "y": 8, "faction": "congregation", "look": { "hair": "hood", "skin": 0.55, "age": 0.75, "beard": 1 },
+      "dialogue": { "starts": [ { "node": "hi" } ], "nodes": {
+        "hi": { "text": "A red dog ran past the graves toward the crater this morning. Poor thing will glow by nightfall.", "options": [ { "text": "I'll look for it.", "end": true } ] }
+      } } },
+    { "id": "milo", "name": "Milo", "x": 8, "y": 19, "faction": "none", "look": { "hair": "messy", "skin": 0.6, "age": 0.05, "kid": 1 },
+      "dialogue": { "starts": [ { "req": ["q:rusty=found"], "node": "back" }, { "req": ["q:rusty=none"], "node": "lost" }, { "node": "wait" } ], "nodes": {
+        "lost": { "text": "Have you seen Rusty? He's red and he's a good boy and he ran toward the big hole where the power plant was.",
+          "options": [ { "text": "I'll find him.", "effects": ["q:rusty=active"], "end": true }, { "text": "Sorry, kid.", "end": true } ] },
+        "wait": { "text": "Please find Rusty!", "options": [ { "text": "Working on it.", "end": true } ] },
+        "back": { "text": "RUSTY! You found him! Here, it's my best thing. Don't tell Mom.",
+          "options": [ { "text": "Take care of him.", "effects": ["q:rusty=done", "give:patch_kit", "give:patch_kit", "xp:50", "flag:rusty_home"], "end": true } ] }
+      } } },
+    { "id": "tom", "name": "Old Tom", "x": 28, "y": 6, "faction": "none", "look": { "hair": "long", "skin": 0.4, "age": 0.95, "beard": 1, "hat": 1 },
+      "dialogue": { "starts": [ { "req": ["has:sealed_parcel"], "node": "parcel" }, { "node": "hi" } ], "nodes": {
+        "parcel": { "text": "That's Rosa's wrapping. Give it here. And a tip for you: Dutch fears the Hudson tunnel more than any gun.",
+          "options": [ { "text": "Hand over the parcel.", "effects": ["take:sealed_parcel", "q:parcel=done", "caps:+60", "xp:30", "flag:tunnel_tip"], "end": true } ] },
+        "hi": { "text": "Wreckers on the left, rubble on the right, and an old man in the middle. Welcome to the overpass.", "options": [ { "text": "Leave.", "end": true } ] }
+      } } },
+    { "id": "velvet", "name": "Velvet Jones", "x": 37, "y": 17, "faction": "none", "look": { "hair": "afro", "skin": 0.2, "age": 0.45, "earring": 1, "headset": 1 },
+      "dialogue": { "starts": [ { "req": ["q:static=got"], "node": "fix" }, { "req": ["q:static=none"], "node": "ask" }, { "node": "wait" } ], "nodes": {
+        "ask": { "text": "WKNY, the voice of what's left of New York. Or it was, until my signal valve cracked. The Union keeps spares in a crate on the station platform.",
+          "options": [ { "text": "I'll get you a valve.", "effects": ["q:static=active"], "end": true }, { "text": "Maybe later.", "end": true } ] },
+        "wait": { "text": "Dead air is the loneliest sound in the world, baby.", "options": [ { "text": "Leave.", "end": true } ] },
+        "fix": { "text": "Ooh, that's the one. Tune your WRIST-LINK to 88.1, sugar. Brass & Ash is back.",
+          "options": [ { "text": "Hand over the signal valve.", "effects": ["take:signal_valve", "q:static=done", "caps:+80", "xp:60", "radio:brass"], "end": true } ] }
+      } } },
+    { "id": "dutch", "name": "Dutch Malloy", "x": 34, "y": 6, "faction": "wreckers", "look": { "hair": "mohawk", "skin": 0.5, "age": 0.5, "scar": 1, "mask": 1 },
+      "dialogue": { "starts": [ { "req": ["q:overpass=active"], "node": "talk" }, { "node": "warn" } ], "nodes": {
+        "warn": { "text": "Keep walking, shelter rat. The overpass is closed to people without business.", "options": [ { "text": "Leave.", "end": true } ] },
+        "talk": { "text": "So Ada sent her pet. Every jug of water that crosses my overpass pays a toll. That's the law out here.",
+          "options": [
+            { "text": "Your crew is starving on tolls. Leave, and live.", "check": { "stat": "charm", "dc": 7 }, "next": "peace", "fail": "angry" },
+            { "text": "The Union is opening the Hudson tunnel under you.", "req": ["flag:tunnel_tip"], "next": "peace" },
+            { "text": "Cut me in and I'll look the other way.", "next": "deal" },
+            { "text": "Then we do this the hard way.", "effects": ["hostile:camp"], "end": true }
+          ] },
+        "peace": { "text": "...Fine. Not worth dying over. Wreckers! Pack it up. We ride for Jersey.",
+          "options": [ { "text": "Smart choice.", "effects": ["remove:camp", "q:overpass=resolved", "flag:end_peace", "xp:120", "rep:union:+10"], "end": true } ] },
+        "angry": { "text": "Big words. Let's see if you can back them up.", "options": [ { "text": "Fight!", "effects": ["hostile:camp"], "end": true } ] },
+        "deal": { "text": "Ha! Now you're speaking Wrecker. Take a cut and tell Ada the road's clear.",
+          "options": [ { "text": "Deal.", "effects": ["caps:+100", "q:overpass=resolved", "flag:end_deal", "rep:union:-30", "rep:congregation:-10"], "end": true }, { "text": "On second thought, no.", "next": "talk" } ] }
+      } } },
+    { "id": "quill", "name": "Quill", "x": 15, "y": 25, "faction": "none", "look": { "hair": "buzz", "skin": 0.35, "age": 0.35, "scar": 1, "goggles": 1 },
+      "dialogue": { "starts": [ { "node": "hi" } ], "nodes": {
+        "hi": { "text": "Used to ride with Dutch. Now I count Geiger clicks for fun. Those glowhounds in the crater? Their legs are weak. Shoot low.",
+          "options": [ { "text": "What's Dutch's weakness?", "next": "dutch" }, { "text": "Leave.", "end": true } ] },
+        "dutch": { "text": "Pride. Talk to him like he's got a choice and he might take it. Or ask Old Tom; that man hears everything.", "options": [ { "text": "Thanks.", "end": true } ] }
+      } } },
+    { "id": "rusty", "name": "Rusty", "x": 24, "y": 30, "faction": "none", "sprite": "dog", "look": {},
+      "dialogue": { "starts": [ { "req": ["q:rusty=found"], "node": "follow" }, { "req": ["q:rusty=done"], "node": "home" }, { "node": "find" } ], "nodes": {
+        "find": { "text": "A red mutt with one ear up wags so hard his whole back half wiggles. His collar tag reads RUSTY.",
+          "options": [ { "text": "Come on, boy. Let's go home.", "effects": ["q:rusty=found", "follow:rusty", "xp:20"], "end": true } ] },
+        "follow": { "text": "Rusty sits and stares at you, waiting.", "options": [ { "text": "Good boy.", "end": true } ] },
+        "home": { "text": "Rusty is busy licking Milo's face.", "options": [ { "text": "Leave.", "end": true } ] }
+      } } }
+  ]
+}

@@ -1,0 +1,2 @@
+#!/usr/bin/env -S RUST_LOG=error bun
+import "../wasteland.tsx"

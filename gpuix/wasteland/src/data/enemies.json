@@ -1,0 +1,6 @@
+{
+  "rat":     { "name": "Tunnel Rat",   "hp": 22,  "armor": 0, "ap": 8, "dmg": [4, 8],   "hit": 55, "range": 1, "xp": 15, "aggro": 4, "sprite": "rat" },
+  "hound":   { "name": "Glowhound",    "hp": 48,  "armor": 1, "ap": 8, "dmg": [8, 13],  "hit": 60, "range": 1, "xp": 40, "aggro": 5, "rads": 12, "sprite": "hound" },
+  "wrecker": { "name": "Wrecker",      "hp": 45,  "armor": 2, "ap": 7, "dmg": [8, 13],  "hit": 55, "range": 6, "xp": 30, "aggro": 6, "sprite": "human" },
+  "dutch":   { "name": "Dutch Malloy", "hp": 130, "armor": 4, "ap": 8, "dmg": [13, 20], "hit": 62, "range": 5, "xp": 120, "aggro": 6, "sprite": "human" }
+}
