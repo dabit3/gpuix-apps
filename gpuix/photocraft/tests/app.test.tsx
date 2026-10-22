@@ -45,7 +45,7 @@ describeNative('PhotoCraft in the GPU test renderer', () => {
       draw()
       renderer.flush()
     }
-    expect(text()).toContain('PhotoCraft')
+    expect(text()).toContain('test.png')
     expect(text()).toContain('Background')
 
     await click('dup-layer')
@@ -97,7 +97,7 @@ describeNative('PhotoCraft in the GPU test renderer', () => {
     expect(ed.layer!.kind).toBe('adjust')
     await tick()
     renderer.flush()
-    expect(text()).toContain('CURVES')
+    expect(text().split('\n').filter((t) => t === 'Curves').length).toBeGreaterThanOrEqual(3)
 
     await click('tool-marquee')
     renderer.nativeSimulateMouseDown(cx - 80, cy - 50, 0)

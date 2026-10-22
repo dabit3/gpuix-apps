@@ -456,6 +456,7 @@ export class Editor {
 
   private insertLayer(L: Layer, at: number, label: string) {
     const prevActive = this.active
+    this.editMask = false
     this.command({
       label,
       bytes: L.kind === 'pixel' ? L.pixels.length : 0,

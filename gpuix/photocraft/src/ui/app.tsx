@@ -38,8 +38,8 @@ const TOOLS: { id: Tool; icon: keyof typeof ICONS; key: string; label: string }[
 
 const ADJ_KINDS: AdjustKind[] = ['curves', 'hue-sat', 'brightness-contrast', 'exposure', 'vibrance', 'black-white', 'invert', 'threshold']
 const FILTERS: FilterKind[] = ['gaussian', 'unsharp', 'motion', 'noise', 'high-pass', 'median']
-const SHORT_ADJ: Record<AdjustKind, string> = { curves: 'Curves', 'hue-sat': 'Hue/Sat', 'brightness-contrast': 'Bright/Con', exposure: 'Exposure', vibrance: 'Vibrance', 'black-white': 'B & W', invert: 'Invert', threshold: 'Threshold' }
-const SHORT_FILTER: Record<FilterKind, string> = { gaussian: 'Blur', unsharp: 'Sharpen', motion: 'Motion', noise: 'Noise', 'high-pass': 'High Pass', median: 'Median' }
+const SHORT_ADJ: Record<AdjustKind, string> = { curves: 'Curves', 'hue-sat': 'Hue/Sat', 'brightness-contrast': 'Brightness', exposure: 'Exposure', vibrance: 'Vibrance', 'black-white': 'Grayscale', invert: 'Invert', threshold: 'Threshold' }
+const SHORT_FILTER: Record<FilterKind, string> = { gaussian: 'Blur', unsharp: 'Sharpen', motion: 'Motion Blur', noise: 'Noise', 'high-pass': 'High Pass', median: 'Median' }
 
 const Icon = ({ name, color = T.dim, size = 16 }: { name: keyof typeof ICONS; color?: string; size?: number }) => <svg source={ICONS[name]} style={{ width: size, height: size, color }} />
 
@@ -52,21 +52,21 @@ function IconButton({ name, onClick, active, testId, disabled }: { name: keyof t
     <div
       testId={testId}
       onClick={disabled ? undefined : onClick}
-      style={{ width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: active ? T.accentBg : undefined, cursor: disabled ? 'default' : 'pointer', hover: disabled ? undefined : { backgroundColor: T.hover } }}
+      style={{ width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: active ? T.hover : undefined, cursor: disabled ? 'default' : 'pointer', hover: disabled ? undefined : { backgroundColor: T.hover } }}
     >
-      <Icon name={name} color={disabled ? T.line : active ? T.accent : T.dim} />
+      <Icon name={name} color={disabled ? T.lineHi : active ? T.fg : T.dim} size={15} />
     </div>
   )
 }
 
-function Chip({ label, onClick, testId, active }: { label: string; onClick: () => void; testId?: string; active?: boolean }) {
+function Chip({ label, onClick, testId, active, width }: { label: string; onClick: () => void; testId?: string; active?: boolean; width?: number }) {
   return (
     <div
       testId={testId}
       onClick={onClick}
-      style={{ paddingLeft: 9, paddingRight: 9, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', backgroundColor: active ? T.accentBg : T.raised, borderWidth: 1, borderColor: active ? T.accent : T.line, cursor: 'pointer', hover: { borderColor: T.lineHi, backgroundColor: T.hover } }}
+      style={{ width, paddingLeft: width ? 0 : 10, paddingRight: width ? 0 : 10, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: active ? T.hover : T.raised, cursor: 'pointer', hover: { backgroundColor: T.hover } }}
     >
-      <Label color={active ? T.accent : T.fg} size={11.5}>{label}</Label>
+      <Label color={T.fg} size={11.5} clip>{label}</Label>
     </div>
   )
 }
@@ -83,16 +83,16 @@ function Slider({ label, value, min, max, step = 1, format, onChange, testId, wi
   }
   const t = (value - min) / (max - min || 1)
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, width, flexGrow: width ? 0 : 1 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width, flexGrow: width ? 0 : 1 }}>
       <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-        <Label size={11} color={T.faint}>{label}</Label>
-        <Label size={11} color={T.fg} weight={600}>{format ? format(value) : String(value)}</Label>
+        <Label size={11} color={T.dim}>{label}</Label>
+        <Label size={11} color={T.fg}>{format ? format(value) : String(value)}</Label>
       </div>
       <div style={{ position: 'relative', height: 14, display: 'flex', alignItems: 'center' }}>
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', width: '100%', height: 12 }}>
-          <div style={{ flexGrow: Math.max(0.0001, t), flexBasis: 0, height: 4, borderTopLeftRadius: 2, borderBottomLeftRadius: 2, backgroundColor: T.accent }} />
-          <div style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: T.fg, flexShrink: 0 }} />
-          <div style={{ flexGrow: Math.max(0.0001, 1 - t), flexBasis: 0, height: 4, borderTopRightRadius: 2, borderBottomRightRadius: 2, backgroundColor: T.line }} />
+          <div style={{ flexGrow: Math.max(0.0001, t), flexBasis: 0, height: 3, borderTopLeftRadius: 2, borderBottomLeftRadius: 2, backgroundColor: T.dim }} />
+          <div style={{ width: 11, height: 11, borderRadius: 6, backgroundColor: T.fg, flexShrink: 0 }} />
+          <div style={{ flexGrow: Math.max(0.0001, 1 - t), flexBasis: 0, height: 3, borderTopRightRadius: 2, borderBottomRightRadius: 2, backgroundColor: T.line }} />
         </div>
         {/* Childless hit layer on top: in GPUIX 0.11 a div whose children paint over it stops getting mouse events. */}
         <div
@@ -115,9 +115,9 @@ function Slider({ label, value, min, max, step = 1, format, onChange, testId, wi
 
 function Section({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 14, paddingRight: 14, paddingTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderColor: T.line }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, gap: 10, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 14, borderBottomWidth: 1, borderColor: T.line }}>
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 22 }}>
-        <Label size={11} color={T.faint} weight={700}>{title.toUpperCase()}</Label>
+        <Label size={12} color={T.fg} weight={600}>{title}</Label>
         {right ?? null}
       </div>
       {children}
@@ -157,7 +157,7 @@ function Thumb({ ed, layer, mask, w, h, active, onClick, version }: { ed: Editor
     img.current?.setImagePixels(bw, bh, out)
   }, [version, layer, mask, w, h])
   return (
-    <div onClick={onClick} style={{ width: w + 4, height: h + 4, padding: 1, borderRadius: 4, borderWidth: 1, borderColor: active ? T.accent : T.line, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: T.bg }}>
+    <div onClick={onClick} style={{ width: w + 4, height: h + 4, padding: 1, borderRadius: 4, borderWidth: 1, borderColor: active ? T.dim : T.line, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: T.bg }}>
       <img ref={img} objectFit="contain" style={{ width: w, height: h, borderRadius: 2 }} />
     </div>
   )
@@ -169,10 +169,10 @@ function LayerRow({ ed, L, i, version }: { ed: Editor; L: Layer; i: number; vers
     <div
       testId={`layer-${i}`}
       onClick={() => ed.select(i)}
-      style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingLeft: 6, paddingRight: 8, borderRadius: 8, backgroundColor: active ? T.accentBg : undefined, cursor: 'pointer', hover: active ? undefined : { backgroundColor: T.raised } }}
+      style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingLeft: 6, paddingRight: 8, borderRadius: 7, backgroundColor: active ? T.raised : undefined, cursor: 'pointer', hover: active ? undefined : { backgroundColor: T.raised } }}
     >
       <div testId={`eye-${i}`} onClick={() => ed.toggleVisible(i)} style={{ width: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={L.visible ? 'eye' : 'eyeOff'} color={L.visible ? T.dim : T.line} size={15} />
+        <Icon name={L.visible ? 'eye' : 'eyeOff'} color={L.visible ? T.faint : T.lineHi} size={14} />
       </div>
       <Thumb ed={ed} layer={L} w={38} h={26} version={version} active={active && !ed.editMask} onClick={() => {
         ed.editMask = false
@@ -195,15 +195,15 @@ function LayerRow({ ed, L, i, version }: { ed: Editor; L: Layer; i: number; vers
         />
       ) : null}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, overflow: 'hidden' }}>
-        <Label color={L.visible ? T.fg : T.faint} size={12.5} weight={active ? 600 : 500} clip>{L.name}</Label>
+        <Label color={L.visible ? T.fg : T.faint} size={12.5} weight={500} clip>{L.name}</Label>
         <Label color={T.faint} size={10.5} clip>{`${BLEND_LABELS[L.blend]} · ${Math.round(L.opacity * 100)}%${active && ed.editMask ? ' · mask' : ''}`}</Label>
       </div>
     </div>
   )
 }
 
-function CurveEditor({ ed, adjust, version }: { ed: Editor; adjust: Extract<Adjust, { kind: 'curves' }>; version: number }) {
-  const W = 236
+function CurveEditor({ ed, adjust, version, width }: { ed: Editor; adjust: Extract<Adjust, { kind: 'curves' }>; version: number; width: number }) {
+  const W = width
   const H = 150
   const img = useRef<ImgInstance>(null)
   const box = useRef({ x: 0, y: 0, w: W, h: H })
@@ -242,8 +242,8 @@ function CurveEditor({ ed, adjust, version }: { ed: Editor; adjust: Extract<Adju
       const y = Math.round((1 - lut[Math.round((x / (W - 1)) * 255)]!) * (H - 1))
       const y0 = prev < 0 ? y : prev
       for (let yy = Math.min(y, y0); yy <= Math.max(y, y0); yy++) {
-        plot(x, yy, [113, 183, 255])
-        plot(x, yy + 1, [113, 183, 255])
+        plot(x, yy, [201, 209, 217])
+        plot(x, yy + 1, [201, 209, 217])
       }
       prev = y
     }
@@ -253,7 +253,7 @@ function CurveEditor({ ed, adjust, version }: { ed: Editor; adjust: Extract<Adju
       for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (dx * dx + dy * dy <= 16) plot(cx + dx, cy + dy, dx * dx + dy * dy <= 6 ? [240, 243, 246] : [10, 12, 16])
     }
     img.current?.setImagePixels(W, H, out)
-  }, [version, adjust])
+  }, [version, adjust, width])
   const toCurve = (e: Ev) => ({ x: Math.min(1, Math.max(0, ((e.x ?? 0) - box.current.x) / box.current.w)), y: Math.min(1, Math.max(0, 1 - ((e.y ?? 0) - box.current.y) / box.current.h)) })
   return (
     <div
@@ -293,14 +293,14 @@ function CurveEditor({ ed, adjust, version }: { ed: Editor; adjust: Extract<Adju
   )
 }
 
-function AdjustProps({ ed, version }: { ed: Editor; version: number }) {
+function AdjustProps({ ed, version, width }: { ed: Editor; version: number; width: number }) {
   const L = ed.layer
   if (!L || L.kind !== 'adjust') return null
   const a = L.adjust
   const set = (patch: Partial<Adjust>) => ed.setAdjust({ ...a, ...patch } as Adjust)
   switch (a.kind) {
     case 'curves':
-      return <CurveEditor ed={ed} adjust={a} version={version} />
+      return <CurveEditor ed={ed} adjust={a} version={version} width={width} />
     case 'hue-sat':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -333,8 +333,10 @@ function Panel({ ed, L: layout, version, openBlend }: { ed: Editor; L: ReturnTyp
   const blendRow = useRef({ x: 0, y: 0, h: 0 })
   const h = ed.history
   const firstHist = Math.max(0, h.entries.length - 6)
+  const cols = layout.panel >= 280 ? 3 : 2
+  const cell = Math.floor((layout.panel - 34 - 6 * (cols - 1)) / cols)
   return (
-    <div testId="panel" style={{ position: 'absolute', right: 0, top: layout.top, width: layout.panel, height: layout.h - layout.top - layout.status, backgroundColor: T.panel, borderLeftWidth: 1, borderColor: T.line, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div testId="panel" style={{ position: 'absolute', right: 0, top: layout.top, width: layout.panel, height: layout.h - layout.top - layout.status, backgroundColor: T.panel, borderLeftWidth: 1, borderColor: T.line, display: 'flex', flexDirection: 'column', overflowY: 'scroll' }}>
       <Section
         title="Layers"
         right={
@@ -357,12 +359,12 @@ function Panel({ ed, L: layout, version, openBlend }: { ed: Editor; L: ReturnTyp
         {L ? (
           <div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, width: layout.panel >= 280 ? 120 : 98 }}>
-              <Label size={11} color={T.faint}>Blend</Label>
+              <Label size={11} color={T.dim}>Blend</Label>
               <div
                 testId="blend-button"
                 onLayout={(e) => (blendRow.current = { x: e.x ?? 0, y: e.y ?? 0, h: e.height ?? 26 })}
                 onClick={() => openBlend(blendRow.current.y + blendRow.current.h + 4, blendRow.current.x)}
-                style={{ height: 26, borderRadius: 6, borderWidth: 1, borderColor: T.line, backgroundColor: T.raised, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 8, paddingRight: 6, cursor: 'pointer', hover: { borderColor: T.lineHi } }}
+                style={{ height: 26, borderRadius: 6, backgroundColor: T.raised, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 9, paddingRight: 7, cursor: 'pointer', hover: { backgroundColor: T.hover } }}
               >
                 <Label size={12} color={T.fg}>{BLEND_LABELS[L.blend]}</Label>
                 <Icon name="chevron" size={13} color={T.faint} />
@@ -374,20 +376,20 @@ function Panel({ ed, L: layout, version, openBlend }: { ed: Editor; L: ReturnTyp
       </Section>
       {L?.kind === 'adjust' ? (
         <Section title={ADJUST_LABELS[L.adjust.kind]}>
-          <AdjustProps ed={ed} version={version} />
+          <AdjustProps ed={ed} version={version} width={layout.panel - 34} />
         </Section>
       ) : null}
       <Section title="Adjustments">
         <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {ADJ_KINDS.map((k) => (
-            <Chip key={k} testId={`adj-${k}`} label={SHORT_ADJ[k]} onClick={() => ed.addAdjustment(k)} />
+            <Chip key={k} width={cell} testId={`adj-${k}`} label={SHORT_ADJ[k]} onClick={() => ed.addAdjustment(k)} />
           ))}
         </div>
       </Section>
       <Section title="Filters">
         <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {FILTERS.map((k) => (
-            <Chip key={k} testId={`filter-${k}`} label={SHORT_FILTER[k]} onClick={() => ed.applyFilter(k)} />
+            <Chip key={k} width={cell} testId={`filter-${k}`} label={SHORT_FILTER[k]} onClick={() => ed.applyFilter(k)} />
           ))}
         </div>
         <Slider label="Radius" value={ed.filterAmount.gaussian} min={1} max={40} format={(v) => `${v} px`} onChange={(v) => {
@@ -397,7 +399,7 @@ function Panel({ ed, L: layout, version, openBlend }: { ed: Editor; L: ReturnTyp
         }} />
       </Section>
       {layout.showHistory ? (
-        <Section title="History" right={<Label size={10.5} color={T.faint}>{`${h.index}/${h.entries.length}`}</Label>}>
+        <Section title="History">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <HistRow label="Open" active={h.index === 0} faded={false} onClick={() => ed.jumpTo(0)} hidden={firstHist > 0} />
             {h.entries.slice(firstHist).map((c, k) => {
@@ -413,9 +415,8 @@ function Panel({ ed, L: layout, version, openBlend }: { ed: Editor; L: ReturnTyp
 
 const HistRow = ({ label, active, faded, onClick, hidden }: { label: string; active: boolean; faded: boolean; onClick: () => void; hidden?: boolean }) =>
   hidden ? null : (
-    <div onClick={onClick} style={{ height: 22, borderRadius: 5, paddingLeft: 8, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: active ? T.accentBg : undefined, cursor: 'pointer', hover: active ? undefined : { backgroundColor: T.raised } }}>
-      <div style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: active ? T.accent : faded ? T.line : T.faint }} />
-      <Label size={11.5} color={active ? T.accent : faded ? T.faint : T.fg}>{label}</Label>
+    <div onClick={onClick} style={{ height: 24, borderRadius: 6, paddingLeft: 8, display: 'flex', flexDirection: 'row', alignItems: 'center', backgroundColor: active ? T.raised : undefined, cursor: 'pointer', hover: active ? undefined : { backgroundColor: T.raised } }}>
+      <Label size={11.5} color={faded ? T.faint : active ? T.fg : T.dim}>{label}</Label>
     </div>
   )
 
@@ -663,6 +664,7 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
 
   const L = ed.layer
   const toolLabel = TOOLS.find((t) => t.id === ed.tool)?.label ?? ''
+  const [docName, docSize] = fileLabel.split(' · ')
   const brushTool = ed.tool === 'brush' || ed.tool === 'eraser'
   const fg = hex(ed.fg)
   const status = notice && ed.lastAction === '' ? notice : ed.lastAction
@@ -693,14 +695,11 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
       {/* Options bar */}
       <div style={{ position: 'absolute', left: 0, top: 0, width: layout.w, height: layout.top, borderBottomWidth: 1, borderColor: T.line, backgroundColor: T.panel, display: 'flex', flexDirection: 'row', alignItems: 'center', paddingLeft: 14, paddingRight: 10, gap: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <div style={{ width: 18, height: 18, borderRadius: 5, backgroundColor: T.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <text style={{ color: T.bg, fontSize: 11, fontWeight: 800 }}>P</text>
-          </div>
-          <Label color={T.fg} size={13} weight={700}>PhotoCraft</Label>
-          {layout.compactTop ? null : <Label color={T.faint} size={12}>{fileLabel}</Label>}
+          <Label color={T.fg} size={12.5} weight={600}>{docName}</Label>
+          {layout.compactTop || !docSize ? null : <Label color={T.faint} size={12}>{docSize}</Label>}
         </div>
-        <div style={{ width: 1, height: 20, backgroundColor: T.line }} />
-        <Label color={T.fg} size={12} weight={600}>{toolLabel}</Label>
+        <div style={{ width: 1, height: 16, backgroundColor: T.line }} />
+        <Label color={T.dim} size={12}>{toolLabel}</Label>
         {brushTool ? (
           <div style={{ display: 'flex', flexDirection: 'row', gap: 14, alignItems: 'center' }}>
             <Slider testId="size-slider" width={layout.compactTop ? 92 : 110} label="Size" value={ed.brush.size} min={1} max={300} format={(v) => `${v} px`} onChange={(v) => ((ed.brush.size = v), ed.emit())} />
@@ -713,8 +712,6 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
             <Slider width={120} label="Tolerance" value={ed.tolerance} min={0} max={255} onChange={(v) => ((ed.tolerance = v), ed.emit())} />
             <Chip label={ed.contiguous ? 'Contiguous' : 'Global'} active={ed.contiguous} onClick={() => ((ed.contiguous = !ed.contiguous), ed.emit())} />
           </div>
-        ) : ed.tool === 'marquee' || ed.tool === 'ellipse' || ed.tool === 'lasso' ? (
-          <Label color={T.faint} size={11.5}>{layout.compactTop ? 'Shift add · Alt subtract' : 'Drag to select · Shift adds · Alt subtracts · Ctrl-D deselect · Q mask from selection'}</Label>
         ) : null}
         <div style={{ flexGrow: 1 }} />
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 0 }}>
@@ -723,10 +720,9 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
           <div
             testId="export"
             onClick={() => actions.exportPng()}
-            style={{ marginLeft: 8, height: 28, paddingLeft: 10, paddingRight: 12, borderRadius: 7, backgroundColor: T.accent, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer', hover: { backgroundColor: '#91cbff' } }}
+            style={{ marginLeft: 10, height: 26, paddingLeft: 12, paddingRight: 12, borderRadius: 6, backgroundColor: T.raised, borderWidth: 1, borderColor: T.line, display: 'flex', flexDirection: 'row', alignItems: 'center', cursor: 'pointer', hover: { backgroundColor: T.hover, borderColor: T.lineHi } }}
           >
-            <Icon name="export" color={T.bg} size={14} />
-            <Label color={T.bg} size={12} weight={700}>Export</Label>
+            <Label color={T.fg} size={12} weight={500}>Export</Label>
           </div>
         </div>
       </div>
@@ -743,9 +739,9 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
                 ed.tool = t.id
                 ed.emit()
               }}
-              style={{ width: 36, height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: on ? T.accentBg : undefined, cursor: 'pointer', hover: on ? undefined : { backgroundColor: T.raised } }}
+              style={{ width: 34, height: 32, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: on ? T.hover : undefined, cursor: 'pointer', hover: on ? undefined : { backgroundColor: T.raised } }}
             >
-              <Icon name={t.icon} color={on ? T.accent : T.dim} size={18} />
+              <Icon name={t.icon} color={on ? T.fg : T.faint} size={17} />
             </div>
           )
         })}
@@ -777,14 +773,14 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
 
       {/* Status bar */}
       <div style={{ position: 'absolute', left: 0, top: layout.h - layout.status, width: layout.w, height: layout.status, borderTopWidth: 1, borderColor: T.line, backgroundColor: T.panel, display: 'flex', flexDirection: 'row', alignItems: 'center', paddingLeft: 14, paddingRight: 14, gap: 18 }}>
-        <Label size={11} color={T.fg} weight={600}>{`${Math.round(vp.zoom * 100)}%`}</Label>
+        <Label size={11} color={T.dim}>{`${Math.round(vp.zoom * 100)}%`}</Label>
         <Label size={11} color={T.faint}>{`${ed.doc.width} × ${ed.doc.height}`}</Label>
         {cursor && cursor.x >= 0 && cursor.y >= 0 && cursor.x < ed.doc.width && cursor.y < ed.doc.height ? <Label size={11} color={T.faint}>{`${Math.floor(cursor.x)}, ${Math.floor(cursor.y)}`}</Label> : null}
-        {ed.selectionBounds ? <Label size={11} color={T.cyan}>{`sel ${ed.selectionBounds.x1 - ed.selectionBounds.x0} × ${ed.selectionBounds.y1 - ed.selectionBounds.y0}`}</Label> : null}
+        {ed.selectionBounds ? <Label size={11} color={T.faint}>{`Selection ${ed.selectionBounds.x1 - ed.selectionBounds.x0} × ${ed.selectionBounds.y1 - ed.selectionBounds.y0}`}</Label> : null}
         {layout.w >= 760 && L ? <Label size={11} color={T.faint}>{`${L.name}${ed.editMask ? ' (mask)' : ''}`}</Label> : null}
         <div style={{ flexGrow: 1 }} />
-        <Label size={11} color={status.startsWith('Exported') || status.startsWith('Saved') ? T.green : T.dim}>{status}</Label>
-        {layout.w >= 900 ? <Label size={11} color={T.faint}>? keys</Label> : null}
+        <Label size={11} color={status.startsWith('Exported') || status.startsWith('Saved') ? T.fg : T.faint}>{status}</Label>
+        {layout.w >= 900 ? <Label size={11} color={T.faint}>? Shortcuts</Label> : null}
       </div>
 
       {blendMenu && L ? (
@@ -797,9 +793,9 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
                 ed.setBlend(m)
                 setBlendMenu(null)
               }}
-              style={{ height: 24, borderRadius: 5, paddingLeft: 8, display: 'flex', alignItems: 'center', backgroundColor: L.blend === m ? T.accentBg : undefined, cursor: 'pointer', hover: { backgroundColor: T.hover } }}
+              style={{ height: 24, borderRadius: 5, paddingLeft: 8, display: 'flex', alignItems: 'center', backgroundColor: L.blend === m ? T.hover : undefined, cursor: 'pointer', hover: { backgroundColor: T.hover } }}
             >
-              <Label size={12} color={L.blend === m ? T.accent : T.fg}>{BLEND_LABELS[m]}</Label>
+              <Label size={12} color={T.fg} weight={L.blend === m ? 600 : 400}>{BLEND_LABELS[m]}</Label>
             </div>
           ))}
         </div>
@@ -816,7 +812,7 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
                 setSwatches(false)
                 ed.emit()
               }}
-              style={{ width: 30, height: 30, borderRadius: 7, backgroundColor: c, borderWidth: 2, borderColor: c === fg ? T.accent : T.line, cursor: 'pointer' }}
+              style={{ width: 30, height: 30, borderRadius: 7, backgroundColor: c, borderWidth: 2, borderColor: c === fg ? T.fg : T.line, cursor: 'pointer' }}
             />
           ))}
         </div>
@@ -824,7 +820,7 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
 
       {help ? (
         <div onClick={() => setHelp(false)} style={{ position: 'absolute', left: cv.x + 20, top: cv.y + 20, width: 340, padding: 16, borderRadius: 12, backgroundColor: T.raised, borderWidth: 1, borderColor: T.lineHi, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <Label size={13} color={T.fg} weight={700}>Keys</Label>
+          <Label size={13} color={T.fg} weight={600}>Keyboard Shortcuts</Label>
           {[
             ['B / E', 'brush / eraser'],
             ['M  O  L  W', 'rect · ellipse · lasso · wand'],
@@ -842,7 +838,7 @@ export function App({ ed, size: fixed, actions, fileLabel, notice }: AppProps) {
           ].map(([k, v]) => (
             <div key={k} style={{ display: 'flex', flexDirection: 'row', gap: 10 }}>
               <div style={{ width: 150 }}>
-                <Label size={11.5} color={T.accent} weight={600}>{k!}</Label>
+                <Label size={11.5} color={T.fg} weight={500}>{k!}</Label>
               </div>
               <Label size={11.5} color={T.dim}>{v!}</Label>
             </div>
