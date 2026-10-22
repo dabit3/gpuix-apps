@@ -1,3 +1,4 @@
+/** @jsxImportSource #zoom */
 // Pages from the v3 API that the first rounds didn't cover: the full sessions table (with archived), usage metrics, repositories, scan findings, and per-session tags and insights.
 import React, { useEffect, useMemo, useState } from 'react'
 import { Icon } from './icons'

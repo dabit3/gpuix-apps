@@ -1,4 +1,5 @@
 #!/usr/bin/env -S RUST_LOG=error bun
+/** @jsxImportSource #zoom */
 import { parseArgs } from 'util'
 import { readFileSync } from 'fs'
 import { initialSessions, MODES, type AgentMode } from './src/data'
@@ -121,6 +122,7 @@ function Root() {
   return (
     <DevinApp
       key={conn.n}
+      followTerminalFont={!windowMode}
       client={live}
       sessionQuery={live && conn.n === 0 ? values.session : undefined}
       initialSelected={live ? null : initialSelected}
