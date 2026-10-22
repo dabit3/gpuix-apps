@@ -530,7 +530,7 @@ function CardHeader({ icon, children, right }: { icon: IconName; children: React
 function ShellCard({ step }: { step: Extract<Step, { kind: 'shell' }> }) {
   const exitColor = step.exit === undefined ? C.blue : step.exit === 0 ? C.add : C.del
   return (
-    <div style={{ ...col(), borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
+    <div style={{ ...col(), borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
       <CardHeader icon="laptop" right={<text style={{ color: exitColor, fontSize: 11.5, fontFamily: MONO }}>{step.exit === undefined ? 'running…' : `exit ${step.exit}`}</text>}>
         <text style={{ color: C.ghost, fontSize: 12, fontFamily: MONO }}>$</text>
         <text style={{ color: C.text, fontSize: 12, fontFamily: MONO, whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 }}>{step.cmd}</text>
@@ -544,7 +544,7 @@ function ShellCard({ step }: { step: Extract<Step, { kind: 'shell' }> }) {
 
 function EditCard({ step }: { step: Extract<Step, { kind: 'edit' }> }) {
   return (
-    <div style={{ ...col(), borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
+    <div style={{ ...col(), borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
       <CardHeader
         icon="pencil"
         right={
@@ -564,7 +564,7 @@ function EditCard({ step }: { step: Extract<Step, { kind: 'edit' }> }) {
 
 function BrowserCard({ step, large }: { step: Extract<Step, { kind: 'browser' }>; large?: boolean }) {
   return (
-    <div style={{ ...col(), borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
+    <div style={{ ...col(), borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
       <div style={{ ...row({ gap: 8 }), paddingLeft: 10, paddingRight: 10, height: 34, backgroundColor: C.cardHead, borderBottomWidth: 1, borderColor: C.border }}>
         <Icon name="arrowLeft" size={12} color={C.ghost} />
         <Icon name="arrowRight" size={12} color={C.ghost} />
@@ -923,7 +923,7 @@ function allSteps(s: Session): Step[] {
 
 function PanelTabs({ tabs, tab, onTab }: { tabs: { id: string; label: string; icon: IconName }[]; tab: string; onTab: (t: string) => void }) {
   return (
-    <div style={{ ...row({ gap: 2 }), height: 46, paddingLeft: 10, paddingRight: 10, flexShrink: 0, borderBottomWidth: 1, borderColor: C.border, overflow: 'hidden' }}>
+    <div style={{ ...row({ gap: 2 }), height: 48, paddingLeft: 10, paddingRight: 10, flexShrink: 0, borderBottomWidth: 1, borderColor: C.border, overflow: 'hidden' }}>
       {tabs.map((t) => {
         const active = t.id === tab
         return (
@@ -931,10 +931,10 @@ function PanelTabs({ tabs, tab, onTab }: { tabs: { id: string; label: string; ic
             key={t.id}
             testId={`tab-${t.id}`}
             onClick={() => onTab(t.id)}
-            style={{ ...row({ gap: 6 }), height: 30, paddingLeft: 10, paddingRight: 10, borderRadius: 8, cursor: 'pointer', flexShrink: 0, backgroundColor: active ? C.selected : C.canvas, hover: { backgroundColor: active ? C.selected : C.hover } }}
+            style={{ ...row({ gap: 6 }), height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 8, cursor: 'pointer', flexShrink: 0, backgroundColor: active ? C.selected : C.canvas, hover: { backgroundColor: active ? C.selected : C.hover } }}
           >
             <Icon name={t.icon} size={14} color={active ? C.text : C.tertiary} />
-            <text style={{ fontFamily: SANS, color: active ? C.text : C.tertiary, fontSize: 13.5, whiteSpace: 'nowrap' }}>{t.label}</text>
+            <text style={{ fontFamily: SANS, color: active ? C.text : C.tertiary, fontSize: 13, fontWeight: active ? 500 : 400, whiteSpace: 'nowrap' }}>{t.label}</text>
           </div>
         )
       })}
@@ -1142,7 +1142,7 @@ function ComputerPanel({ session, client, pollMs, previews }: { session: Session
       <Button
         testId="computer-stage"
         onClick={() => openOriginal(shot)}
-        style={{ ...col({ alignItems: 'center', justifyContent: 'center' }), position: 'relative', flexGrow: 1, minHeight: 200, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden', cursor: 'pointer' }}
+        style={{ ...col({ alignItems: 'center', justifyContent: 'center' }), position: 'relative', flexGrow: 1, minHeight: 200, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden', cursor: 'pointer' }}
       >
         {ready?.path ? (
           <img testId="computer-image" src={ready.path} objectFit="contain" alt={shot.name} style={{ width: '100%', height: '100%', pointerEvents: 'none' }} />
@@ -1174,7 +1174,7 @@ function ComputerPanel({ session, client, pollMs, previews }: { session: Session
             key={s.attachment_id}
             testId={`computer-item-${i}`}
             onClick={() => go(i)}
-            style={{ ...row({ gap: 8 }), height: 28, paddingLeft: 8, paddingRight: 8, borderRadius: 7, cursor: 'pointer', backgroundColor: i === idx ? C.selected : C.canvas, hover: { backgroundColor: i === idx ? C.selected : C.hover } }}
+            style={{ ...row({ gap: 8 }), height: 28, paddingLeft: 8, paddingRight: 8, borderRadius: 8, cursor: 'pointer', backgroundColor: i === idx ? C.selected : C.canvas, hover: { backgroundColor: i === idx ? C.selected : C.hover } }}
           >
             <Icon name={s.kind === 'video' ? 'laptop' : 'monitor'} size={13} color={i === idx ? C.text : C.ghost} />
             <text style={{ fontFamily: MONO, color: i === idx ? C.text : C.tertiary, fontSize: 11.5, flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{s.name}</text>
@@ -1215,7 +1215,7 @@ function SessionHeader({ session, panelOpen, onTogglePanel, compact = false, men
       <text testId="session-title" style={{ fontFamily: SANS, color: C.text, fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap', textOverflow: 'ellipsis', flexShrink: 1, minWidth: 0 }}>{session.title}</text>
       {prs > 0 && <Icon name="pr" size={13} color={C.tertiary} />}
       {prs > 0 && <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 13 }}>{String(prs)}</text>}
-      <div style={{ ...row({ gap: 6 }), height: 22, paddingLeft: 8, paddingRight: 8, borderRadius: 6, backgroundColor: C.chip, flexShrink: 0 }}>
+      <div style={{ ...row({ gap: 6 }), height: 22, paddingLeft: 9, paddingRight: 10, borderRadius: 11, backgroundColor: C.chip, flexShrink: 0 }}>
         <StatusDot status={session.status} size={6} />
         <text testId="session-status" style={{ fontFamily: SANS, color: C.chipText, fontSize: 12, whiteSpace: 'nowrap' }}>{STATUS_LABEL[session.status]}</text>
       </div>
