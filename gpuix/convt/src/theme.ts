@@ -96,11 +96,11 @@ function build(t: { name: string; bg: string; fg: string; palette: string[] }): 
   const p = t.palette
   return {
     ...t,
-    panel: mix(t.bg, t.fg, 0.035),
+    panel: mix(t.bg, t.fg, 0.045),
     well: mix(t.bg, t.fg, 0.02),
     line: mix(t.bg, t.fg, 0.1),
-    dim: mix(t.bg, t.fg, 0.62),
-    faint: mix(t.bg, t.fg, 0.38),
+    dim: mix(t.bg, t.fg, 0.7),
+    faint: mix(t.bg, t.fg, 0.48),
     accent: p[4]!,
     good: p[2]!,
     warn: p[3]!,

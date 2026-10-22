@@ -23,8 +23,8 @@ export function computeLayout(w: number, h: number): Layout {
   if (w >= 1080) {
     const listW = Math.round(Math.min(420, Math.max(300, w * 0.27)))
     const settingsW = Math.round(Math.min(360, Math.max(300, w * 0.24)))
-    const previewW = w - listW - settingsW - pad * 4
-    return { kind: 'wide', w, h, header, footer, listW, listH: body - pad * 2, settingsW, previewW, previewH: body - pad * 2, showPreview: previewW > 200 }
+    const previewW = w - listW - settingsW - pad * 6
+    return { kind: 'wide', w, h, header, footer, listW, listH: body - pad, settingsW, previewW, previewH: body - pad, showPreview: previewW > 200 }
   }
   const listH = Math.round(Math.min(body * 0.38, 330))
   if (w >= 620) {

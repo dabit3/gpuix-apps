@@ -62,7 +62,7 @@ Everything is clickable too: files, format buttons, presets, the quality slider 
   - Documents → Markdown/HTML/DOCX/RTF/TXT to PDF (Pandoc + Typst), DOCX, HTML, Markdown, RTF, TXT.
   - PDF → PNG/JPEG/TIFF of page 1.
   - Targets are dimmed with a reason when an engine is missing ("needs cwebp") or the input can't support them ("no audio track").
-- **Live preview**: a 1:1 crop of the source next to the same crop actually encoded with the current settings, plus a size estimate. Video shows a 2×2 frame grid, audio a waveform, documents their text.
+- **Live preview**: a 1:1 crop of the source next to the same crop actually encoded with the current settings, plus a size estimate. Video shows a representative frame, audio a waveform, documents their text. After converting, an Original / Converted switch flips the preview to the written file.
 - **Progress**: FFmpeg runs with `-progress pipe:1`; per-file bars show percent and speed. Cancel kills the process and removes the partial output.
 - **Batch**: a queue with `cores − 1` workers (`-j` to override).
 - **Output naming**: `name.converted.ext` beside the input, then `name.converted-2.ext`, ...; never overwrites.

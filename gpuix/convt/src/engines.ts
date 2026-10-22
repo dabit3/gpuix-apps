@@ -91,13 +91,12 @@ export async function thumbnail(src: Source, engines: Engines, cache: string, co
     return r.code === 0 && existsSync(out) ? out : null
   }
   if (src.kind === 'video' && engines.ffmpeg) {
-    const d = src.duration ?? 4
-    const fps = 4 / Math.max(0.5, d)
-    const r = await run([engines.ffmpeg, '-nostdin', '-v', 'error', '-y', '-i', src.path, '-vf', `fps=${fps.toFixed(4)},scale=480:-2:flags=lanczos,tile=2x2:padding=6:color=black@0`, '-frames:v', '1', '-update', '1', out])
+    const at = Math.max(0, (src.duration ?? 0) * 0.4)
+    const r = await run([engines.ffmpeg, '-nostdin', '-v', 'error', '-y', '-ss', at.toFixed(2), '-i', src.path, '-vf', 'scale=1100:-2:flags=lanczos', '-frames:v', '1', '-update', '1', out])
     return r.code === 0 && existsSync(out) ? out : null
   }
   if (src.kind === 'audio' && engines.ffmpeg) {
-    const r = await run([engines.ffmpeg, '-nostdin', '-v', 'error', '-y', '-i', src.path, '-filter_complex', `aformat=channel_layouts=mono,showwavespic=s=1100x360:scale=sqrt:colors=${color.replace('#', '0x')}:split_channels=0`, '-frames:v', '1', '-update', '1', out])
+    const r = await run([engines.ffmpeg, '-nostdin', '-v', 'error', '-y', '-i', src.path, '-filter_complex', `aformat=channel_layouts=mono,showwavespic=s=1100x300:scale=sqrt:colors=${color.replace('#', '0x')}@0.7:split_channels=0`, '-frames:v', '1', '-update', '1', out])
     return r.code === 0 && existsSync(out) ? out : null
   }
   return null
