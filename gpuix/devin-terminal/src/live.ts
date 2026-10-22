@@ -15,7 +15,7 @@ function repoFromPrs(s: ApiSession): string {
 }
 
 export function sessionFromApi(s: ApiSession, now = Date.now() / 1000): Session {
-  const mode = (['normal', 'fast', 'ultra'].includes(s.devin_mode ?? '') ? s.devin_mode : 'normal') as AgentMode
+  const mode = (['fusion', 'ultra', 'normal', 'lite', 'fast'].includes(s.devin_mode ?? '') ? s.devin_mode : 'normal') as AgentMode
   return {
     id: s.session_id.replace(/^devin-/, ''),
     title: s.title?.trim() || 'Untitled session',

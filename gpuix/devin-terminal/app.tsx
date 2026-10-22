@@ -5,6 +5,7 @@ import { initialSessions, MODES, type AgentMode } from './src/data'
 import { filterSessions } from './src/state'
 import { DevinClient, loadConfig } from './src/api'
 import { resolveTheme } from './src/theme'
+import { loadPrefs } from './src/prefs'
 
 const HELP = `devin-tui: the Devin web app, GPU-painted inside your terminal (GPUIX + kitty graphics)
 
@@ -16,7 +17,7 @@ Arguments
 
 Options
   -s, --session <q>   open the first session matching <q> (title or repo)
-  -m, --mode <mode>   agent mode for new sessions: normal | fast | ultra
+  -m, --mode <mode>   agent mode for new sessions: fusion | ultra | normal | lite | fast
   -r, --repo <repo>   repository for new sessions (owner/name)
   -t, --theme <name>  light | dark | auto (default: follow Ghostty's theme)
       --demo          use scripted demo data instead of the Devin API
@@ -69,7 +70,8 @@ if (values.help) {
   process.exit(0)
 }
 
-const mode = (values.mode ?? 'normal').toLowerCase() as AgentMode
+const prefs = loadPrefs()
+const mode = (values.mode ?? prefs.mode ?? 'normal').toLowerCase() as AgentMode
 if (!MODES.some((m) => m.value === mode)) fail(`unknown mode "${values.mode}"`)
 
 const config = values.demo ? null : loadConfig()
@@ -87,7 +89,7 @@ let ghosttyConfig = ''
 try {
   ghosttyConfig = readFileSync(`${process.env.HOME}/.config/ghostty/config`, 'utf8')
 } catch {}
-const theme = resolveTheme(values.theme, ghosttyConfig)
+const theme = resolveTheme(values.theme ?? prefs.theme, ghosttyConfig)
 
 const prompt = positionals.join(' ').trim() || undefined
 const windowMode = values.window || process.env.GPUIX_WINDOW === '1'
@@ -113,7 +115,10 @@ render(
     initialSelected={client ? null : initialSelected}
     initialMode={mode}
     initialPrompt={prompt}
-    initialRepo={values.repo}
+    initialRepo={values.repo ?? prefs.repo}
+    orgId={config?.orgId ?? null}
+    baseUrl={config?.baseUrl ?? 'https://api.devin.ai'}
+    keyHint={config ? `${config.apiKey.slice(0, 4)}…${config.apiKey.slice(-4)}` : null}
     theme={theme}
     userName={process.env.DEVIN_TUI_NAME ?? 'Nader Dabit'}
   />,

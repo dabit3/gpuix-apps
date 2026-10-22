@@ -38,6 +38,9 @@ import { Icon, type IconName } from './icons'
 import { C, setTheme, type ThemeName } from './theme'
 import type { DevinApi } from './api'
 import { eventsFromMessages, sessionFromApi, statusLine } from './live'
+import type { ApiPlaybook, ApiSession } from './api'
+import { ActionMenu, AutomationsView, Btn, copyText, CustomizeView, Field, notificationsFor, NotificationsView, ReviewView, SecurityView, SettingsView, WEB, type MenuAction, type View } from './views'
+import { loadPrefs, savePrefs, type Prefs } from './prefs'
 
 export { C }
 
@@ -262,6 +265,11 @@ function Sidebar({
   limit,
   onLoadMore,
   userName,
+  view,
+  onNav,
+  notifCount,
+  onHideSidebar,
+  onShortcuts,
 }: {
   width?: number
   state: State
@@ -277,6 +285,11 @@ function Sidebar({
   limit: number
   onLoadMore: () => void
   userName: string
+  view: View
+  onNav: (v: View) => void
+  notifCount: number
+  onHideSidebar: () => void
+  onShortcuts: () => void
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const searching = state.search.trim().length > 0
@@ -309,16 +322,30 @@ function Sidebar({
         <Icon name="chevronDown" size={13} color={C.tertiary} />
         <div style={{ flexGrow: 1 }} />
         <IconButton icon="search" testId="search-button" onClick={() => searchRef.current && renderer?.focusElement?.(searchRef.current.id)} />
-        {!narrow && <IconButton icon="bell" dot />}
-        {!narrow && <IconButton icon="panelLeft" />}
+        {!narrow && <IconButton icon="bell" testId="bell" dot={notifCount > 0} active={view === 'notifications'} onClick={() => onNav('notifications')} />}
+        {!narrow && <IconButton icon="panelLeft" testId="hide-sidebar" onClick={onHideSidebar} />}
       </div>
       <div style={{ ...col({ gap: 1 }), flexShrink: 0 }}>
-        <NavRow icon="plus" label="New session" hint="⇧⌘O" onClick={onNew} testId="new-session" active={state.selectedId === null} />
-        <NavRow icon="clock" label="Automations" />
-        <NavRow icon="shield" label="Security" />
-        <NavRow icon="pr" label="Review" />
-        <NavRow icon="shapes" label="Customize" />
-        <NavRow icon="more" label="More" chevron />
+        <NavRow icon="plus" label="New session" hint="⇧⌘O" onClick={onNew} testId="new-session" active={state.selectedId === null && view === 'home'} />
+        <NavRow icon="clock" label="Automations" testId="nav-automations" onClick={() => onNav('automations')} active={view === 'automations'} />
+        <NavRow icon="shield" label="Security" testId="nav-security" onClick={() => onNav('security')} active={view === 'security'} />
+        <NavRow icon="pr" label="Review" testId="nav-review" onClick={() => onNav('review')} active={view === 'review'} />
+        <NavRow icon="shapes" label="Customize" testId="nav-customize" onClick={() => onNav('customize')} active={view === 'customize'} />
+        <ActionMenu
+          testId="nav-more"
+          side="right"
+          triggerStyle={{ justifyContent: 'flex-start', gap: 11, width: narrow ? width - 16 : SIDEBAR_WIDTH - 16, height: 32, paddingLeft: 10, paddingRight: 10, marginLeft: 8 }}
+          items={[
+            { id: 'wiki', label: 'DeepWiki', icon: 'library', run: () => openUrl(`${WEB}/wiki`) },
+            { id: 'oncall', label: 'Oncall', icon: 'bell', run: () => openUrl(`${WEB}/oncall`) },
+            { id: 'web', label: 'Open app.devin.ai', icon: 'share', run: () => openUrl(WEB) },
+            { id: 'docs', label: 'Documentation', icon: 'help', run: () => openUrl('https://docs.devin.ai') },
+          ]}
+        >
+          <Icon name="more" size={16} color={C.secondary} />
+          <text style={{ fontFamily: SANS, color: C.text, fontSize: 14, flexGrow: 1 }}>More</text>
+          <Icon name="chevronRight" size={13} color={C.ghost} />
+        </ActionMenu>
       </div>
       <div style={row({ paddingLeft: 16, paddingRight: 8, marginTop: 16, height: 30, flexShrink: 0, gap: 8 })}>
         <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 13.5, fontWeight: 500 }}>Sessions</text>
@@ -326,7 +353,19 @@ function Sidebar({
           {narrow ? `${running} running` : `${state.sessions.length} sessions · ${running} running`}
         </text>
         <IconButton icon="plus" size={15} box={26} onClick={onNew} testId="sessions-new" />
-        {!narrow && <IconButton icon="more" size={15} box={26} />}
+        {!narrow && (
+          <ActionMenu
+            testId="sessions-menu"
+            items={[
+              { id: 'collapse', label: 'Collapse all', icon: 'chevronRight', run: () => setExpanded({}) },
+              { id: 'expand', label: 'Expand all', icon: 'chevronDown', run: () => setExpanded(Object.fromEntries(state.sessions.filter((x) => x.live?.childIds.length).map((x) => [x.id, true]))) },
+              { id: 'notifications', label: 'Notifications', icon: 'bell', run: () => onNav('notifications') },
+              { id: 'web', label: 'Open sessions on web', icon: 'share', run: () => openUrl(WEB) },
+            ]}
+          >
+            <Icon name="more" size={15} color={C.tertiary} />
+          </ActionMenu>
+        )}
       </div>
       <div style={{ ...row({ gap: 8 }), marginLeft: 8, marginRight: 8, marginTop: 4, marginBottom: 6, height: 30, paddingLeft: 10, paddingRight: 8, borderRadius: 8, backgroundColor: C.hover, flexShrink: 0 }}>
         <Icon name="search" size={13} color={C.ghost} />
@@ -367,8 +406,19 @@ function Sidebar({
         </div>
       )}
       <div style={{ ...row({ gap: 2 }), paddingLeft: 10, paddingRight: 10, height: 44, flexShrink: 0 }}>
-        <IconButton icon="help" size={17} />
-        <IconButton icon="settings" size={17} />
+        <ActionMenu
+          testId="help"
+          side="top"
+          items={[
+            { id: 'docs', label: 'Documentation', icon: 'library', run: () => openUrl('https://docs.devin.ai') },
+            { id: 'api', label: 'API reference', icon: 'zap', run: () => openUrl('https://docs.devin.ai/api-reference/overview') },
+            { id: 'shortcuts', label: 'Keyboard shortcuts', icon: 'list', run: onShortcuts },
+            { id: 'release', label: 'Release notes', icon: 'sparkle', run: () => openUrl('https://docs.devin.ai/release-notes/overview') },
+          ]}
+        >
+          <Icon name="help" size={17} color={C.tertiary} />
+        </ActionMenu>
+        <IconButton icon="settings" size={17} testId="settings" active={view === 'settings'} onClick={() => onNav('settings')} />
         <div style={{ flexGrow: 1 }} />
         <text testId="data-source" style={{ fontFamily: SANS, color: C.ghost, fontSize: 11.5, marginRight: 4, whiteSpace: 'nowrap' }}>{live ? (narrow ? 'Live' : 'Live · api.devin.ai') : 'Demo data'}</text>
         <IconButton icon={themeName === 'dark' ? 'sun' : 'moon'} size={16} testId="theme-toggle" onClick={onToggleTheme} />
@@ -652,7 +702,7 @@ function menuItemStyle(state: { selected: boolean; highlighted: boolean }): Styl
   return { ...row({ gap: 10 }), width: '100%', paddingLeft: 9, paddingRight: 9, paddingTop: 7, paddingBottom: 7, borderRadius: 8, cursor: 'pointer', backgroundColor: state.highlighted ? C.hover : C.menu, hover: { backgroundColor: C.hover } }
 }
 
-const MODE_ICON: Record<AgentMode, IconName> = { normal: 'sparkle', fast: 'zap', ultra: 'sliders' }
+const MODE_ICON: Record<AgentMode, IconName> = { fusion: 'link', ultra: 'sliders', normal: 'sparkle', lite: 'list', fast: 'zap' }
 
 function TextSelect({
   value,
@@ -756,9 +806,12 @@ type ComposerProps = {
   placeholder: string
   composerRef: React.RefObject<PublicInstance | null>
   big?: boolean
+  plusMenu?: MenuAction[]
+  slashMenu?: MenuAction[]
+  chips?: { id: string; label: string; icon: IconName; onRemove: () => void }[]
 }
 
-function Composer({ draft, setDraft, onSubmit, mode, onMode, repo, onRepo, repos, placeholder, composerRef, big }: ComposerProps) {
+function Composer({ draft, setDraft, onSubmit, mode, onMode, repo, onRepo, repos, placeholder, composerRef, big, plusMenu, slashMenu, chips }: ComposerProps) {
   const canSend = draft.trim().length > 0
   return (
     <div
@@ -777,6 +830,19 @@ function Composer({ draft, setDraft, onSubmit, mode, onMode, repo, onRepo, repos
         boxShadow: { offsetX: 0, offsetY: 2, blurRadius: 12, spreadRadius: 0, color: C.name === 'light' ? '#0000000f' : '#00000040' },
       }}
     >
+      {chips && chips.length > 0 && (
+        <div style={row({ gap: 6, flexWrap: 'wrap' })}>
+          {chips.map((c) => (
+            <div key={c.id} testId={`chip-${c.id}`} style={{ ...row({ gap: 6 }), height: 24, paddingLeft: 8, paddingRight: 4, borderRadius: 6, backgroundColor: C.chip }}>
+              <Icon name={c.icon} size={12} color={C.chipText} />
+              <text style={{ fontFamily: SANS, fontSize: 12, color: C.chipText, whiteSpace: 'nowrap' }}>{c.label}</text>
+              <div testId={`chip-${c.id}-x`} onClick={c.onRemove} style={{ ...row({ justifyContent: 'center' }), width: 16, height: 16, borderRadius: 4, cursor: 'pointer', hover: { backgroundColor: C.hover } }}>
+                <text style={{ fontFamily: SANS, fontSize: 12, color: C.chipText }}>×</text>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <textarea
         ref={composerRef}
         testId="composer"
@@ -790,15 +856,20 @@ function Composer({ draft, setDraft, onSubmit, mode, onMode, repo, onRepo, repos
         theme={{ caret: C.text, textMuted: C.ghost }}
       />
       <div style={row({ gap: 2 })}>
-        <IconButton icon="plus" size={17} />
-        <IconButton icon="slash" size={16} />
-        {big && <IconButton icon="settings2" size={16} />}
+        {plusMenu && (
+          <ActionMenu testId="composer-plus" side="top" items={plusMenu}>
+            <Icon name="plus" size={17} color={C.tertiary} />
+          </ActionMenu>
+        )}
+        {slashMenu && (
+          <ActionMenu testId="composer-slash" side="top" items={slashMenu}>
+            <Icon name="slash" size={16} color={C.tertiary} />
+          </ActionMenu>
+        )}
         {big && repo && onRepo && repos && <RepoPicker value={repo} onChange={onRepo} repos={repos} />}
         <div style={{ flexGrow: 1 }} />
         <ModePicker value={mode} onChange={onMode} />
-        <IconButton icon="mic" size={16} />
-        <IconButton icon="wave" size={16} />
-        <SendButton canSend={canSend} split={big} onClick={() => canSend && onSubmit(draft)} />
+        <SendButton canSend={canSend} onClick={() => canSend && onSubmit(draft)} />
       </div>
     </div>
   )
@@ -968,8 +1039,19 @@ function Empty({ text }: { text: string }) {
 
 /* ───────────────────────────── Main panes ───────────────────────────── */
 
-function SessionHeader({ session, panelOpen, onTogglePanel, compact = false }: { session: Session; panelOpen: boolean; onTogglePanel: () => void; compact?: boolean }) {
+function SessionHeader({ session, panelOpen, onTogglePanel, compact = false, menu, onChecklist, renaming, onRename }: { session: Session; panelOpen: boolean; onTogglePanel: () => void; compact?: boolean; menu: MenuAction[]; onChecklist: () => void; renaming: boolean; onRename: (title: string | null) => void }) {
   const prs = prCount(session)
+  const [name, setName] = useState(session.title)
+  if (renaming)
+    return (
+      <div style={{ ...row({ gap: 8 }), height: 48, paddingLeft: 18, paddingRight: 10, borderBottomWidth: 1, borderColor: C.border, flexShrink: 0 }}>
+        <div style={{ flexGrow: 1, maxWidth: 420 }}>
+          <Field testId="rename-input" value={name} onChange={setName} placeholder="Session name" />
+        </div>
+        <Btn small primary testId="rename-save" label="Save" disabled={!name.trim()} onClick={() => onRename(name.trim())} />
+        <Btn small testId="rename-cancel" label="Cancel" onClick={() => onRename(null)} />
+      </div>
+    )
   return (
     <div style={{ ...row({ gap: 8 }), height: 48, paddingLeft: 18, paddingRight: 10, borderBottomWidth: 1, borderColor: C.border, flexShrink: 0 }}>
       <Icon name="gitBranch" size={14} color={C.tertiary} />
@@ -982,8 +1064,10 @@ function SessionHeader({ session, panelOpen, onTogglePanel, compact = false }: {
       </div>
       <text testId="session-mode" style={{ fontFamily: SANS, color: C.ghost, fontSize: 12.5, flexShrink: 0 }}>{MODES.find((m) => m.value === session.mode)?.label ?? ''}</text>
       <div style={{ flexGrow: 1 }} />
-      {!compact && <IconButton icon="listChecks" />}
-      <IconButton icon="more" />
+      {!compact && <IconButton icon="listChecks" testId="checklist" onClick={onChecklist} />}
+      <ActionMenu testId="session-menu" items={menu}>
+        <Icon name="more" size={16} color={C.tertiary} />
+      </ActionMenu>
       {!compact && <IconButton icon="panelRight" testId="toggle-panel" onClick={onTogglePanel} active={panelOpen} />}
     </div>
   )
@@ -1039,6 +1123,9 @@ function HomeView({ composer, kind, onKind }: { composer: ComposerProps; kind: '
 /* ───────────────────────────── App ───────────────────────────── */
 
 export interface DevinAppProps {
+  orgId?: string | null
+  baseUrl?: string
+  keyHint?: string | null
   speed?: number
   initialSelected?: string | null
   initialMode?: AgentMode
@@ -1065,6 +1152,9 @@ export function DevinApp({
   theme = 'dark',
   userName = 'Nader Dabit',
   pollMs = 3000,
+  orgId = null,
+  baseUrl = 'https://api.devin.ai',
+  keyHint = null,
   initialRepo,
 }: DevinAppProps) {
   const live = client !== null
@@ -1085,6 +1175,43 @@ export function DevinApp({
   const [kind, setKind] = useState<'agent' | 'ask'>('agent')
   const [liveError, setLiveError] = useState<string | null>(null)
   const [pageSize, setPageSize] = useState(40)
+  const [view, setView] = useState<View>('home')
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const [customizeTab, setCustomizeTab] = useState<'playbooks' | 'knowledge'>('playbooks')
+  const [settingsKey, setSettingsKey] = useState(0)
+  const [sidebarHidden, setSidebarHidden] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const [prefs, setPrefs] = useState<Prefs>(() => loadPrefs())
+  const titlesRef = useRef<Record<string, string>>({})
+  titlesRef.current = prefs.titles ?? {}
+  const updatePrefs = useCallback((patch: Partial<Prefs>) => {
+    setPrefs((p) => {
+      const next = { ...p, ...patch }
+      savePrefs(next)
+      return next
+    })
+  }, [])
+  const [playbooks, setPlaybooks] = useState<ApiPlaybook[]>([])
+  type Attach = { playbook?: { id: string; title: string }; links?: { url: string; title: string }[] }
+  const [attach, setAttach] = useState<Attach>({})
+  const attachRef = useRef(attach)
+  attachRef.current = attach
+  const kindRef = useRef<'agent' | 'ask'>('agent')
+  const fromApi = (s: ApiSession): Session => {
+    const x = sessionFromApi(s)
+    const t = titlesRef.current[x.id]
+    return t ? { ...x, title: t } : x
+  }
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 2600)
+    return () => clearTimeout(t)
+  }, [toast])
+  useEffect(() => {
+    client?.listPlaybooks?.().then(setPlaybooks).catch(() => {})
+  }, [client])
   const { renderer } = useGpuix()
   const searchRef = useRef<PublicInstance | null>(null)
   const composerRef = useRef<PublicInstance | null>(null)
@@ -1144,8 +1271,8 @@ export function DevinApp({
       try {
         for (let page = 0; page < MAX_PAGES && alive; page++) {
           const res = await client.listSessions(100, cursor)
-          all.push(...res.items.map((s) => sessionFromApi(s)))
-          dispatch({ type: page === 0 ? 'load' : 'merge', sessions: page === 0 ? [...all] : res.items.map((s) => sessionFromApi(s)) })
+          all.push(...res.items.map((s) => fromApi(s)))
+          dispatch({ type: page === 0 ? 'load' : 'merge', sessions: page === 0 ? [...all] : res.items.map((s) => fromApi(s)) })
           setLiveError(null)
           applyQuery(all)
           if (!res.hasMore || !res.cursor) break
@@ -1158,7 +1285,7 @@ export function DevinApp({
     const refresh = async () => {
       try {
         const res = await client.listSessions(100)
-        if (alive) dispatch({ type: 'merge', sessions: res.items.map((s) => sessionFromApi(s)) })
+        if (alive) dispatch({ type: 'merge', sessions: res.items.map((s) => fromApi(s)) })
       } catch (error) {
         if (alive) setLiveError((error as Error).message)
       }
@@ -1180,7 +1307,7 @@ export function DevinApp({
       try {
         const [messages, s] = await Promise.all([client.listMessages(id), client.getSession(id)])
         if (!alive) return
-        const session = sessionFromApi(s)
+        const session = fromApi(s)
         dispatch({ type: 'upsert', session })
         dispatch({ type: 'events', id, events: eventsFromMessages(messages, { running: session.status === 'running' }) })
       } catch (error) {
@@ -1238,9 +1365,16 @@ export function DevinApp({
           },
         })
         setDraft('')
+        setTimeout(() => setAttach({}), 0)
         client
-          .createSession(prompt, { mode: s.mode, repos: repo !== NO_REPO ? [repo] : undefined })
-          .then((api) => dispatch({ type: 'rekey', from: tmp, session: sessionFromApi(api) }))
+          .createSession(kindRef.current === 'ask' ? `Answer this question only. Don't change code or open pull requests.\n\n${prompt}` : prompt, {
+            mode: s.mode,
+            repos: repo !== NO_REPO ? [repo] : undefined,
+            playbookId: attachRef.current.playbook?.id,
+            sessionLinks: attachRef.current.links?.map((l) => l.url),
+            tags: kindRef.current === 'ask' ? ['devin-tui', 'ask'] : undefined,
+          })
+          .then((api) => dispatch({ type: 'rekey', from: tmp, session: fromApi(api) }))
           .catch((error: Error) => {
             dispatch({ type: 'patch', id: tmp, patch: { status: 'failed' } })
             dispatch({ type: 'append', sessionId: tmp, event: { kind: 'devin', id: `${tmp}-err`, md: `Couldn’t start the session: ${error.message}` } })
@@ -1305,6 +1439,8 @@ export function DevinApp({
   const select = useCallback(
     (id: string | null) => {
       dispatch({ type: 'select', id })
+      setView('home')
+      setRenaming(false)
       if (rootRef.current) renderer?.focusElement?.(rootRef.current.id)
     },
     [renderer],
@@ -1312,6 +1448,7 @@ export function DevinApp({
   const onToggleWork = useCallback((sessionId: string, workId: string) => dispatch({ type: 'toggle-work', sessionId, workId }), [])
   const newSession = useCallback(() => {
     dispatch({ type: 'select', id: null })
+    setView('home')
     focusComposer()
   }, [focusComposer])
   const toggleTheme = useCallback(() => {
@@ -1344,14 +1481,29 @@ export function DevinApp({
       toggleTheme()
       return
     }
+    if (mod && key === ',') {
+      event.preventDefault()
+      setView('settings')
+      return
+    }
+    if (mod && key === 'b') {
+      event.preventDefault()
+      setSidebarHidden((h) => !h)
+      return
+    }
+    if (mod && key === '.') {
+      event.preventDefault()
+      dispatch({ type: 'panel', open: !stateRef.current.panelOpen })
+      return
+    }
     if (key === 'escape') {
       if (focused != null && focused === searchRef.current?.id) {
         dispatch({ type: 'search', value: '' })
         r.blur?.()
-      }
+      } else if (viewRef.current !== 'home') setView('home')
       return
     }
-    if ((key === 'up' || key === 'down') && focused !== composerRef.current?.id) {
+    if ((key === 'up' || key === 'down') && focused !== composerRef.current?.id && viewRef.current === 'home') {
       const list = filterSessions(stateRef.current.sessions, stateRef.current.search)
       if (list.length === 0) return
       const idx = list.findIndex((s) => s.id === stateRef.current.selectedId)
@@ -1361,6 +1513,144 @@ export function DevinApp({
     }
   }
 
+  kindRef.current = kind
+  const sessionUrl = (x: Session) => x.live?.url || `${WEB}/sessions/${x.id.replace(/^devin-/, '')}`
+  const attachPlaybook = (pb: ApiPlaybook) => {
+    setAttach((a) => ({ ...a, playbook: { id: pb.playbook_id, title: pb.title } }))
+    if (stateRef.current.selectedId || viewRef.current !== 'home') newSession()
+  }
+  const linkSession = (x: Session) => {
+    setAttach((a) => ({ ...a, links: [...(a.links ?? []).filter((l) => l.url !== sessionUrl(x)), { url: sessionUrl(x), title: x.title }] }))
+    if (stateRef.current.selectedId) newSession()
+  }
+  const plusMenu: MenuAction[] = [
+    { id: 'h-repo', label: 'Repositories', header: true },
+    ...repos.slice(0, 6).map((r) => ({ id: `repo:${r}`, label: r, icon: 'folder' as IconName, hint: state.repo === r ? '✓' : undefined, run: () => dispatch({ type: 'repo', repo: r }) })),
+    ...(playbooks.length ? [{ id: 'h-pb', label: 'Playbooks', header: true }] : []),
+    ...playbooks.slice(0, 6).map((pb) => ({ id: `pb:${pb.playbook_id}`, label: pb.title, icon: 'library' as IconName, hint: pb.macro ?? undefined, run: () => attachPlaybook(pb) })),
+    { id: 'h-s', label: 'Devin sessions', header: true },
+    ...byRecent(state.sessions)
+      .filter((x) => !x.id.startsWith('pending-'))
+      .slice(0, 5)
+      .map((x) => ({ id: `s:${x.id}`, label: x.title, icon: 'compose' as IconName, run: () => linkSession(x) })),
+    { id: 'h-more', label: 'More', header: true },
+    { id: 'knowledge', label: 'Knowledge & playbooks', icon: 'shapes', run: () => setView('customize') },
+    { id: 'secrets', label: 'Secrets', icon: 'shield', run: () => setView('security') },
+  ]
+  const slashMenu: MenuAction[] = [
+    { id: 'h-c', label: 'Commands', header: true },
+    { id: 'new', label: '/new', hint: 'New session', icon: 'plus', run: newSession },
+    { id: 'ask', label: kind === 'ask' ? '/agent' : '/ask', hint: kind === 'ask' ? 'Back to Agent' : 'Question only, no code', icon: 'help', run: () => setKind((k) => (k === 'ask' ? 'agent' : 'ask')) },
+    { id: 'theme', label: '/theme', hint: themeName === 'dark' ? 'Light mode' : 'Dark mode', icon: themeName === 'dark' ? 'sun' : 'moon', run: toggleTheme },
+    { id: 'automate', label: '/automate', hint: 'Schedule this', icon: 'clock', run: () => setView('automations') },
+    { id: 'review', label: '/review', hint: 'Review a PR', icon: 'pr', run: () => setView('review') },
+    { id: 'settings', label: '/settings', hint: '⌘,', icon: 'settings', run: () => setView('settings') },
+    ...(playbooks.some((p) => p.macro) ? [{ id: 'h-p', label: 'Playbooks', header: true }] : []),
+    ...playbooks
+      .filter((p) => p.macro)
+      .slice(0, 8)
+      .map((p) => ({ id: `m:${p.playbook_id}`, label: p.macro!, hint: p.title, icon: 'zap' as IconName, run: () => attachPlaybook(p) })),
+  ]
+  const chips = [
+    ...(attach.playbook ? [{ id: 'playbook', label: `Playbook · ${attach.playbook.title}`, icon: 'library' as IconName, onRemove: () => setAttach((a) => ({ ...a, playbook: undefined })) }] : []),
+    ...(attach.links ?? []).map((l, i) => ({ id: `link-${i}`, label: `Linked · ${l.title}`, icon: 'link' as IconName, onRemove: () => setAttach((a) => ({ ...a, links: (a.links ?? []).filter((x) => x.url !== l.url) })) })),
+    ...(kind === 'ask' ? [{ id: 'ask', label: 'Ask · no code changes', icon: 'help' as IconName, onRemove: () => setKind('agent') }] : []),
+  ]
+  const sessionMenu: MenuAction[] = selected
+    ? [
+        { id: 'copy', label: 'Copy session link', icon: 'link', run: () => (copyText(sessionUrl(selected)), setToast('Session link copied')) },
+        { id: 'open', label: 'Open in Devin web app', icon: 'share', run: () => openUrl(sessionUrl(selected)) },
+        ...(selected.live?.prs[0] ? [{ id: 'pr', label: 'Open pull request', icon: 'pr' as IconName, run: () => openUrl(selected.live!.prs[0]!.url) }] : []),
+        { id: 'child', label: 'New linked session', icon: 'plus', run: () => linkSession(selected) },
+        { id: 'rename', label: 'Rename', icon: 'pencil', run: () => setRenaming(true) },
+        { id: 'archive', label: 'Archive', icon: 'folder', run: () => archive(selected) },
+        ...(selected.status === 'running' || selected.status === 'blocked' ? [{ id: 'terminate', label: 'Stop session', icon: 'retry' as IconName, danger: true, run: () => terminate(selected) }] : []),
+      ]
+    : []
+  const archive = (x: Session) => {
+    const done = () => {
+      dispatch({ type: 'remove', id: x.id })
+      setToast(`Archived “${x.title}”`)
+    }
+    if (client?.archiveSession && x.live) client.archiveSession(x.id).then(done).catch((e: Error) => setToast(e.message))
+    else done()
+  }
+  const terminate = (x: Session) => {
+    const done = () => {
+      dispatch({ type: 'patch', id: x.id, patch: { status: 'sleeping' } })
+      setToast(`Stopped “${x.title}”`)
+    }
+    if (client?.terminateSession && x.live) client.terminateSession(x.id).then(done).catch((e: Error) => setToast(e.message))
+    else done()
+  }
+  const rename = (t: string | null) => {
+    setRenaming(false)
+    if (!t || !selected) return
+    dispatch({ type: 'patch', id: selected.id, patch: { title: t } })
+    updatePrefs({ titles: { ...(prefs.titles ?? {}), [selected.id]: t } })
+    setToast('Renamed (saved on this machine)')
+  }
+  const notifs = useMemo(() => notificationsFor(state.sessions, prefs.readAt ?? 0), [state.sessions, prefs.readAt])
+  const unread = notifs.filter((n) => n.unread).length
+  const openSettings = (page?: string) => {
+    if (page === 'shortcuts') setSettingsKey((k) => k + 1000)
+    setView('settings')
+  }
+  const navigate = (v: View, tab?: string) => {
+    if (v === 'customize' && (tab === 'knowledge' || tab === 'playbooks')) setCustomizeTab(tab)
+    setView(v)
+  }
+  const viewEl =
+    view === 'automations' ? (
+      <AutomationsView api={client} narrow={tiny} />
+    ) : view === 'security' ? (
+      <SecurityView api={client} sessions={state.sessions} narrow={tiny} />
+    ) : view === 'review' ? (
+      <ReviewView
+        sessions={byRecent(state.sessions)}
+        narrow={tiny}
+        onOpenSession={select}
+        onReview={(url) => {
+          newSession()
+          createSession(`Review this pull request and point out bugs, risky changes and missing tests: ${url}`, NO_REPO)
+        }}
+      />
+    ) : view === 'customize' ? (
+      <CustomizeView api={client} tab={customizeTab} onTab={setCustomizeTab} onUsePlaybook={attachPlaybook} narrow={tiny} />
+    ) : view === 'notifications' ? (
+      <NotificationsView items={notifs} onOpen={select} onMarkAll={() => updatePrefs({ readAt: Math.floor(Date.now() / 1000) })} narrow={tiny} />
+    ) : view === 'settings' ? (
+      <SettingsView
+        key={settingsKey}
+        initialPage={settingsKey >= 1000 ? 'shortcuts' : undefined}
+        api={client}
+        orgId={orgId}
+        baseUrl={baseUrl}
+        keyHint={keyHint}
+        themeName={themeName}
+        onTheme={(t) => {
+          if (t !== themeName) toggleTheme()
+          updatePrefs({ theme: t })
+        }}
+        mode={state.mode}
+        modes={MODES.map((m) => ({ value: m.value, label: m.label }))}
+        onMode={(m) => {
+          dispatch({ type: 'mode', mode: m as AgentMode })
+          updatePrefs({ mode: m })
+        }}
+        repo={state.repo}
+        repos={repos}
+        onRepo={(r) => {
+          dispatch({ type: 'repo', repo: r })
+          updatePrefs({ repo: r })
+        }}
+        onNavigate={navigate}
+        renamedCount={Object.keys(prefs.titles ?? {}).length}
+        onResetTitles={() => updatePrefs({ titles: {} })}
+        narrow={compact}
+      />
+    ) : null
+
   const composer: ComposerProps = {
     draft,
     setDraft,
@@ -1369,6 +1659,8 @@ export function DevinApp({
     onMode: (mode: AgentMode) => dispatch({ type: 'mode', mode }),
     composerRef,
     placeholder: kind === 'ask' ? 'Ask a question about your code' : PLACEHOLDER,
+    plusMenu,
+    slashMenu,
   }
 
   return (
@@ -1380,7 +1672,7 @@ export function DevinApp({
       onKeyDown={(event) => renderer && windowKeyHandler?.(event, renderer)}
       style={{ ...row({ alignItems: 'stretch' }), width: '100%', height: '100%', backgroundColor: C.canvas, fontFamily: SANS }}
     >
-      {!tiny && (
+      {!tiny && !sidebarHidden && (
         <Sidebar
           width={compact ? SIDEBAR_COMPACT : SIDEBAR_WIDTH}
           state={state}
@@ -1396,12 +1688,35 @@ export function DevinApp({
           limit={pageSize}
           onLoadMore={() => setPageSize((n) => n + 40)}
           userName={userName}
+          view={view}
+          onNav={navigate}
+          notifCount={unread}
+          onHideSidebar={() => setSidebarHidden(true)}
+          onShortcuts={() => openSettings('shortcuts')}
         />
       )}
       <div style={{ ...col(), flexGrow: 1, minWidth: 0, height: '100%' }}>
-        {selected ? (
+        {(sidebarHidden || tiny) && (
+          <div style={{ ...row({ gap: 4 }), height: 40, paddingLeft: 8, flexShrink: 0 }}>
+            {!tiny && <IconButton icon="panelLeft" testId="show-sidebar" onClick={() => setSidebarHidden(false)} />}
+            {view !== 'home' && <IconButton icon="arrowLeft" testId="back-home" onClick={() => setView('home')} />}
+          </div>
+        )}
+        {view !== 'home' ? (
+          viewEl
+        ) : selected ? (
           <>
-            <SessionHeader compact={compact} session={selected} panelOpen={state.panelOpen} onTogglePanel={() => dispatch({ type: 'panel', open: !state.panelOpen })} />
+            <SessionHeader
+              key={`${selected.id}-${renaming}`}
+              compact={compact}
+              session={selected}
+              panelOpen={state.panelOpen}
+              onTogglePanel={() => dispatch({ type: 'panel', open: !state.panelOpen })}
+              menu={sessionMenu}
+              onChecklist={() => dispatch({ type: 'panel', open: true, tab: selected.live ? 'details' : 'planner' })}
+              renaming={renaming}
+              onRename={rename}
+            />
             <virtual-list key={selected.id} testId="transcript" alignment="top" followTail estimatedItemHeight={160} overdraw={600} style={{ flexGrow: 1, minHeight: 0, paddingTop: 14, paddingBottom: 12 }}>
               {selected.live && !selected.live.loaded && selected.events.length === 0
                 ? [
@@ -1417,10 +1732,10 @@ export function DevinApp({
             </div>
           </>
         ) : (
-          <HomeView composer={{ ...composer, repo: state.repo, repos, onRepo: (repo) => dispatch({ type: 'repo', repo }) }} kind={kind} onKind={setKind} />
+          <HomeView composer={{ ...composer, chips, repo: state.repo, repos, onRepo: (repo) => dispatch({ type: 'repo', repo }) }} kind={kind} onKind={setKind} />
         )}
       </div>
-      {selected && !compact && (
+      {selected && view === 'home' && !compact && (
         <motion.div initial={false} animate={{ width: state.panelOpen ? PANEL_WIDTH : 0 }} transition={{ duration: 0.25, ease: 'easeOut' }} style={{ height: '100%', overflow: 'hidden', flexShrink: 0 }}>
           <div style={{ ...col(), width: PANEL_WIDTH, height: '100%', backgroundColor: C.canvas, borderLeftWidth: 1, borderColor: C.border }}>
             {selected.live ? (
@@ -1430,6 +1745,13 @@ export function DevinApp({
             )}
           </div>
         </motion.div>
+      )}
+      {toast && (
+        <div style={{ position: 'absolute', bottom: 22, left: 0, right: 0, ...row({ justifyContent: 'center' }), pointerEvents: 'none' }}>
+          <div style={{ ...row({ gap: 8 }), height: 34, paddingLeft: 14, paddingRight: 14, borderRadius: 17, backgroundColor: C.sendBg }}>
+            <text testId="toast" style={{ fontFamily: SANS, color: C.sendFg, fontSize: 13 }}>{toast}</text>
+          </div>
+        </div>
       )}
     </div>
   )

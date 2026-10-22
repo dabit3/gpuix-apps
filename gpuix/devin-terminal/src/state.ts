@@ -29,6 +29,7 @@ export type Action =
   | { type: 'events'; id: string; events: TranscriptEvent[] }
   | { type: 'rekey'; from: string; session: Session }
   | { type: 'patch'; id: string; patch: Partial<Session> }
+  | { type: 'remove'; id: string }
 
 function mapEvents(s: Session, fn: (e: TranscriptEvent) => TranscriptEvent): Session {
   return { ...s, events: s.events.map(fn) }
@@ -181,6 +182,8 @@ export function reducer(state: State, action: Action): State {
         selectedId: state.selectedId === action.from ? action.session.id : state.selectedId,
         sessions: state.sessions.map((s) => (s.id === action.from ? { ...mergeLive(s, action.session), id: action.session.id } : s)),
       }
+    case 'remove':
+      return { ...state, sessions: state.sessions.filter((s) => s.id !== action.id), selectedId: state.selectedId === action.id ? null : state.selectedId }
     case 'patch':
       return { ...state, sessions: state.sessions.map((s) => (s.id === action.id ? { ...s, ...action.patch } : s)) }
   }
