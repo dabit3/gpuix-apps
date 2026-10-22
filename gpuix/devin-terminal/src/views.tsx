@@ -6,6 +6,20 @@ import { C, nativeTheme } from './theme'
 import { DevinClient, describeTrigger, SCHEDULE_PRESETS, timeAgo, type ApiAutomation, type ApiNote, type ApiPlaybook, type ApiSecret, type ApiTemplate, type DevinApi } from './api'
 import type { Session } from './data'
 
+// View-local UI state that survives the theme toggle (which remounts the tree so memoized rows repaint).
+const sticky = new Map<string, unknown>()
+export function useSticky<S>(key: string, initial: S): [S, (v: S | ((s: S) => S)) => void] {
+  const [v, setV] = useState<S>(() => (sticky.has(key) ? (sticky.get(key) as S) : initial))
+  const set = useCallback((next: S | ((s: S) => S)) => {
+    setV((cur) => {
+      const val = typeof next === 'function' ? (next as (s: S) => S)(cur) : next
+      sticky.set(key, val)
+      return val
+    })
+  }, [key])
+  return [v, set]
+}
+
 export type View = 'home' | 'automations' | 'security' | 'review' | 'customize' | 'settings' | 'notifications'
 
 export const SANS = 'Inter'
@@ -240,13 +254,13 @@ export function ActionMenu({ items, testId, side = 'bottom', children, triggerSt
 export function AutomationsView({ api, narrow }: { api: DevinApi | null; narrow?: boolean }) {
   const autos = useApiList<ApiAutomation>(api?.listAutomations?.bind(api), [api])
   const templates = useApiList<ApiTemplate>(api?.listTemplates?.bind(api), [api])
-  const [tab, setTab] = useState<'automations' | 'templates'>('automations')
-  const [creating, setCreating] = useState(false)
-  const [name, setName] = useState('')
-  const [prompt, setPrompt] = useState('')
-  const [preset, setPreset] = useState(SCHEDULE_PRESETS[0]!.id)
+  const [tab, setTab] = useSticky<'automations' | 'templates'>('auto.tab', 'automations')
+  const [creating, setCreating] = useSticky('auto.creating', false)
+  const [name, setName] = useSticky('auto.name', '')
+  const [prompt, setPrompt] = useSticky('auto.prompt', '')
+  const [preset, setPreset] = useSticky('auto.preset', SCHEDULE_PRESETS[0]!.id)
   const [notice, setNotice] = useState<{ text: string; tone?: 'error' | 'ok' } | null>(null)
-  const [category, setCategory] = useState('all')
+  const [category, setCategory] = useSticky('auto.category', 'all')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const categories = useMemo(() => ['all', ...new Set((templates.items ?? []).map((t) => t.category))], [templates.items])
@@ -429,9 +443,9 @@ export function SecurityView({ api, sessions, narrow }: { api: DevinApi | null; 
 /* ───────────────────────────── Review ───────────────────────────── */
 
 export function ReviewView({ sessions, onReview, onOpenSession, narrow }: { sessions: Session[]; onReview: (prUrl: string) => void; onOpenSession: (id: string) => void; narrow?: boolean }) {
-  const [url, setUrl] = useState('')
-  const [repo, setRepo] = useState('all')
-  const [state, setState] = useState<'open' | 'merged' | 'all'>('open')
+  const [url, setUrl] = useSticky('review.url', '')
+  const [repo, setRepo] = useSticky('review.repo', 'all')
+  const [state, setState] = useSticky<'open' | 'merged' | 'all'>('review.state', 'open')
   const prs = useMemo(
     () =>
       sessions.flatMap((s) =>
@@ -478,12 +492,12 @@ export function ReviewView({ sessions, onReview, onOpenSession, narrow }: { sess
 export function CustomizeView({ api, tab, onTab, onUsePlaybook, narrow }: { api: DevinApi | null; tab: 'playbooks' | 'knowledge'; onTab: (t: 'playbooks' | 'knowledge') => void; onUsePlaybook: (pb: ApiPlaybook) => void; narrow?: boolean }) {
   const playbooks = useApiList<ApiPlaybook>(api?.listPlaybooks?.bind(api), [api])
   const notes = useApiList<ApiNote>(api?.listNotes ? () => api.listNotes!() : undefined, [api])
-  const [q, setQ] = useState('')
-  const [openId, setOpenId] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
-  const [title, setTitle] = useState('')
-  const [macro, setMacro] = useState('')
-  const [body, setBody] = useState('')
+  const [q, setQ] = useSticky('custom.q', '')
+  const [openId, setOpenId] = useSticky<string | null>('custom.open', null)
+  const [creating, setCreating] = useSticky('custom.creating', false)
+  const [title, setTitle] = useSticky('custom.title', '')
+  const [macro, setMacro] = useSticky('custom.macro', '')
+  const [body, setBody] = useSticky('custom.body', '')
   const [notice, setNotice] = useState<{ text: string; tone?: 'error' | 'ok' } | null>(null)
   const needle = q.trim().toLowerCase()
 
@@ -631,7 +645,7 @@ export function notificationsFor(sessions: Session[], readAt: number, now = Date
 }
 
 export function NotificationsView({ items, onOpen, onMarkAll, narrow }: { items: Notification[]; onOpen: (id: string) => void; onMarkAll: () => void; narrow?: boolean }) {
-  const [tab, setTab] = useState<'all' | 'unread'>('all')
+  const [tab, setTab] = useSticky<'all' | 'unread'>('notif.tab', 'all')
   const unread = items.filter((n) => n.unread).length
   const shown = tab === 'unread' ? items.filter((n) => n.unread) : items
   return (
@@ -740,7 +754,7 @@ export type SettingsProps = {
 
 export function SettingsView(p: SettingsProps) {
   const [page, setPage] = useState<string>(p.initialPage ?? 'preferences')
-  const [q, setQ] = useState('')
+  const [q, setQ] = useSticky('settings.q', '')
   const [check, setCheck] = useState<{ text: string; tone?: 'error' | 'ok' } | null>(null)
   const [keyDraft, setKeyDraft] = useState('')
   const [orgDraft, setOrgDraft] = useState(p.orgId ?? '')
