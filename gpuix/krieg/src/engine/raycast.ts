@@ -170,7 +170,8 @@ export class Renderer {
       const y0 = Math.max(0, Math.floor(sTop)), y1 = Math.min(H, Math.ceil(sBot))
       if (x0 >= x1 || y0 >= y1) continue
       const li = lmi(s.x, s.y)
-      const [lr, lg, lb] = lit(s.x, s.y, lm[li]! + 0.15, lm[li + 1]! + 0.15, lm[li + 2]! + 0.15)
+      const [cr, cg, cb] = lit(s.x, s.y, lm[li]! + 0.15, lm[li + 1]! + 0.15, lm[li + 2]! + 0.15)
+      const L = (cr + cg + cb) / 3, sat = (c: number) => Math.min(1.3, L + (c - L) * 0.35), lr = sat(cr), lg = sat(cg), lb = sat(cb)
       const fog = Math.min(1, tY / FOG_FAR) ** 1.4, nf = 1 - fog
       const fr = fog * FOG[0]!, fg = fog * FOG[1]!, fb = fog * FOG[2]!
       const img = s.img, iw = img.w, ih = img.h

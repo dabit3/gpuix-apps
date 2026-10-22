@@ -93,7 +93,9 @@ export class Audio {
   dir = join(tmpdir(), 'krieg-audio')
   enabled: boolean
   music = true
-  private kids = new Set<ChildProcess>()
+  // SFX spawn from a worker thread: posix_spawn of afplay on the render thread stalled frames in busy fights.
+  private wk: Worker | null = null
+  private n = 0
   private musicProc: ChildProcess | null = null
   private last: Record<string, number> = {}
   ms = 0
@@ -106,15 +108,19 @@ export class Audio {
     for (const [k, f] of Object.entries(SFX)) writeFileSync(join(this.dir, `${k}.wav`), wav(f()))
     writeFileSync(join(this.dir, 'song.wav'), wav(song()))
     this.ms = performance.now() - t0
+    const code = 'const{spawn}=require("node:child_process");const k=new Set;onmessage=e=>{if(!e.data){for(const c of k)c.kill();return}const c=spawn("/usr/bin/afplay",e.data,{stdio:"ignore"});k.add(c);c.on("exit",()=>{k.delete(c);postMessage(0)})}'
+    this.wk = new Worker(URL.createObjectURL(new Blob([code], { type: 'application/javascript' })))
+    this.wk.onmessage = () => { this.n-- }
+    this.wk.unref()
   }
 
   play(name: string, vol = 0.6) {
-    if (!this.enabled || !SFX[name] || this.kids.size > 8) return
+    if (!this.wk || !SFX[name] || this.n > 8) return
     const now = performance.now()
     if (now - (this.last[name] ?? 0) < (name === 'shoot' ? 60 : 40)) return
     this.last[name] = now
-    const c = spawn('/usr/bin/afplay', ['-v', String(vol), join(this.dir, `${name}.wav`)], { stdio: 'ignore' })
-    this.kids.add(c); c.on('exit', () => this.kids.delete(c))
+    this.n++
+    this.wk.postMessage(['-v', String(vol), join(this.dir, `${name}.wav`)])
   }
 
   startMusic() {
@@ -129,5 +135,5 @@ export class Audio {
     if (!this.music) { const c = this.musicProc; this.musicProc = null; c?.kill() } else this.startMusic()
   }
 
-  stop() { this.music = false; this.musicProc?.kill(); this.musicProc = null; for (const k of this.kids) k.kill() }
+  stop() { this.music = false; this.musicProc?.kill(); this.musicProc = null; this.wk?.postMessage(0) }
 }

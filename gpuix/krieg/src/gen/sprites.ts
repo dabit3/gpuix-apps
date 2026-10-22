@@ -3,7 +3,7 @@
 import type { Sprite } from '../engine/raycast'
 import type { Texture } from './texops'
 import { clamp, hash2 } from './rng'
-import { buildFaces, buildMonster, buildProps, type MonsterKind } from './monsters'
+import { buildFaces, buildMonster, buildProps, buildShotgun, type MonsterKind } from './monsters'
 
 class Canvas implements Sprite {
   px: Uint32Array
@@ -86,20 +86,9 @@ export function buildSprites(skin: Texture, metal: Texture): SpriteSet {
   })
   const exitPad = new Canvas(48, 16)
   for (let y = 0; y < 16; y++) for (let x = 0; x < 48; x++) { const d = Math.abs(Math.hypot((x - 24) / 24, (y - 8) / 8) - 0.8); if (d < 0.2) exitPad.put(x, y, 0x4ae168, 200) }
-  const hand = (c: Canvas, x: number, y: number, r: number) => { c.ball(x, y, r * 1.2, r, 0xc08a68); c.ball(x - r * 0.35, y - r * 0.4, r * 0.5, r * 0.32, 0xdcae8c) }
+  const hand = (c: Canvas, x: number, y: number, r: number) => { c.ball(x, y, r * 1.2, r, 0x3b342b); c.ball(x - r * 0.35, y - r * 0.4, r * 0.5, r * 0.32, 0x5a5044) }
   const sleeve = (c: Canvas, x: number, y: number) => c.line(x - 14, 80, x, y, 8, 0x3a4630)
-  const shotgun = [0, 1].map((f) => {
-    const c = new Canvas(120, 80), pump = f * 12
-    c.line(66, 6, 64, 80, 5, 0x2c3038)
-    c.line(72, 14, 70, 80, 3, 0x1c2026)
-    c.rect(59, 2, 12, 6, 0x14171c, 1)
-    c.rect(55, 32 + pump, 26, 20, 0x6e4626, 2)
-    for (let k = 1; k < 5; k++) c.rect(57, 33 + pump + k * 4, 22, 1, 0x4a2c14, 0)
-    sleeve(c, 70, 58 + pump); hand(c, 68, 50 + pump, 9)
-    c.rect(50, 62, 30, 18, 0x23272e, 2)
-    sleeve(c, 50, 74); hand(c, 50, 72, 8)
-    return c
-  })
+  const shotgun = [buildShotgun(0), buildShotgun(1)]
   const rifle = new Canvas(120, 80)
   rifle.line(60, 80, 66, 24, 9, 0x2a3240)
   rifle.rect(52, 30, 26, 50, 0x3a4452, 3)

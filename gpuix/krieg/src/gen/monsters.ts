@@ -210,6 +210,23 @@ export function buildFaces(): Img[] {
   return out
 }
 
+// Pump shotgun viewmodel seen from behind: twin steel barrels, wooden pump (f=1 racked back), gloved hands.
+export function buildShotgun(f: number) {
+  const c = new Img(120, 80), p = f * 12, GL = 0x3b342b, SL = 0x3d4a2e
+  c.limb(57, 84, 58, 5, 3.4, 3, 0x56606c); c.limb(63.5, 84, 63, 5, 3.4, 3, 0x56606c)
+  c.ball(58, 5, 2.6, 2.2, 0x0a0c10); c.ball(63, 5, 2.6, 2.2, 0x0a0c10); c.ball(60.5, 9, 1.4, 1.4, 0xe0e0d8)
+  c.limb(60.5, 60, 60.5, 86, 11, 12, 0x2a2e36)
+  c.limb(60.5, 30 + p, 60.5, 50 + p, 9, 9, 0x7a4a26)
+  for (let k = 0; k < 5; k++) c.limb(53, 33 + p + k * 4, 68, 33 + p + k * 4, 0.6, 0.6, 0x3a2010)
+  c.limb(28, 86, 47, 52 + p, 10, 7, SL)
+  c.ball(50, 44 + p, 7, 10, GL)
+  for (let k = 0; k < 4; k++) c.limb(50, 36 + p + k * 5, 69 - Math.abs(k - 1.5), 37 + p + k * 5, 2.6, 2.4, GL)
+  c.limb(96, 86, 70, 72, 11, 9, SL); c.ball(66, 72, 10, 8, GL)
+  for (let k = 0; k < 3; k++) c.limb(56 + k * 5, 66, 55 + k * 5, 75, 2.4, 2.4, GL)
+  c.outline()
+  return c
+}
+
 export function buildProps() {
   const barrel = new Img(48, 64)
   for (let y = 9; y < 63; y++) for (let x = 6; x < 42; x++) {

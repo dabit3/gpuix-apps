@@ -59,8 +59,8 @@ while (Date.now() - t0 < SECS * 1000) {
   live.d.forEach((o, i) => { level.doors[i]!.open = o })
   const [px, py, pa] = live.p
   const keys = new Set<string>()
-  const foes = live.e.map(([x, y, , st], i) => ({ x, y, st, i, d: Math.hypot(x - px, y - py) }))
-    .filter((e) => e.st !== 'dead' && e.d < 9 && lineOfSight(level, px, py, e.x, e.y)).sort((a, b) => a.d - b.d)
+  const foes = live.e.map(([x, y, k, st], i) => ({ x, y, k, st, i, d: Math.hypot(x - px, y - py) }))
+    .filter((e) => e.k !== 'barrel' && e.st !== 'dead' && e.d < 9 && lineOfSight(level, px, py, e.x, e.y)).sort((a, b) => a.d - b.d)
   let aim: number
   if (foes.length) {
     const f = foes[0]!
@@ -70,7 +70,7 @@ while (Date.now() - t0 < SECS * 1000) {
     if (f.d > 3.2 && Math.abs(err) < 0.4) keys.add('w')
     if (f.d < 1.6) keys.add('s')
   } else {
-    const alive = live.e.filter(([, , , st]) => st !== 'dead')
+    const alive = live.e.filter(([, , k, st]) => k !== 'barrel' && st !== 'dead')
     let goal: (i: number) => boolean
     const near = (x: number, y: number) => (i: number) => i === Math.floor(y) * MW + Math.floor(x)
     const key = level.pickups.find((k) => k.kind === 'key')!

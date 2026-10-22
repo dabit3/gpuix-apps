@@ -59,8 +59,8 @@ export function scene(w: World, s: SpriteSet, t: number) {
   }
   const vm: Viewmodel = {
     img: p.weapon === 0 ? s.shotgun[p.cool > 0.15 && p.cool < 0.55 ? 1 : 0]! : p.weapon === 1 ? s.rifle : s.launcher,
-    ox: 0.16 + Math.sin(p.bob * 0.5) * 0.02 + p.sway * 0.05, oy: Math.abs(Math.cos(p.bob * 0.5)) * 0.02 + p.kick * 0.035 + Math.max(0, p.cool - [0.8, 0.1, 0.5][p.weapon]!) * 0.2 + (p.z - 0.5) * 0.2,
-    scale: 0.5, flash: p.flash, muzzle: s.muzzle[Math.floor(t * 30) % 3], tip: p.weapon === 2 ? [0.533, 0.16] : p.weapon ? [0.533, 0.03] : [0.542, 0.05],
+    ox: (p.weapon ? 0.16 : 0.02) + Math.sin(p.bob * 0.5) * 0.02 + p.sway * 0.05, oy: Math.abs(Math.cos(p.bob * 0.5)) * 0.02 + p.kick * 0.035 + Math.max(0, p.cool - [0.8, 0.1, 0.5][p.weapon]!) * 0.2 + (p.z - 0.5) * 0.2 - 0.05,
+    scale: p.weapon ? 0.5 : 0.46, flash: p.flash, muzzle: s.muzzle[Math.floor(t * 30) % 3], tip: p.weapon === 2 ? [0.533, 0.16] : p.weapon ? [0.533, 0.03] : [0.542, 0.05],
   }
   let tint: [number, number, number, number] | null = null
   if (w.state === 'dead') tint = [120, 10, 10, 0.45]
