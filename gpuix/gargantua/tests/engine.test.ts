@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { Engine } from '../src/engine'
 import type { FromEngine } from '../src/protocol'
+import { makeSpec } from '../src/probe'
 
 async function frames(settings: Record<string, unknown>, n = 2) {
   const got: FromEngine[] = []
@@ -48,4 +49,28 @@ test('dropped probes are shared by spec and stay in sync; a dive starts and repo
   expect(e.dive?.phase).toBe('fall')
   expect(sent).toContainEqual({ type: 'dive', phase: 'start' })
   e.handle({ type: 'stop' }); other.handle({ type: 'stop' })
+})
+
+test('a probe from a linked pane starts at t=0 even after this pane was paused', async () => {
+  const e = new Engine({}, () => {}, 1)
+  e.handle({ type: 'set', settings: { paused: true } })
+  await new Promise((r) => setTimeout(r, 300))
+  e.handle({ type: 'set', settings: { paused: false } })
+  const spec = makeSpec(Date.now())
+  e.handle({ type: 'drop', specs: [spec] })
+  expect(e.paths).toHaveLength(1)
+  const local = (e as unknown as { now(): number }).now() - e.paths[0]!.at0
+  expect(Math.abs(local)).toBeLessThan(50)
+  e.handle({ type: 'stop' })
+})
+
+test('pause freezes the dive', () => {
+  const e = new Engine({}, () => {}, 1)
+  e.handle({ type: 'dive' })
+  e.handle({ type: 'set', settings: { paused: true } })
+  const priv = e as unknown as { dive: { r: number } | null; step(dt: number): void }
+  const r = priv.dive!.r
+  for (let i = 0; i < 30; i++) priv.step(0.1)
+  expect(priv.dive!.r).toBe(r)
+  e.handle({ type: 'stop' })
 })

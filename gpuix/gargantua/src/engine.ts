@@ -39,7 +39,8 @@ export class Engine {
   private lastMove = 0
   dive: Dive | null = null
   private diveDir: V3 = [0, 0, 1]
-  paths: Path[] = []
+  /** Probe paths; `at0` is the spec's wall-clock start shifted onto this pane's pause-adjusted clock. */
+  paths: (Path & { at0: number })[] = []
   private pausedMs = 0
   private pauseAt = 0
   private table: Table | null = null
@@ -118,7 +119,7 @@ export class Engine {
       case 'drop': {
         if (m.specs) for (const s of m.specs) this.addProbe(s)
         else {
-          const now = this.now()
+          const now = Date.now()
           const specs = Array.from({ length: Math.max(1, m.n ?? 1) }, (_, i) => makeSpec(now + i * 350))
           for (const s of specs) this.addProbe(s)
           this.send({ type: 'probes', specs })
@@ -139,7 +140,7 @@ export class Engine {
 
   addProbe(spec: ProbeSpec) {
     if (this.paths.some((p) => p.spec.id === spec.id)) return
-    this.paths.push(integrate(spec))
+    this.paths.push({ ...integrate(spec), at0: spec.at - this.pausedMs - (this.settings.paused ? Date.now() - this.pauseAt : 0) })
     if (this.paths.length > 24) this.paths.shift()
   }
 
@@ -175,7 +176,7 @@ export class Engine {
       this.dist = clamp(this.dist * Math.exp(this.vzoom * dt), DIST_MIN, DIST_MAX)
       this.vzoom *= Math.exp(-dt * 5)
     }
-    if (this.dive) {
+    if (this.dive && !this.settings.paused) {
       const was = this.dive.phase
       const next = stepDive(this.dive, dt)
       if (!next) { this.dive = null; this.send({ type: 'dive', phase: 'end' }); this.lastMove = performance.now() }
@@ -185,7 +186,7 @@ export class Engine {
       }
     }
     const now = this.now()
-    this.paths = this.paths.filter((p) => (now - p.spec.at) / 1000 * PROBE_RATE < p.tEnd + 2)
+    this.paths = this.paths.filter((p) => (now - p.at0) / 1000 * PROBE_RATE < p.tEnd + 2)
   }
 
   private moving() {
@@ -296,7 +297,7 @@ export class Engine {
     }
     const px = h / 540
     for (const p of this.paths) {
-      const tNow = ((now - p.spec.at) / 1000) * PROBE_RATE
+      const tNow = ((now - p.at0) / 1000) * PROBE_RATE
       const st = sample(p, tNow)
       if (!st) continue
       const hue = blackbody(5200 + p.spec.hue * 9000)
@@ -365,13 +366,13 @@ export class Engine {
     const now = this.now()
     let probe: Hud['probe'] = null
     for (const p of this.paths) {
-      const st = sample(p, ((now - p.spec.at) / 1000) * PROBE_RATE)
+      const st = sample(p, ((now - p.at0) / 1000) * PROBE_RATE)
       if (st && (!probe || st.r < probe.r)) probe = { r: st.r, g: st.g, stretch: tidal(st.r) }
     }
     return {
       r: d ? d.r : this.dist, yaw: this.yaw, pitch: this.pitch,
       dive: d ? { phase: d.phase, r: d.r, v: d.v, tau: d.tau, t: d.t, inside: d.inside } : null,
-      probes: this.paths.filter((p) => sample(p, ((now - p.spec.at) / 1000) * PROBE_RATE)).length, probe,
+      probes: this.paths.filter((p) => sample(p, ((now - p.at0) / 1000) * PROBE_RATE)).length, probe,
     }
   }
 
