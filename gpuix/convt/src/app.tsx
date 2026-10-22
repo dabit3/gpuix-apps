@@ -125,7 +125,7 @@ function subline(f: FileItem): string {
 function Mark({ t, on, onClick, testId }: { t: Theme; on: boolean; onClick: () => void; testId: string }) {
   return (
     <div testId={testId} onClick={onClick} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 36, flexShrink: 0, cursor: 'pointer' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: on ? 0 : 1.5, borderColor: alpha(t.fg, 0.3), backgroundColor: on ? t.fg : 'transparent' }}>
+      <div style={{ pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 8, borderWidth: on ? 0 : 1.5, borderColor: alpha(t.fg, 0.3), backgroundColor: on ? t.fg : 'transparent' }}>
         {on ? <T c={t.panel} s={9.5} w={800}>✓</T> : null}
       </div>
     </div>
