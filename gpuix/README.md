@@ -1,6 +1,6 @@
 # gpuix demos
 
-Twelve apps built with [GPUIX](https://github.com/remorses/gpuix) 0.11.0 (React on Zed's GPUI,
+Thirteen apps built with [GPUIX](https://github.com/remorses/gpuix) 0.11.0 (React on Zed's GPUI,
 rendered by Metal). In terminal mode the same React tree is painted into the terminal over the
 Kitty graphics protocol, so each app behaves like a TUI: launch it from the prompt, split the pane
 around it, Ctrl-C back to the shell.
@@ -17,6 +17,7 @@ alias caustic="$GPUIX_DEMO_HOME/caustic/src/cli.ts"
 alias convt="$GPUIX_DEMO_HOME/convt/src/cli.ts"
 alias couch="$GPUIX_DEMO_HOME/couch/src/cli.ts"
 alias devin-tui="$GPUIX_DEMO_HOME/devin-terminal/app.tsx"
+alias gargantua="$GPUIX_DEMO_HOME/gargantua/src/cli.ts"
 alias krieg="$GPUIX_DEMO_HOME/krieg/src/cli.ts"
 alias photocraft="$GPUIX_DEMO_HOME/photocraft/bin/photocraft.tsx"
 alias sinkhole="$GPUIX_DEMO_HOME/sinkhole/src/cli.ts"
@@ -35,6 +36,7 @@ where `GPUIX_DEMO_HOME="$HOME/opensource/private-app-demos-2/gpuix"`.
 | `convt` | Local file converter GUI | `convt demo -w` (watches the folder for new files) |
 | `couch` | 10-foot media center | `couch ~/Movies` · `couch remote` in a split |
 | `devin-tui` | Devin web app as a TUI | `devin-tui --demo` (or live with API credentials) |
+| `gargantua` | Real-time relativistic black hole | `gargantua -s m87` · `gargantua drop` in a second pane |
 | `krieg` | Procedural FPS | `krieg` · `krieg map` in a split for the live map |
 | `photocraft` | Photoshop-style image editor | `photocraft photocraft/samples/lake.jpg` |
 | `sinkhole` | DNS ad/tracker blocker + dashboard | `sinkhole`, then `dig @127.0.0.1 -p 5300 doubleclick.net` |
@@ -117,6 +119,19 @@ devin-tui -m fast -r acme/web "Fix the flaky checkout test"
 Credentials: `DEVIN_API_KEY` + `DEVIN_ORG_ID`, the macOS Keychain, or
 `~/.config/devin-tui/config.json` (`{"apiKey": "...", "orgId": "org-..."}`, chmod 600).
 Don't pipe stdin into it — GPUIX treats a stdin pipe as the automation protocol.
+
+### `gargantua` — relativistic black hole
+
+A Schwarzschild black hole ray traced on CPU workers into a GPUIX `<img>`: real null-geodesic
+lensing from precomputed impact-parameter tables, a Keplerian accretion disk with Doppler beaming
+and gravitational redshift, a lensed Milky Way, a radial free-fall Dive through the horizon, and
+probes that spaghettify on timelike orbits. Every running `gargantua` shares its probes unless `--solo`.
+
+```sh
+gargantua -s sgr-a -l physical   # Milky Way centre, full Doppler beaming
+gargantua drop -n 3              # throw 3 probes into every running pane
+gargantua --help                 # scenes, looks, quality, camera, workers
+```
 
 ### `krieg` — procedural FPS
 
