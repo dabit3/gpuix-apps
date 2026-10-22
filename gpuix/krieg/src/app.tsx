@@ -177,7 +177,7 @@ function Hud({ hud, W, H, fs, small, perf }: { hud: HudState; W: number; H: numb
     <>
       <div style={{ ...ov, left: W / 2 - 13, top: H / 2 - 13, width: 26, height: 26 }}>
         {[[12, 4 - sp, 2, 6], [12, 16 + sp, 2, 6], [4 - sp, 12, 6, 2], [16 + sp, 12, 6, 2]].map(([l, t, w, h], i) => (
-          <div key={i} style={{ position: 'absolute', left: l, top: t, width: w, height: h, backgroundColor: xc }} />
+          <div key={i} style={{ ...ov, left: l, top: t, width: w, height: h, backgroundColor: xc }} />
         ))}
       </div>
       <div style={{ ...ov, left: pad, top: pad, display: 'flex', flexDirection: 'column', gap: 4 }}>
