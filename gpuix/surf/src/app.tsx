@@ -253,7 +253,7 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
         {s.findOpen ? (
           <div style={{ position: 'absolute', top: 10, right: 14, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, paddingLeft: 12, paddingRight: 6, borderRadius: 10, backgroundColor: t.panel, borderWidth: 1, borderColor: t.line, boxShadow: [{ offsetX: 0, offsetY: 6, blurRadius: 18, spreadRadius: 0, color: 'rgba(0,0,0,0.45)' }] }}>
             <input ref={find} testId="find-input" value={s.findQuery} placeholder="Find in page" onFocus={() => { s.focus = 'find'; setRev((r) => r + 1) }} onChange={(e) => void s.runFind(e.value ?? '', { fromStart: true })} onSubmit={() => void s.runFind(s.findQuery)} style={{ width: 170, fontSize: 13, color: t.fg, fontFamily: UI }} />
-            <text style={{ color: t.dim, fontSize: 12, fontFamily: UI }}>{s.findQuery ? `${s.findCount} match${s.findCount === 1 ? '' : 'es'}` : ''}</text>
+            <text style={{ color: t.dim, fontSize: 12, fontFamily: UI }}>{s.findQuery ? (s.findCount ? `${s.findIndex} of ${s.findCount}` : 'no matches') : ''}</text>
             <IconButton t={t} testId="find-prev" label="↑" size={13} onClick={() => void s.runFind(s.findQuery, { backwards: true })} />
             <IconButton t={t} testId="find-next" label="↓" size={13} onClick={() => void s.runFind(s.findQuery)} />
             <IconButton t={t} testId="find-close" label="×" onClick={() => { s.findOpen = false; void b?.find(''); ui.focusPage() }} />

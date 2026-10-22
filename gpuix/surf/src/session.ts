@@ -20,6 +20,7 @@ export class Session {
   findOpen = false
   findQuery = ''
   findCount = 0
+  findIndex = 0
   omnibox = ''
   box: Box = { x: 0, y: 0, width: 0, height: 0 }
   painted = 0
@@ -81,9 +82,10 @@ export class Session {
 
   async runFind(query: string, opts: { backwards?: boolean; fromStart?: boolean } = {}) {
     this.findQuery = query
-    if (!this.browser || !query) { this.findCount = 0; this.ping(); return }
+    if (!this.browser || !query) { this.findCount = 0; this.findIndex = 0; this.ping(); return }
     const r = await this.browser.find(query, opts)
     this.findCount = r.count
+    this.findIndex = r.index
     this.ping()
   }
 
@@ -125,7 +127,7 @@ export class Session {
         writeFileSync(path, png)
         return { path, bytes: png.length }
       },
-      find: async ([q]) => { this.findOpen = true; await this.runFind(q ?? '', { fromStart: true }); return { query: q, count: this.findCount } },
+      find: async ([q]) => { this.findOpen = true; await this.runFind(q ?? '', { fromStart: true }); return { query: q, count: this.findCount, index: this.findIndex } },
     }
   }
 

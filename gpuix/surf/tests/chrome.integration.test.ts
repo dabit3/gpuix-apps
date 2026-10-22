@@ -12,6 +12,9 @@ const PAGE = `<!doctype html><title>surf test</title>
 <button id="go" onclick="this.textContent='clicked '+(++window.n||(window.n=1));document.title='clicked'">click me</button>
 <input id="field" style="position:absolute;left:100px;top:200px;width:200px">`
 
+const LONG = `<!doctype html><title>long</title><nav style="display:none">needle in a hidden menu</nav>
+<div style="height:3000px">top</div><p id="hit">the visible needle</p><div style="height:2000px"></div>`
+
 let server: ReturnType<typeof Bun.serve>
 let chrome: ChromeProcess
 let browser: Browser
@@ -19,7 +22,7 @@ const profile = mkdtempSync(join(tmpdir(), 'surf-it-'))
 
 beforeAll(async () => {
   expect(findChrome()).not.toBeNull()
-  server = Bun.serve({ port: 0, fetch: () => new Response(PAGE, { headers: { 'content-type': 'text/html' } }) })
+  server = Bun.serve({ port: 0, fetch: (req) => new Response(new URL(req.url).pathname === '/long' ? LONG : PAGE, { headers: { 'content-type': 'text/html' } }) })
   const vp = viewportFor({ width: 640, height: 400 }, 1)
   chrome = await launchChrome({ profile, width: vp.width, height: vp.height })
   browser = await Browser.connect(chrome.wsUrl, { viewport: vp })
@@ -71,4 +74,17 @@ test('typing reaches a focused input and the viewport follows a resize', async (
   let size: ReturnType<typeof imageSize> = null
   expect(await until(() => { const f = browser.frames.take(); size = f ? imageSize(f.bytes) : size; return !!size && size.width * 300 === size.height * 320 })).toBe(true)
   expect([320, 640]).toContain(size!.width)
+}, 30000)
+
+test('find skips hidden text and scrolls the match into view', async () => {
+  await browser.navigate(`http://localhost:${server.port}/long`)
+  expect(await until(async () => (await browser.evaluate('document.readyState+location.pathname')) === 'complete/long')).toBe(true)
+  expect(await browser.evaluate('scrollY')).toBe(0)
+  const r = await browser.find('needle', { fromStart: true })
+  expect(r).toEqual({ count: 1, found: true, index: 1 })
+  expect(await browser.evaluate('String(getSelection())')).toBe('needle')
+  expect(await browser.evaluate('scrollY')).toBeGreaterThan(2500)
+  expect(await browser.evaluate("CSS.highlights.get('surf-find-current').size")).toBe(1)
+  expect(await browser.find('needle')).toEqual({ count: 1, found: true, index: 1 })
+  expect(await browser.find('nothing-here', { fromStart: true })).toEqual({ count: 0, found: false, index: 0 })
 }, 30000)

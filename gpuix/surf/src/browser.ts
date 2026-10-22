@@ -1,5 +1,6 @@
 import { Cdp } from './cdp'
 import { decodeBase64, imageSize, LatestFrame, RateMeter } from './frame'
+import { findExpression } from './findpage'
 import { securityOf, type Security } from './omnibox'
 import type { KeyEventParams } from './input'
 
@@ -323,11 +324,8 @@ export class Browser {
   }
 
   /** Find in page via window.find (which selects and scrolls to the match), plus a total count. */
-  async find(query: string, opts: { backwards?: boolean; fromStart?: boolean } = {}): Promise<{ count: number; found: boolean }> {
-    if (!query) { await this.evaluate('getSelection().removeAllRanges()').catch(() => {}); return { count: 0, found: false } }
-    const q = JSON.stringify(query)
-    const expr = `(()=>{const q=${q};const s=getSelection();${opts.fromStart ? 's.removeAllRanges();' : ''}const found=window.find(q,false,${!!opts.backwards},true,false,false,false);const t=(document.body&&document.body.innerText||'').toLowerCase();let n=0,i=0,l=q.toLowerCase();while(l&&(i=t.indexOf(l,i))>=0){n++;i+=l.length}return{count:n,found}})()`
-    try { return (await this.evaluate(expr)) as { count: number; found: boolean } } catch { return { count: 0, found: false } }
+  async find(query: string, opts: { backwards?: boolean; fromStart?: boolean } = {}): Promise<{ count: number; found: boolean; index: number }> {
+    try { return (await this.evaluate(findExpression(query, opts))) as { count: number; found: boolean; index: number } } catch { return { count: 0, found: false, index: 0 } }
   }
 
   async close() {
