@@ -1,0 +1,1436 @@
+import React, { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { readFileSync } from 'fs'
+import {
+  Button,
+  isTerminal,
+  motion,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  useGpuix,
+  useWindowSize,
+  type KeyEvent,
+  type NativeRenderer,
+  type PublicInstance,
+  type StyleDesc,
+} from '@gpuix/react'
+import {
+  buildFollowUp,
+  buildRun,
+  initialSessions,
+  MODES,
+  REPOS,
+  STATUS_LABEL,
+  titleFromPrompt,
+  slugify,
+  type AgentMode,
+  type Check,
+  type PlanItem,
+  type RunAction,
+  type Session,
+  type Status,
+  type Step,
+  type TranscriptEvent,
+} from './data'
+import { byRecent, filterSessions, formatDuration, reducer, type PanelTab, type State } from './state'
+import { Icon, type IconName } from './icons'
+import { C, setTheme, type ThemeName } from './theme'
+import type { DevinApi } from './api'
+import { eventsFromMessages, sessionFromApi, statusLine } from './live'
+
+export { C }
+
+const SANS = 'Inter'
+const MONO = 'Menlo'
+const SIDEBAR_WIDTH = 288
+const SIDEBAR_COMPACT = 232
+const PANEL_WIDTH = 400
+const TRAFFIC_LIGHT_HEIGHT = 40
+const NO_REPO = 'No repository'
+const MAX_PAGES = 20
+const CLEAR = '#00000000'
+const PLACEHOLDER = 'Ask Devin to build features, fix bugs, or work on your code'
+
+function nativeTheme() {
+  return {
+    appearance: C.name,
+    accent: C.accent,
+    text: C.text,
+    textMuted: C.tertiary,
+    bg: C.card,
+    border: C.border,
+    diffAdd: C.add,
+    diffDel: C.del,
+    codeText: C.codeText,
+    codeWash: C.codeWash,
+  }
+}
+
+function statusColor(s: Status): string {
+  return s === 'running' ? C.blue : s === 'blocked' ? C.orange : s === 'finished' ? C.add : s === 'failed' ? C.del : C.ghost
+}
+
+function openUrl(url: string) {
+  if (!url || typeof Bun === 'undefined') return
+  try {
+    Bun.spawn(['open', url], { stdout: 'ignore', stderr: 'ignore' })
+  } catch {}
+}
+
+/** Window-level key handler; `app.tsx` forwards `render({ onKeyDown })` here. */
+let windowKeyHandler: ((event: KeyEvent, renderer: NativeRenderer) => void) | null = null
+export function handleWindowKey(event: KeyEvent, renderer: NativeRenderer) {
+  windowKeyHandler?.(event, renderer)
+}
+
+const row = (extra: StyleDesc = {}): StyleDesc => ({ display: 'flex', flexDirection: 'row', alignItems: 'center', ...extra })
+const col = (extra: StyleDesc = {}): StyleDesc => ({ display: 'flex', flexDirection: 'column', ...extra })
+
+function StatusDot({ status, size = 8 }: { status: Status; size?: number }) {
+  const [dim, setDim] = useState(false)
+  const running = status === 'running'
+  return (
+    <motion.div
+      initial={false}
+      animate={{ opacity: running && dim ? 0.3 : 1 }}
+      transition={{ duration: 0.8, ease: 'easeInOut' }}
+      onMotionComplete={() => running && setDim((d) => !d)}
+      style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: statusColor(status), flexShrink: 0, pointerEvents: 'none' }}
+    />
+  )
+}
+
+function IconButton({
+  icon,
+  onClick,
+  testId,
+  active,
+  size = 16,
+  box = 30,
+  color,
+  dot,
+}: {
+  icon: IconName
+  onClick?: () => void
+  testId?: string
+  active?: boolean
+  size?: number
+  box?: number
+  color?: string
+  dot?: boolean
+}) {
+  return (
+    <Button
+      testId={testId}
+      onClick={onClick}
+      style={{ ...row({ justifyContent: 'center' }), position: 'relative', width: box, height: box, borderRadius: 8, cursor: 'pointer', backgroundColor: active ? C.selected : CLEAR, hover: { backgroundColor: C.hover } }}
+    >
+      <Icon name={icon} size={size} color={color ?? (active ? C.text : C.tertiary)} />
+      {dot && <div style={{ position: 'absolute', top: 5, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: C.del, pointerEvents: 'none' }} />}
+    </Button>
+  )
+}
+
+/* ───────────────────────────── Sidebar ───────────────────────────── */
+
+type TreeRow = { session: Session; depth: number; hasChildren: boolean; open: boolean }
+
+function buildTree(visible: Session[], expanded: Record<string, boolean>, searching: boolean): TreeRow[] {
+  const ids = new Set(visible.map((s) => s.id))
+  const kids = new Map<string, Session[]>()
+  const top: Session[] = []
+  for (const s of visible) {
+    const p = s.live?.parentId
+    if (p && ids.has(p) && !searching) kids.set(p, [...(kids.get(p) ?? []), s])
+    else top.push(s)
+  }
+  const out: TreeRow[] = []
+  const walk = (s: Session, depth: number) => {
+    const children = kids.get(s.id) ?? []
+    const open = expanded[s.id] ?? false
+    out.push({ session: s, depth, hasChildren: children.length > 0, open })
+    if (open && depth < 3) for (const c of children) walk(c, depth + 1)
+  }
+  for (const s of top) walk(s, 0)
+  return out
+}
+
+function prCount(s: Session): number {
+  return s.live ? s.live.prs.length : s.events.filter((e) => e.kind === 'pr').length
+}
+
+const SessionRow = memo(function SessionRow({
+  item,
+  selected,
+  onSelect,
+  onToggle,
+}: {
+  item: TreeRow
+  selected: boolean
+  onSelect: (id: string) => void
+  onToggle: (id: string, open: boolean) => void
+}) {
+  const s = item.session
+  const prs = prCount(s)
+  const blocked = s.status === 'blocked'
+  const showDot = s.status === 'running' || blocked || s.status === 'failed'
+  return (
+    <div style={{ width: '100%', paddingLeft: 8, paddingRight: 8 }}>
+    <div
+      style={{
+        ...row({ alignItems: 'start' }),
+        width: '100%',
+        paddingLeft: 4 + item.depth * 18,
+        paddingRight: 10,
+        borderRadius: 8,
+        backgroundColor: selected ? C.selected : C.sidebar,
+        hover: { backgroundColor: selected ? C.selected : C.hover },
+      }}
+    >
+      <div
+        testId={`expand-${s.id}`}
+        onClick={item.hasChildren ? () => onToggle(s.id, !item.open) : undefined}
+        style={{ ...row({ justifyContent: 'center' }), width: 20, height: 34, flexShrink: 0, cursor: item.hasChildren ? 'pointer' : 'default' }}
+      >
+        {item.hasChildren ? (
+          <Icon name={item.open ? 'chevronDown' : 'chevronRight'} size={13} color={C.tertiary} />
+        ) : item.depth > 0 ? (
+          <div style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: C.borderStrong }} />
+        ) : null}
+      </div>
+      <div
+        testId={`session-${s.id}`}
+        onClick={() => onSelect(s.id)}
+        style={{ ...row({ alignItems: 'start', gap: 8 }), flexGrow: 1, minWidth: 0, paddingTop: 7, paddingBottom: 7, paddingLeft: 2, cursor: 'pointer' }}
+      >
+        <div style={col({ flexGrow: 1, minWidth: 0, gap: 2, pointerEvents: 'none' })}>
+          <text style={{ fontFamily: SANS, color: C.text, fontSize: 13.5, lineHeight: 18, fontWeight: selected ? 500 : 400, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+            {s.title}
+          </text>
+          <div style={row({ gap: 5, minWidth: 0 })}>
+            {blocked ? (
+              <text style={{ fontFamily: SANS, color: C.orange, fontSize: 12, lineHeight: 16, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                {s.live ? 'Waiting for you' : STATUS_LABEL.blocked}
+              </text>
+            ) : (
+              <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 12, lineHeight: 16, whiteSpace: 'nowrap' }}>{s.updated}</text>
+            )}
+            {prs > 0 && <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 12, lineHeight: 16 }}>·</text>}
+            {prs > 0 && <Icon name="pr" size={11} color={C.tertiary} />}
+            {prs > 0 && <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 12, lineHeight: 16 }}>{String(prs)}</text>}
+          </div>
+        </div>
+        {showDot && (
+          <div style={{ paddingTop: 6, pointerEvents: 'none' }}>
+            <StatusDot status={s.status} size={7} />
+          </div>
+        )}
+      </div>
+    </div>
+    </div>
+  )
+})
+
+function NavRow({ icon, label, hint, chevron, onClick, testId, active }: { icon: IconName; label: string; hint?: string; chevron?: boolean; onClick?: () => void; testId?: string; active?: boolean }) {
+  return (
+    <Button
+      testId={testId}
+      onClick={onClick}
+      style={{ ...row({ gap: 11 }), height: 32, paddingLeft: 10, paddingRight: 10, marginLeft: 8, marginRight: 8, borderRadius: 8, cursor: 'pointer', backgroundColor: active ? C.selected : C.sidebar, hover: { backgroundColor: active ? C.selected : C.hover } }}
+    >
+      <Icon name={icon} size={16} color={C.secondary} />
+      <text style={{ fontFamily: SANS, color: C.text, fontSize: 14, flexGrow: 1 }}>{label}</text>
+      {hint && <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 12 }}>{hint}</text>}
+      {chevron && <Icon name="chevronRight" size={13} color={C.ghost} />}
+    </Button>
+  )
+}
+
+function Sidebar({
+  state,
+  visible,
+  onSelect,
+  onNew,
+  onSearch,
+  searchRef,
+  width = SIDEBAR_WIDTH,
+  themeName,
+  onToggleTheme,
+  live,
+  liveError,
+  limit,
+  onLoadMore,
+  userName,
+}: {
+  width?: number
+  state: State
+  visible: Session[]
+  onSelect: (id: string) => void
+  onNew: () => void
+  onSearch: (value: string) => void
+  searchRef: React.RefObject<PublicInstance | null>
+  themeName: ThemeName
+  onToggleTheme: () => void
+  live: boolean
+  liveError: string | null
+  limit: number
+  onLoadMore: () => void
+  userName: string
+}) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const searching = state.search.trim().length > 0
+  const allRows = useMemo(() => buildTree(visible, expanded, searching), [visible, expanded, searching])
+  const rows = useMemo(() => {
+    if (searching || !live) return allRows
+    let top = 0
+    const out: TreeRow[] = []
+    for (const r of allRows) {
+      if (r.depth === 0 && ++top > limit) break
+      out.push(r)
+    }
+    return out
+  }, [allRows, searching, live, limit])
+  const hasMore = live && !searching && allRows.filter((r) => r.depth === 0).length > limit
+  const onToggle = useCallback((id: string, open: boolean) => setExpanded((e) => ({ ...e, [id]: open })), [])
+  const running = state.sessions.filter((s) => s.status === 'running').length
+  const macWindow = process.platform === 'darwin' && !isTerminal()
+  const { renderer } = useGpuix()
+  const narrow = width < SIDEBAR_WIDTH
+
+  return (
+    <div style={{ ...col(), width, height: '100%', flexShrink: 0, backgroundColor: C.sidebar, borderRightWidth: 1, borderColor: C.border }}>
+      {macWindow && <div style={{ height: TRAFFIC_LIGHT_HEIGHT - 12, flexShrink: 0 }} />}
+      <div style={row({ gap: 8, paddingLeft: 14, paddingRight: 8, height: 48, flexShrink: 0 })}>
+        <div style={{ ...row({ justifyContent: 'center' }), width: 22, height: 22, borderRadius: 5, backgroundColor: C.selected, flexShrink: 0 }}>
+          <text style={{ fontFamily: SANS, color: C.secondary, fontSize: 12, fontWeight: 600 }}>{userName.slice(0, 1).toUpperCase()}</text>
+        </div>
+        <text style={{ fontFamily: SANS, color: C.text, fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap', textOverflow: 'ellipsis', flexShrink: 1, minWidth: 0 }}>{userName}</text>
+        <Icon name="chevronDown" size={13} color={C.tertiary} />
+        <div style={{ flexGrow: 1 }} />
+        <IconButton icon="search" testId="search-button" onClick={() => searchRef.current && renderer?.focusElement?.(searchRef.current.id)} />
+        {!narrow && <IconButton icon="bell" dot />}
+        {!narrow && <IconButton icon="panelLeft" />}
+      </div>
+      <div style={{ ...col({ gap: 1 }), flexShrink: 0 }}>
+        <NavRow icon="plus" label="New session" hint="⇧⌘O" onClick={onNew} testId="new-session" active={state.selectedId === null} />
+        <NavRow icon="clock" label="Automations" />
+        <NavRow icon="shield" label="Security" />
+        <NavRow icon="pr" label="Review" />
+        <NavRow icon="shapes" label="Customize" />
+        <NavRow icon="more" label="More" chevron />
+      </div>
+      <div style={row({ paddingLeft: 16, paddingRight: 8, marginTop: 16, height: 30, flexShrink: 0, gap: 8 })}>
+        <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 13.5, fontWeight: 500 }}>Sessions</text>
+        <text testId="session-count" style={{ fontFamily: SANS, color: C.ghost, fontSize: 11.5, flexGrow: 1, whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0 }}>
+          {narrow ? `${running} running` : `${state.sessions.length} sessions · ${running} running`}
+        </text>
+        <IconButton icon="plus" size={15} box={26} onClick={onNew} testId="sessions-new" />
+        {!narrow && <IconButton icon="more" size={15} box={26} />}
+      </div>
+      <div style={{ ...row({ gap: 8 }), marginLeft: 8, marginRight: 8, marginTop: 4, marginBottom: 6, height: 30, paddingLeft: 10, paddingRight: 8, borderRadius: 8, backgroundColor: C.hover, flexShrink: 0 }}>
+        <Icon name="search" size={13} color={C.ghost} />
+        <input
+          ref={searchRef}
+          testId="search"
+          value={state.search}
+          placeholder="Search sessions"
+          onChange={(e) => onSearch(e.value ?? '')}
+          style={{ flexGrow: 1, minWidth: 0, height: 28, fontSize: 13, color: C.text, backgroundColor: C.hover, fontFamily: SANS }}
+          theme={{ caret: C.text, textMuted: C.ghost }}
+        />
+        <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 11 }}>⌘K</text>
+      </div>
+      <virtual-list testId="session-list" estimatedItemHeight={50} overdraw={400} style={{ flexGrow: 1, minHeight: 0, paddingBottom: 8 }}>
+        {[
+          ...(rows.length === 0
+            ? [
+                <div key="empty" style={{ padding: 18 }}>
+                  <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 12.5 }}>
+                    {searching ? `No sessions match “${state.search}”` : live ? (liveError ? 'Couldn’t reach the Devin API' : 'Loading sessions…') : 'No sessions yet'}
+                  </text>
+                </div>,
+              ]
+            : rows.map((r) => <SessionRow key={r.session.id} item={r} selected={r.session.id === state.selectedId} onSelect={onSelect} onToggle={onToggle} />)),
+          ...(live && hasMore && !searching
+            ? [
+                <div key="more" testId="load-more" onClick={onLoadMore} style={{ marginLeft: 8, marginRight: 8, paddingLeft: 24, height: 34, ...row(), borderRadius: 8, cursor: 'pointer', hover: { backgroundColor: C.hover } }}>
+                  <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 13 }}>Load more…</text>
+                </div>,
+              ]
+            : []),
+        ]}
+      </virtual-list>
+      {liveError && (
+        <div style={{ paddingLeft: 16, paddingRight: 16, paddingBottom: 6 }}>
+          <text style={{ fontFamily: SANS, color: C.del, fontSize: 11.5, lineHeight: 15 }}>{liveError}</text>
+        </div>
+      )}
+      <div style={{ ...row({ gap: 2 }), paddingLeft: 10, paddingRight: 10, height: 44, flexShrink: 0 }}>
+        <IconButton icon="help" size={17} />
+        <IconButton icon="settings" size={17} />
+        <div style={{ flexGrow: 1 }} />
+        <text testId="data-source" style={{ fontFamily: SANS, color: C.ghost, fontSize: 11.5, marginRight: 4, whiteSpace: 'nowrap' }}>{live ? (narrow ? 'Live' : 'Live · api.devin.ai') : 'Demo data'}</text>
+        <IconButton icon={themeName === 'dark' ? 'sun' : 'moon'} size={16} testId="theme-toggle" onClick={onToggleTheme} />
+      </div>
+    </div>
+  )
+}
+
+/* ───────────────────────────── Transcript ───────────────────────────── */
+
+function UserBubble({ text }: { text: string }) {
+  return (
+    <div style={col({ alignItems: 'end' })}>
+      <div style={{ maxWidth: '82%', paddingLeft: 15, paddingRight: 15, paddingTop: 10, paddingBottom: 10, borderRadius: 18, backgroundColor: C.userBubble }}>
+        <text style={{ fontFamily: SANS, color: C.text, fontSize: 14.5, lineHeight: 22 }}>{text.length > 1200 ? `${text.slice(0, 1200)}…` : text}</text>
+      </div>
+    </div>
+  )
+}
+
+function DevinMessage({ id, md, streaming, fresh }: { id: string; md: string; streaming?: boolean; fresh?: boolean }) {
+  const [shown, setShown] = useState(fresh ? 0 : md.length)
+  useEffect(() => {
+    if (!fresh) {
+      setShown(md.length)
+      return
+    }
+    const total = md.length
+    const step = Math.max(3, Math.ceil(total / 50))
+    const id = setInterval(() => {
+      setShown((n) => {
+        const next = Math.min(total, n + step)
+        if (next >= total) clearInterval(id)
+        return next
+      })
+    }, 30)
+    return () => clearInterval(id)
+  }, [fresh, md])
+  const typing = streaming || shown < md.length
+  const source = shown >= md.length ? md : md.slice(0, shown)
+  return (
+    <markdown
+      testId={`msg-${id}`}
+      source={source + (typing ? ' ▍' : '')}
+      theme={nativeTheme()}
+      style={{ width: '100%', minWidth: 0, color: C.text, fontSize: 14.5, lineHeight: 23, fontFamily: SANS }}
+    />
+  )
+}
+
+function PlanCard({ items }: { items: PlanItem[] }) {
+  const done = items.filter((i) => i.done).length
+  return (
+    <div style={{ ...col(), borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
+      <div style={{ ...row({ gap: 8 }), paddingLeft: 14, paddingRight: 14, height: 36, borderBottomWidth: 1, borderColor: C.border }}>
+        <Icon name="listChecks" size={14} color={C.secondary} />
+        <text style={{ fontFamily: SANS, color: C.text, fontSize: 13, fontWeight: 500, flexGrow: 1 }}>Plan</text>
+        <text testId="plan-progress" style={{ fontFamily: SANS, color: C.tertiary, fontSize: 12 }}>{`${done}/${items.length} done`}</text>
+      </div>
+      <div style={col({ gap: 8, paddingLeft: 14, paddingRight: 14, paddingTop: 11, paddingBottom: 13 })}>
+        {items.map((item, i) => (
+          <div key={i} style={row({ gap: 10 })}>
+            <div style={{ ...row({ justifyContent: 'center' }), width: 16, height: 16, borderRadius: 8, borderWidth: item.done ? 0 : 1.5, borderColor: C.borderStrong, backgroundColor: item.done ? C.text : C.card }}>
+              {item.done && <Icon name="check" size={10} color={C.canvas} />}
+            </div>
+            <text style={{ fontFamily: SANS, color: item.done ? C.tertiary : C.text, fontSize: 13.5 }}>{item.text}</text>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CardHeader({ icon, children, right }: { icon: IconName; children: React.ReactNode; right?: React.ReactNode }) {
+  return (
+    <div style={{ ...row({ gap: 8 }), paddingLeft: 12, paddingRight: 12, height: 34, backgroundColor: C.cardHead, borderBottomWidth: 1, borderColor: C.border }}>
+      <Icon name={icon} size={13} color={C.tertiary} />
+      <div style={{ ...row({ gap: 6 }), flexGrow: 1, minWidth: 0 }}>{children}</div>
+      {right}
+    </div>
+  )
+}
+
+function ShellCard({ step }: { step: Extract<Step, { kind: 'shell' }> }) {
+  const exitColor = step.exit === undefined ? C.blue : step.exit === 0 ? C.add : C.del
+  return (
+    <div style={{ ...col(), borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
+      <CardHeader icon="laptop" right={<text style={{ color: exitColor, fontSize: 11.5, fontFamily: MONO }}>{step.exit === undefined ? 'running…' : `exit ${step.exit}`}</text>}>
+        <text style={{ color: C.ghost, fontSize: 12, fontFamily: MONO }}>$</text>
+        <text style={{ color: C.text, fontSize: 12, fontFamily: MONO, whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 }}>{step.cmd}</text>
+      </CardHeader>
+      {step.output.length > 0 && (
+        <code code={step.output} language="log" theme={nativeTheme()} style={{ paddingLeft: 12, paddingRight: 12, paddingTop: 9, paddingBottom: 10, fontSize: 12, lineHeight: 17, color: C.secondary, fontFamily: MONO }} />
+      )}
+    </div>
+  )
+}
+
+function EditCard({ step }: { step: Extract<Step, { kind: 'edit' }> }) {
+  return (
+    <div style={{ ...col(), borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
+      <CardHeader
+        icon="pencil"
+        right={
+          <div style={row({ gap: 6 })}>
+            <text style={{ color: C.add, fontSize: 11.5, fontFamily: MONO }}>{`+${step.additions}`}</text>
+            <text style={{ color: C.del, fontSize: 11.5, fontFamily: MONO }}>{`-${step.deletions}`}</text>
+          </div>
+        }
+      >
+        <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 12 }}>Edited</text>
+        <text style={{ color: C.text, fontSize: 12, fontFamily: MONO, whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 }}>{step.path}</text>
+      </CardHeader>
+      <diff patch={step.patch} wordDiff maxLines={28} theme={nativeTheme()} style={{ fontSize: 12 }} />
+    </div>
+  )
+}
+
+function BrowserCard({ step, large }: { step: Extract<Step, { kind: 'browser' }>; large?: boolean }) {
+  return (
+    <div style={{ ...col(), borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
+      <div style={{ ...row({ gap: 8 }), paddingLeft: 10, paddingRight: 10, height: 34, backgroundColor: C.cardHead, borderBottomWidth: 1, borderColor: C.border }}>
+        <Icon name="arrowLeft" size={12} color={C.ghost} />
+        <Icon name="arrowRight" size={12} color={C.ghost} />
+        <Icon name="retry" size={11} color={C.ghost} />
+        <div style={{ ...row(), flexGrow: 1, minWidth: 0, height: 22, paddingLeft: 9, borderRadius: 6, backgroundColor: C.canvas, borderWidth: 1, borderColor: C.border }}>
+          <text style={{ color: C.secondary, fontSize: 11.5, fontFamily: MONO, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{step.url}</text>
+        </div>
+      </div>
+      <div style={{ ...col({ gap: 10 }), padding: 14, backgroundColor: '#f6f7f9', height: large ? 280 : undefined }}>
+        <div style={row({ gap: 8 })}>
+          <div style={{ width: 18, height: 18, borderRadius: 5, backgroundColor: '#1f2937' }} />
+          <text style={{ fontFamily: SANS, color: '#111827', fontSize: 13, fontWeight: 600 }}>{step.title}</text>
+        </div>
+        <div style={row({ gap: 8 })}>
+          {[0.9, 0.55, 0.7].map((w, i) => (
+            <div key={i} style={{ height: 34, flexGrow: w, borderRadius: 6, backgroundColor: i === 1 ? '#2f6fde' : '#e5e7eb' }} />
+          ))}
+        </div>
+        <div style={{ height: 8, width: '70%', borderRadius: 4, backgroundColor: '#d1d5db' }} />
+        <div style={{ height: 8, width: '45%', borderRadius: 4, backgroundColor: '#d1d5db' }} />
+      </div>
+      <div style={{ paddingLeft: 12, paddingRight: 12, paddingTop: 8, paddingBottom: 9, borderTopWidth: 1, borderColor: C.border }}>
+        <text style={{ fontFamily: SANS, color: C.secondary, fontSize: 12.5, lineHeight: 18 }}>{step.note}</text>
+      </div>
+    </div>
+  )
+}
+
+function StepView({ step }: { step: Step }) {
+  switch (step.kind) {
+    case 'shell':
+      return <ShellCard step={step} />
+    case 'edit':
+      return <EditCard step={step} />
+    case 'browser':
+      return <BrowserCard step={step} />
+    case 'think':
+      return <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 13.5 }}>{step.text}</text>
+  }
+}
+
+function WorkGroup({ event, onToggle }: { event: Extract<TranscriptEvent, { kind: 'work' }>; onToggle: () => void }) {
+  const label = event.active ? `Working for ${formatDuration(event.seconds)}` : `Worked for ${formatDuration(event.seconds)}`
+  const expandable = event.steps.length > 0
+  return (
+    <div style={col({ gap: 8 })}>
+      <div
+        testId={`work-${event.id}`}
+        onClick={expandable ? onToggle : undefined}
+        style={{ ...row({ gap: 7 }), alignSelf: 'start', height: 26, paddingLeft: 4, paddingRight: 8, marginLeft: -4, borderRadius: 6, cursor: expandable ? 'pointer' : 'default', hover: { backgroundColor: expandable ? C.hover : C.canvas } }}
+      >
+        <Icon name={event.open ? 'chevronDown' : 'chevronRight'} size={13} color={C.ghost} />
+        {event.active && <StatusDot status="running" size={7} />}
+        <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 13.5 }}>{label}</text>
+        {expandable && <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 13 }}>{`· ${event.steps.length} ${event.steps.length === 1 ? 'step' : 'steps'}`}</text>}
+      </div>
+      {event.open && (
+        <div style={{ ...col({ gap: 10 }), paddingLeft: 14, borderLeftWidth: 1, borderColor: C.border }}>
+          {event.steps.map((step) => (
+            <motion.div key={step.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+              <StepView step={step} />
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CheckDot({ state }: { state: Check['state'] }) {
+  const color = state === 'pass' ? C.add : state === 'fail' ? C.del : C.orange
+  return (
+    <div style={{ ...row({ justifyContent: 'center' }), width: 14, height: 14, borderRadius: 7, backgroundColor: state === 'pending' ? C.card : color, borderWidth: state === 'pending' ? 2 : 0, borderColor: color }}>
+      {state === 'pass' && <Icon name="check" size={9} color="#ffffff" />}
+    </div>
+  )
+}
+
+function PRCard({ event }: { event: Extract<TranscriptEvent, { kind: 'pr' }> }) {
+  const passed = event.checks.filter((c) => c.state === 'pass').length
+  const merged = event.state === 'merged'
+  return (
+    <div testId={`pr-${event.number}`} style={{ ...col(), borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
+      <div style={col({ gap: 6, paddingLeft: 14, paddingRight: 14, paddingTop: 12, paddingBottom: 12 })}>
+        <div style={row({ gap: 8 })}>
+          <Icon name={merged ? 'merge' : 'pr'} size={15} color={merged ? C.blue : C.add} />
+          <text style={{ fontFamily: SANS, color: C.text, fontSize: 14, fontWeight: 600, flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{event.title}</text>
+          <div style={{ ...row(), height: 22, paddingLeft: 9, paddingRight: 9, borderRadius: 11, backgroundColor: C.chip }}>
+            <text style={{ fontFamily: SANS, color: C.chipText, fontSize: 11.5, fontWeight: 500 }}>{merged ? 'Merged' : 'Open'}</text>
+          </div>
+        </div>
+        <div style={row({ gap: 8 })}>
+          <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 12.5 }}>{`${event.repo} #${event.number}`}</text>
+          <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 12.5 }}>·</text>
+          <text style={{ color: C.tertiary, fontSize: 12, fontFamily: MONO }}>{event.branch}</text>
+          <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 12.5 }}>·</text>
+          <text style={{ color: C.add, fontSize: 12, fontFamily: MONO }}>{`+${event.additions}`}</text>
+          <text style={{ color: C.del, fontSize: 12, fontFamily: MONO }}>{`-${event.deletions}`}</text>
+        </div>
+      </div>
+      <div style={{ ...col({ gap: 6 }), paddingLeft: 14, paddingRight: 14, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderColor: C.border }}>
+        <text testId={`checks-${event.number}`} style={{ fontFamily: SANS, color: C.secondary, fontSize: 12.5, fontWeight: 500 }}>
+          {passed === event.checks.length ? `All checks passed (${passed}/${event.checks.length})` : `Checks running (${passed}/${event.checks.length} passed)`}
+        </text>
+        {event.checks.map((c) => (
+          <div key={c.name} style={row({ gap: 8 })}>
+            <CheckDot state={c.state} />
+            <text style={{ fontFamily: SANS, color: C.secondary, fontSize: 12.5, flexGrow: 1 }}>{c.name}</text>
+            <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 12 }}>{c.detail}</text>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const EventView = memo(function EventView({ event, sessionId, onToggleWork }: { event: TranscriptEvent; sessionId: string; onToggleWork: (sessionId: string, workId: string) => void }) {
+  let body: React.ReactNode
+  switch (event.kind) {
+    case 'user':
+      body = <UserBubble text={event.text} />
+      break
+    case 'devin':
+      body = <DevinMessage id={event.id} md={event.md} streaming={event.streaming} fresh={event.fresh} />
+      break
+    case 'plan':
+      body = <PlanCard items={event.items} />
+      break
+    case 'work':
+      body = <WorkGroup event={event} onToggle={() => onToggleWork(sessionId, event.id)} />
+      break
+    case 'pr':
+      body = <PRCard event={event} />
+      break
+  }
+  return (
+    <div style={{ ...col({ alignItems: 'center' }), width: '100%', minWidth: 0, paddingLeft: 32, paddingRight: 32, paddingTop: 9, paddingBottom: 9 }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} style={{ ...col(), width: '100%', minWidth: 0, maxWidth: 740 }}>
+        {body}
+      </motion.div>
+    </div>
+  )
+})
+
+/* ───────────────────────────── Composer ───────────────────────────── */
+
+function menuStyle(): StyleDesc {
+  return {
+    minWidth: 220,
+    padding: 4,
+    backgroundColor: C.menu,
+    borderWidth: 1,
+    borderColor: C.borderStrong,
+    borderRadius: 12,
+    boxShadow: { offsetX: 0, offsetY: 8, blurRadius: 24, spreadRadius: 0, color: C.name === 'light' ? '#0000001f' : '#00000080' },
+  }
+}
+
+function menuItemStyle(state: { selected: boolean; highlighted: boolean }): StyleDesc {
+  return { ...row({ gap: 10 }), width: '100%', paddingLeft: 9, paddingRight: 9, paddingTop: 7, paddingBottom: 7, borderRadius: 8, cursor: 'pointer', backgroundColor: state.highlighted ? C.hover : C.menu, hover: { backgroundColor: C.hover } }
+}
+
+const MODE_ICON: Record<AgentMode, IconName> = { normal: 'sparkle', fast: 'zap', ultra: 'sliders' }
+
+function TextSelect({
+  value,
+  onChange,
+  items,
+  label,
+  testId,
+  icon,
+  children,
+}: {
+  value: string
+  onChange: (v: string) => void
+  items: { value: string; label: string }[]
+  label: string
+  testId: string
+  icon?: IconName
+  children: React.ReactNode
+}) {
+  return (
+    <Select items={items} value={value} onValueChange={onChange} style={{ flexShrink: 0 }}>
+      <div style={{ position: 'relative', display: 'flex' }}>
+        <SelectTrigger
+          testId={testId}
+          style={(s) => ({ ...row({ gap: 5 }), height: 30, paddingLeft: 8, paddingRight: 7, borderRadius: 8, cursor: 'pointer', backgroundColor: s.open ? C.hover : CLEAR, hover: { backgroundColor: C.hover } })}
+        >
+          {icon && <Icon name={icon} size={14} color={C.tertiary} />}
+          <text testId={`${testId}-label`} style={{ fontFamily: SANS, color: C.secondary, fontSize: 13.5, whiteSpace: 'nowrap' }}>{label}</text>
+          <Icon name="chevronDown" size={12} color={C.ghost} />
+        </SelectTrigger>
+        <SelectContent side="top" sideOffset={6} style={menuStyle()}>
+          {children}
+        </SelectContent>
+      </div>
+    </Select>
+  )
+}
+
+function MenuRow({ label, description, icon, selected }: { label: string; description?: string; icon?: IconName; selected: boolean }) {
+  return (
+    <>
+      {icon && <Icon name={icon} size={14} color={C.tertiary} />}
+      <div style={col({ flexGrow: 1, minWidth: 0, pointerEvents: 'none' })}>
+        <text style={{ fontFamily: SANS, color: C.text, fontSize: 13.5 }}>{label}</text>
+        {description && <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 12 }}>{description}</text>}
+      </div>
+      {selected && <Icon name="check" size={13} color={C.text} />}
+    </>
+  )
+}
+
+function ModePicker({ value, onChange }: { value: AgentMode; onChange: (m: AgentMode) => void }) {
+  const current = MODES.find((m) => m.value === value) ?? MODES[0]!
+  return (
+    <TextSelect value={value} onChange={(v) => onChange(v as AgentMode)} items={MODES} label={current.label} testId="mode-picker">
+      {MODES.map((m) => (
+        <SelectItem key={m.value} value={m.value} testId={`mode-${m.value}`} style={(s) => menuItemStyle(s)}>
+          {(s) => <MenuRow label={m.label} description={m.description} icon={MODE_ICON[m.value]} selected={s.selected} />}
+        </SelectItem>
+      ))}
+    </TextSelect>
+  )
+}
+
+function RepoPicker({ value, onChange, repos }: { value: string; onChange: (r: string) => void; repos: string[] }) {
+  return (
+    <TextSelect value={value} onChange={onChange} items={repos.map((r) => ({ value: r, label: r }))} icon="folder" label={value} testId="repo-picker">
+      {repos.map((r) => (
+        <SelectItem key={r} value={r} testId={`repo-${r.split('/')[1] ?? 'none'}`} style={(s) => menuItemStyle(s)}>
+          {(s) => <MenuRow label={r} icon="folder" selected={s.selected} />}
+        </SelectItem>
+      ))}
+    </TextSelect>
+  )
+}
+
+function SendButton({ canSend, onClick, split }: { canSend: boolean; onClick: () => void; split?: boolean }) {
+  const bg = canSend ? C.sendBg : C.selected
+  const fg = canSend ? C.sendFg : C.ghost
+  return (
+    <Button
+      testId="send"
+      onClick={onClick}
+      style={{ ...row({ justifyContent: 'center', gap: 6 }), marginLeft: 4, width: split ? 58 : 32, height: 32, borderRadius: 16, cursor: 'pointer', backgroundColor: bg, hover: { opacity: canSend ? 0.85 : 1 } }}
+    >
+      <Icon name="send" size={16} color={fg} />
+      {split && <div style={{ width: 1, height: 16, backgroundColor: canSend ? C.sendFg : C.borderStrong, opacity: 0.25 }} />}
+      {split && <Icon name="chevronDown" size={12} color={fg} />}
+    </Button>
+  )
+}
+
+type ComposerProps = {
+  draft: string
+  setDraft: (v: string) => void
+  onSubmit: (text: string) => void
+  mode: AgentMode
+  onMode: (m: AgentMode) => void
+  repo?: string
+  onRepo?: (r: string) => void
+  repos?: string[]
+  placeholder: string
+  composerRef: React.RefObject<PublicInstance | null>
+  big?: boolean
+}
+
+function Composer({ draft, setDraft, onSubmit, mode, onMode, repo, onRepo, repos, placeholder, composerRef, big }: ComposerProps) {
+  const canSend = draft.trim().length > 0
+  return (
+    <div
+      style={{
+        ...col({ gap: 10 }),
+        width: '100%',
+        maxWidth: big ? 716 : 760,
+        paddingLeft: 16,
+        paddingRight: 10,
+        paddingTop: 14,
+        paddingBottom: 10,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: C.borderStrong,
+        backgroundColor: C.raised,
+        boxShadow: { offsetX: 0, offsetY: 2, blurRadius: 12, spreadRadius: 0, color: C.name === 'light' ? '#0000000f' : '#00000040' },
+      }}
+    >
+      <textarea
+        ref={composerRef}
+        testId="composer"
+        value={draft}
+        placeholder={placeholder}
+        minRows={big ? 3 : 1}
+        maxRows={8}
+        onChange={(e) => setDraft(e.value ?? '')}
+        onSubmit={(e) => onSubmit(e.value ?? draft)}
+        style={{ fontSize: 15, lineHeight: 22, color: C.text, backgroundColor: C.raised, fontFamily: SANS }}
+        theme={{ caret: C.text, textMuted: C.ghost }}
+      />
+      <div style={row({ gap: 2 })}>
+        <IconButton icon="plus" size={17} />
+        <IconButton icon="slash" size={16} />
+        {big && <IconButton icon="settings2" size={16} />}
+        {big && repo && onRepo && repos && <RepoPicker value={repo} onChange={onRepo} repos={repos} />}
+        <div style={{ flexGrow: 1 }} />
+        <ModePicker value={mode} onChange={onMode} />
+        <IconButton icon="mic" size={16} />
+        <IconButton icon="wave" size={16} />
+        <SendButton canSend={canSend} split={big} onClick={() => canSend && onSubmit(draft)} />
+      </div>
+    </div>
+  )
+}
+
+/* ───────────────────────────── Right panel ───────────────────────────── */
+
+const TABS: { id: PanelTab; label: string; icon: IconName }[] = [
+  { id: 'shell', label: 'Shell', icon: 'laptop' },
+  { id: 'editor', label: 'Editor', icon: 'pencil' },
+  { id: 'browser', label: 'Browser', icon: 'monitor' },
+  { id: 'planner', label: 'Planner', icon: 'listChecks' },
+]
+
+function allSteps(s: Session): Step[] {
+  return s.events.flatMap((e) => (e.kind === 'work' ? e.steps : []))
+}
+
+function PanelTabs({ tabs, tab, onTab }: { tabs: { id: string; label: string; icon: IconName }[]; tab: string; onTab: (t: string) => void }) {
+  return (
+    <div style={{ ...row({ gap: 2 }), height: 46, paddingLeft: 10, paddingRight: 10, flexShrink: 0, borderBottomWidth: 1, borderColor: C.border, overflow: 'hidden' }}>
+      {tabs.map((t) => {
+        const active = t.id === tab
+        return (
+          <div
+            key={t.id}
+            testId={`tab-${t.id}`}
+            onClick={() => onTab(t.id)}
+            style={{ ...row({ gap: 6 }), height: 30, paddingLeft: 10, paddingRight: 10, borderRadius: 8, cursor: 'pointer', flexShrink: 0, backgroundColor: active ? C.selected : C.canvas, hover: { backgroundColor: active ? C.selected : C.hover } }}
+          >
+            <Icon name={t.icon} size={14} color={active ? C.text : C.tertiary} />
+            <text style={{ fontFamily: SANS, color: active ? C.text : C.tertiary, fontSize: 13.5, whiteSpace: 'nowrap' }}>{t.label}</text>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function DemoPanel({ session, tab, onTab }: { session: Session; tab: PanelTab; onTab: (t: PanelTab) => void }) {
+  const steps = allSteps(session)
+  const shells = steps.filter((s): s is Extract<Step, { kind: 'shell' }> => s.kind === 'shell')
+  const edits = steps.filter((s): s is Extract<Step, { kind: 'edit' }> => s.kind === 'edit')
+  const browsers = steps.filter((s): s is Extract<Step, { kind: 'browser' }> => s.kind === 'browser')
+  const plan = [...session.events].reverse().find((e): e is Extract<TranscriptEvent, { kind: 'plan' }> => e.kind === 'plan')
+  return (
+    <>
+      <PanelTabs tabs={TABS} tab={tab} onTab={onTab} />
+      <div style={{ ...col({ gap: 10 }), flexGrow: 1, minHeight: 0, padding: 14, overflow: 'scroll' }}>
+        {tab === 'shell' &&
+          (shells.length ? (
+            shells.map((s) => <ShellCard key={s.id} step={s} />)
+          ) : (
+            <Empty text="No commands yet" />
+          ))}
+        {tab === 'editor' &&
+          (edits.length ? (
+            edits.map((e) => (
+              <div key={e.id} style={col({ gap: 6 })}>
+                <text style={{ color: C.secondary, fontSize: 12, fontFamily: MONO }}>{e.path}</text>
+                <diff patch={e.patch} wordDiff theme={nativeTheme()} style={{ fontSize: 11.5, borderRadius: 8, borderWidth: 1, borderColor: C.border }} />
+              </div>
+            ))
+          ) : (
+            <Empty text="No files edited yet" />
+          ))}
+        {tab === 'browser' && (browsers.length ? <BrowserCard step={browsers[browsers.length - 1]!} large /> : <Empty text="Browser idle" />)}
+        {tab === 'planner' && (
+          <div style={col({ gap: 12 })}>
+            <div style={row({ gap: 8 })}>
+              <StatusDot status={session.status} />
+              <text style={{ fontFamily: SANS, color: C.text, fontSize: 13.5, fontWeight: 500 }}>{STATUS_LABEL[session.status]}</text>
+              <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 12.5 }}>{`· ${session.acus} ACUs`}</text>
+            </div>
+            {plan ? <PlanCard items={plan.items} /> : <Empty text="No plan for this session" />}
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+function prLabel(url: string) {
+  const m = url.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/)
+  return m ? { repo: m[1]!, number: m[2]! } : { repo: url, number: '' }
+}
+
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ ...row({ gap: 10, alignItems: 'start' }), paddingTop: 9, paddingBottom: 9, borderBottomWidth: 1, borderColor: C.border }}>
+      <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 13, width: 92, flexShrink: 0 }}>{label}</text>
+      <div style={{ ...row({ gap: 7 }), flexGrow: 1, minWidth: 0 }}>{children}</div>
+    </div>
+  )
+}
+
+function LivePanel({ session, sessions, tab, onTab, onSelect }: { session: Session; sessions: Session[]; tab: PanelTab; onTab: (t: PanelTab) => void; onSelect: (id: string) => void }) {
+  const live = session.live!
+  const tabs = [{ id: 'details', label: 'Session', icon: 'list' as IconName }, ...live.prs.map((p, i) => ({ id: `pr-${i}`, label: `PR #${prLabel(p.url).number}`, icon: 'pr' as IconName }))]
+  const current = tabs.some((t) => t.id === tab) ? tab : 'details'
+  const children = sessions.filter((s) => s.live?.parentId === session.id)
+  const pr = current.startsWith('pr-') ? live.prs[Number(current.slice(3))] : undefined
+  return (
+    <>
+      <PanelTabs tabs={tabs} tab={current} onTab={onTab} />
+      <div style={{ ...col(), flexGrow: 1, minHeight: 0, paddingLeft: 18, paddingRight: 18, paddingTop: 8, overflow: 'scroll' }}>
+        {pr ? (
+          <div style={col({ gap: 12, paddingTop: 8 })}>
+            <div style={row({ gap: 8 })}>
+              <div style={{ ...row({ gap: 6 }), height: 26, paddingLeft: 10, paddingRight: 10, borderRadius: 13, backgroundColor: C.chip }}>
+                <Icon name={pr.state === 'merged' ? 'merge' : 'pr'} size={13} color={C.chipText} />
+                <text style={{ fontFamily: SANS, color: C.chipText, fontSize: 13, fontWeight: 500 }}>{pr.state ? pr.state[0]!.toUpperCase() + pr.state.slice(1) : 'Open'}</text>
+              </div>
+            </div>
+            <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 13 }}>{`${prLabel(pr.url).repo} · #${prLabel(pr.url).number}`}</text>
+            <text style={{ color: C.secondary, fontSize: 12.5, fontFamily: MONO, lineHeight: 18 }}>{pr.url}</text>
+            <Button testId="open-pr" onClick={() => openUrl(pr.url)} style={{ ...row({ gap: 6, justifyContent: 'center' }), alignSelf: 'start', height: 32, paddingLeft: 12, paddingRight: 12, borderRadius: 8, borderWidth: 1, borderColor: C.borderStrong, cursor: 'pointer', backgroundColor: C.raised, hover: { backgroundColor: C.hover } }}>
+              <Icon name="link" size={13} color={C.secondary} />
+              <text style={{ fontFamily: SANS, color: C.text, fontSize: 13 }}>Open on GitHub</text>
+            </Button>
+          </div>
+        ) : (
+          <>
+            <DetailRow label="Status">
+              <StatusDot status={session.status} size={7} />
+              <text testId="detail-status" style={{ fontFamily: SANS, color: C.text, fontSize: 13 }}>{statusLine(session) ?? STATUS_LABEL[session.status]}</text>
+            </DetailRow>
+            <DetailRow label="Mode">
+              <text style={{ fontFamily: SANS, color: C.text, fontSize: 13 }}>{MODES.find((m) => m.value === session.mode)?.label ?? 'Normal'}</text>
+            </DetailRow>
+            <DetailRow label="ACUs">
+              <text style={{ fontFamily: SANS, color: C.text, fontSize: 13 }}>{String(session.acus)}</text>
+            </DetailRow>
+            <DetailRow label="Updated">
+              <text style={{ fontFamily: SANS, color: C.text, fontSize: 13 }}>{session.updated}</text>
+            </DetailRow>
+            <DetailRow label="Link">
+              <div onClick={() => openUrl(live.url)} style={{ cursor: 'pointer', minWidth: 0, flexShrink: 1 }}>
+                <text style={{ fontFamily: SANS, color: C.accent, fontSize: 13, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{live.url ? live.url.replace('https://', '') : 'Starting…'}</text>
+              </div>
+            </DetailRow>
+            {children.length > 0 && (
+              <div style={col({ gap: 2, paddingTop: 14 })}>
+                <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 12.5, paddingBottom: 6 }}>{`Child sessions · ${children.length}`}</text>
+                {children.map((c) => (
+                  <div key={c.id} onClick={() => onSelect(c.id)} style={{ ...row({ gap: 8 }), height: 32, paddingLeft: 8, paddingRight: 8, marginLeft: -8, borderRadius: 8, cursor: 'pointer', hover: { backgroundColor: C.hover } }}>
+                    <StatusDot status={c.status} size={7} />
+                    <text style={{ fontFamily: SANS, color: C.text, fontSize: 13, flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{c.title}</text>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  )
+}
+
+function Empty({ text }: { text: string }) {
+  return (
+    <div style={{ ...row({ justifyContent: 'center' }), height: 120 }}>
+      <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 13 }}>{text}</text>
+    </div>
+  )
+}
+
+/* ───────────────────────────── Main panes ───────────────────────────── */
+
+function SessionHeader({ session, panelOpen, onTogglePanel, compact = false }: { session: Session; panelOpen: boolean; onTogglePanel: () => void; compact?: boolean }) {
+  const prs = prCount(session)
+  return (
+    <div style={{ ...row({ gap: 8 }), height: 48, paddingLeft: 18, paddingRight: 10, borderBottomWidth: 1, borderColor: C.border, flexShrink: 0 }}>
+      <Icon name="gitBranch" size={14} color={C.tertiary} />
+      <text testId="session-title" style={{ fontFamily: SANS, color: C.text, fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap', textOverflow: 'ellipsis', flexShrink: 1, minWidth: 0 }}>{session.title}</text>
+      {prs > 0 && <Icon name="pr" size={13} color={C.tertiary} />}
+      {prs > 0 && <text style={{ fontFamily: SANS, color: C.tertiary, fontSize: 13 }}>{String(prs)}</text>}
+      <div style={{ ...row({ gap: 6 }), height: 22, paddingLeft: 8, paddingRight: 8, borderRadius: 6, backgroundColor: C.chip, flexShrink: 0 }}>
+        <StatusDot status={session.status} size={6} />
+        <text testId="session-status" style={{ fontFamily: SANS, color: C.chipText, fontSize: 12, whiteSpace: 'nowrap' }}>{STATUS_LABEL[session.status]}</text>
+      </div>
+      <text testId="session-mode" style={{ fontFamily: SANS, color: C.ghost, fontSize: 12.5, flexShrink: 0 }}>{MODES.find((m) => m.value === session.mode)?.label ?? ''}</text>
+      <div style={{ flexGrow: 1 }} />
+      {!compact && <IconButton icon="listChecks" />}
+      <IconButton icon="more" />
+      {!compact && <IconButton icon="panelRight" testId="toggle-panel" onClick={onTogglePanel} active={panelOpen} />}
+    </div>
+  )
+}
+
+function StatusFooter({ session }: { session: Session }) {
+  const line = statusLine(session)
+  if (!line) return null
+  return (
+    <div style={{ ...row({ gap: 9 }), width: '100%', maxWidth: 760, paddingLeft: 6, paddingBottom: 10 }}>
+      <StatusDot status={session.status} size={7} />
+      <text testId="status-line" style={{ fontFamily: SANS, color: C.tertiary, fontSize: 13.5 }}>{line}</text>
+    </div>
+  )
+}
+
+function Segmented({ value, onChange }: { value: 'agent' | 'ask'; onChange: (v: 'agent' | 'ask') => void }) {
+  return (
+    <div style={{ ...row({ gap: 2 }), padding: 3, borderRadius: 10, backgroundColor: C.hover }}>
+      {(['agent', 'ask'] as const).map((v) => {
+        const active = v === value
+        return (
+          <div
+            key={v}
+            testId={`kind-${v}`}
+            onClick={() => onChange(v)}
+            style={{ ...row({ justifyContent: 'center' }), height: 28, paddingLeft: 13, paddingRight: 13, borderRadius: 8, cursor: 'pointer', backgroundColor: active ? C.raised : C.hover, borderWidth: 1, borderColor: active ? C.border : C.hover }}
+          >
+            <text style={{ fontFamily: SANS, color: active ? C.text : C.tertiary, fontSize: 13.5 }}>{v === 'agent' ? 'Agent' : 'Ask'}</text>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function HomeView({ composer, kind, onKind }: { composer: ComposerProps; kind: 'agent' | 'ask'; onKind: (k: 'agent' | 'ask') => void }) {
+  return (
+    <div style={{ ...col({ alignItems: 'center', justifyContent: 'center' }), flexGrow: 1, paddingLeft: 32, paddingRight: 32, paddingBottom: 90 }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} style={{ ...col({ gap: 14 }), width: '100%', maxWidth: 716 }}>
+        <div style={row({ gap: 9, paddingLeft: 6 })}>
+          <Icon name="devin" size={26} color={C.text} />
+          <text testId="home-title" style={{ fontFamily: SANS, color: C.text, fontSize: 27, fontWeight: 600 }}>Devin</text>
+          <div style={{ flexGrow: 1 }} />
+          <Segmented value={kind} onChange={onKind} />
+        </div>
+        <Composer {...composer} big />
+      </motion.div>
+    </div>
+  )
+}
+
+/* ───────────────────────────── App ───────────────────────────── */
+
+export interface DevinAppProps {
+  speed?: number
+  initialSelected?: string | null
+  initialMode?: AgentMode
+  /** Starts a new session with this prompt on launch (the CLI's positional argument). */
+  initialPrompt?: string
+  /** Real Devin API client. Without one the app runs on scripted demo data. */
+  client?: DevinApi | null
+  /** Live mode: select the first session matching this query once the list loads. */
+  sessionQuery?: string
+  theme?: ThemeName
+  userName?: string
+  pollMs?: number
+  /** Repository preselected for new sessions. */
+  initialRepo?: string
+}
+
+export function DevinApp({
+  speed = 1,
+  initialSelected = 's-rate-limit',
+  initialMode = 'normal',
+  initialPrompt,
+  client = null,
+  sessionQuery,
+  theme = 'dark',
+  userName = 'Nader Dabit',
+  pollMs = 3000,
+  initialRepo,
+}: DevinAppProps) {
+  const live = client !== null
+  const [themeName, setThemeName] = useState<ThemeName>(() => {
+    setTheme(theme)
+    return theme
+  })
+  const [state, dispatch] = useReducer(reducer, undefined, (): State => ({
+    sessions: live ? [] : initialSessions(),
+    selectedId: live ? null : initialSelected,
+    search: '',
+    mode: initialMode,
+    panelOpen: true,
+    panelTab: live ? 'details' : 'shell',
+    repo: initialRepo ?? (live ? NO_REPO : REPOS[1]!),
+  }))
+  const [draft, setDraft] = useState('')
+  const [kind, setKind] = useState<'agent' | 'ask'>('agent')
+  const [liveError, setLiveError] = useState<string | null>(null)
+  const [pageSize, setPageSize] = useState(40)
+  const { renderer } = useGpuix()
+  const searchRef = useRef<PublicInstance | null>(null)
+  const composerRef = useRef<PublicInstance | null>(null)
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const runCount = useRef(0)
+  const stateRef = useRef(state)
+  stateRef.current = state
+
+  // Reflow for narrow hosts (a Ghostty split): drop the right panel, then shrink and finally hide the sidebar.
+  const { width: hostWidth } = useWindowSize()
+  const compact = hostWidth > 0 && hostWidth < 1080
+  const tiny = hostWidth > 0 && hostWidth < 600
+  const visible = useMemo(() => filterSessions(state.sessions, state.search), [state.sessions, state.search])
+  const selected = state.sessions.find((s) => s.id === state.selectedId) ?? null
+  const repos = useMemo(() => {
+    if (!live) return REPOS
+    const set = new Set<string>()
+    for (const s of state.sessions) for (const p of s.live?.prs ?? []) set.add(prLabel(p.url).repo)
+    if (initialRepo) set.add(initialRepo)
+    return [NO_REPO, ...[...set].filter((r) => r.includes('/')).sort()]
+  }, [live, state.sessions, initialRepo])
+
+  useEffect(() => {
+    const r = renderer as unknown as { registerFont?: (bytes: Uint8Array) => void } | null
+    for (const w of ['Regular', 'Medium', 'SemiBold']) {
+      try {
+        r?.registerFont?.(readFileSync(new URL(`../assets/fonts/Inter-${w}.ttf`, import.meta.url)))
+      } catch {}
+    }
+  }, [renderer])
+
+  useEffect(() => {
+    const id = setInterval(() => dispatch({ type: 'tick', seconds: live ? 1 : 7 }), 1000)
+    return () => {
+      clearInterval(id)
+      timers.current.forEach(clearTimeout)
+    }
+  }, [live])
+
+  // Live: page through the account's sessions once (the API lists by creation time, the sidebar sorts by activity),
+  // then keep the newest page fresh in the background.
+  const pendingQuery = useRef(sessionQuery)
+  useEffect(() => {
+    if (!client) return
+    let alive = true
+    const applyQuery = (all: Session[]) => {
+      if (!pendingQuery.current) return
+      const match = filterSessions(byRecent(all), pendingQuery.current)[0]
+      if (match) {
+        pendingQuery.current = undefined
+        dispatch({ type: 'select', id: match.id })
+      }
+    }
+    const loadAll = async () => {
+      const all: Session[] = []
+      let cursor: string | undefined
+      try {
+        for (let page = 0; page < MAX_PAGES && alive; page++) {
+          const res = await client.listSessions(100, cursor)
+          all.push(...res.items.map((s) => sessionFromApi(s)))
+          dispatch({ type: page === 0 ? 'load' : 'merge', sessions: page === 0 ? [...all] : res.items.map((s) => sessionFromApi(s)) })
+          setLiveError(null)
+          applyQuery(all)
+          if (!res.hasMore || !res.cursor) break
+          cursor = res.cursor
+        }
+      } catch (error) {
+        if (alive) setLiveError((error as Error).message)
+      }
+    }
+    const refresh = async () => {
+      try {
+        const res = await client.listSessions(100)
+        if (alive) dispatch({ type: 'merge', sessions: res.items.map((s) => sessionFromApi(s)) })
+      } catch (error) {
+        if (alive) setLiveError((error as Error).message)
+      }
+    }
+    void loadAll()
+    const id = setInterval(refresh, Math.max(pollMs * 3, 3000))
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [client, pollMs])
+
+  // Live: the open session's messages and status, polled while it is selected.
+  useEffect(() => {
+    const id = state.selectedId
+    if (!client || !id || id.startsWith('pending-')) return
+    let alive = true
+    const poll = async () => {
+      try {
+        const [messages, s] = await Promise.all([client.listMessages(id), client.getSession(id)])
+        if (!alive) return
+        const session = sessionFromApi(s)
+        dispatch({ type: 'upsert', session })
+        dispatch({ type: 'events', id, events: eventsFromMessages(messages, { running: session.status === 'running' }) })
+      } catch (error) {
+        if (alive) setLiveError((error as Error).message)
+      }
+    }
+    void poll()
+    const timer = setInterval(poll, pollMs)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
+  }, [client, state.selectedId, pollMs])
+
+  const schedule = useCallback(
+    (sessionId: string, actions: RunAction[]) => {
+      for (const action of actions) {
+        timers.current.push(setTimeout(() => dispatch({ type: 'run', sessionId, action }), action.at / speed))
+      }
+    },
+    [speed],
+  )
+
+  const focusComposer = useCallback(() => {
+    setTimeout(() => {
+      if (composerRef.current) renderer?.focusElement?.(composerRef.current.id)
+    }, 30)
+  }, [renderer])
+
+  const createSession = useCallback(
+    (text: string, repo: string) => {
+      const prompt = text.trim()
+      if (!prompt) return
+      const n = ++runCount.current
+      const s = stateRef.current
+      if (client) {
+        const tmp = `pending-${n}`
+        dispatch({
+          type: 'create',
+          session: {
+            id: tmp,
+            title: titleFromPrompt(prompt),
+            repo: repo === NO_REPO ? NO_REPO : repo,
+            branch: '',
+            status: 'running',
+            group: 'Today',
+            updated: 'now',
+            acus: 0,
+            mode: s.mode,
+            events: [
+              { kind: 'user', id: `${tmp}-u`, text: prompt, at: 'now' },
+              { kind: 'work', id: 'w-live', seconds: 0, steps: [], open: false, active: true },
+            ],
+            live: { url: '', statusDetail: 'working', prs: [], parentId: null, childIds: [], updatedAt: Date.now() / 1000, loaded: true },
+          },
+        })
+        setDraft('')
+        client
+          .createSession(prompt, { mode: s.mode, repos: repo !== NO_REPO ? [repo] : undefined })
+          .then((api) => dispatch({ type: 'rekey', from: tmp, session: sessionFromApi(api) }))
+          .catch((error: Error) => {
+            dispatch({ type: 'patch', id: tmp, patch: { status: 'failed' } })
+            dispatch({ type: 'append', sessionId: tmp, event: { kind: 'devin', id: `${tmp}-err`, md: `Couldn’t start the session: ${error.message}` } })
+          })
+        return
+      }
+      const id = `new-${n}-${slugify(prompt).slice(0, 12)}`
+      const session: Session = {
+        id,
+        title: titleFromPrompt(prompt),
+        repo,
+        branch: `devin/${slugify(titleFromPrompt(prompt)).slice(0, 24)}`,
+        status: 'running',
+        group: 'Today',
+        updated: 'now',
+        acus: 0.1,
+        mode: s.mode,
+        events: [{ kind: 'user', id: `${id}-u`, text: prompt, at: 'Just now' }],
+      }
+      dispatch({ type: 'create', session })
+      setDraft('')
+      schedule(id, buildRun(prompt, repo, n))
+    },
+    [client, schedule],
+  )
+
+  const launched = useRef(false)
+  useEffect(() => {
+    if (launched.current || !initialPrompt) return
+    launched.current = true
+    createSession(initialPrompt, stateRef.current.repo)
+  }, [initialPrompt, createSession])
+
+  const submit = useCallback(
+    (text: string) => {
+      const prompt = text.trim()
+      if (!prompt) return
+      const s = stateRef.current
+      const current = s.sessions.find((x) => x.id === s.selectedId)
+      if (!current) {
+        createSession(prompt, s.repo)
+        return
+      }
+      const n = ++runCount.current
+      setDraft('')
+      if (client && current.live) {
+        dispatch({ type: 'append', sessionId: current.id, event: { kind: 'user', id: `local-${n}`, text: prompt, at: 'now' } })
+        dispatch({ type: 'patch', id: current.id, patch: { status: 'running' } })
+        client.sendMessage(current.id, prompt).catch((error: Error) => {
+          dispatch({ type: 'append', sessionId: current.id, event: { kind: 'devin', id: `local-err-${n}`, md: `Couldn’t send: ${error.message}` } })
+        })
+        return
+      }
+      dispatch({ type: 'append', sessionId: current.id, event: { kind: 'user', id: `fu-${n}`, text: prompt, at: 'Just now' } })
+      schedule(current.id, buildFollowUp(prompt, current, n))
+    },
+    [client, createSession, schedule],
+  )
+
+  const rootRef = useRef<PublicInstance | null>(null)
+  const lastKeystroke = useRef<number | undefined>(undefined)
+  const select = useCallback(
+    (id: string | null) => {
+      dispatch({ type: 'select', id })
+      if (rootRef.current) renderer?.focusElement?.(rootRef.current.id)
+    },
+    [renderer],
+  )
+  const onToggleWork = useCallback((sessionId: string, workId: string) => dispatch({ type: 'toggle-work', sessionId, workId }), [])
+  const newSession = useCallback(() => {
+    dispatch({ type: 'select', id: null })
+    focusComposer()
+  }, [focusComposer])
+  const toggleTheme = useCallback(() => {
+    setThemeName((t) => {
+      const next: ThemeName = t === 'dark' ? 'light' : 'dark'
+      setTheme(next)
+      return next
+    })
+  }, [])
+
+  windowKeyHandler = (event, r) => {
+    const key = event.key
+    if (event.keystrokeId === lastKeystroke.current) return
+    lastKeystroke.current = event.keystrokeId
+    const mod = event.modifiers?.cmd || event.modifiers?.ctrl
+    const shift = event.modifiers?.shift
+    const focused = r.getFocusedElementId?.()
+    if (mod && key === 'k') {
+      event.preventDefault()
+      if (searchRef.current) r.focusElement?.(searchRef.current.id)
+      return
+    }
+    if (mod && (key === 'n' || (shift && key === 'o'))) {
+      event.preventDefault()
+      newSession()
+      return
+    }
+    if (mod && shift && key === 'l') {
+      event.preventDefault()
+      toggleTheme()
+      return
+    }
+    if (key === 'escape') {
+      if (focused != null && focused === searchRef.current?.id) {
+        dispatch({ type: 'search', value: '' })
+        r.blur?.()
+      }
+      return
+    }
+    if ((key === 'up' || key === 'down') && focused !== composerRef.current?.id) {
+      const list = filterSessions(stateRef.current.sessions, stateRef.current.search)
+      if (list.length === 0) return
+      const idx = list.findIndex((s) => s.id === stateRef.current.selectedId)
+      const next = idx < 0 ? 0 : Math.max(0, Math.min(list.length - 1, idx + (key === 'down' ? 1 : -1)))
+      event.preventDefault()
+      dispatch({ type: 'select', id: list[next]!.id })
+    }
+  }
+
+  const composer: ComposerProps = {
+    draft,
+    setDraft,
+    onSubmit: submit,
+    mode: state.mode,
+    onMode: (mode: AgentMode) => dispatch({ type: 'mode', mode }),
+    composerRef,
+    placeholder: kind === 'ask' ? 'Ask a question about your code' : PLACEHOLDER,
+  }
+
+  return (
+    <div
+      key={themeName}
+      ref={rootRef}
+      tabIndex={-1}
+      autoFocus
+      onKeyDown={(event) => renderer && windowKeyHandler?.(event, renderer)}
+      style={{ ...row({ alignItems: 'stretch' }), width: '100%', height: '100%', backgroundColor: C.canvas, fontFamily: SANS }}
+    >
+      {!tiny && (
+        <Sidebar
+          width={compact ? SIDEBAR_COMPACT : SIDEBAR_WIDTH}
+          state={state}
+          visible={visible}
+          onSelect={select}
+          onNew={newSession}
+          onSearch={(value) => dispatch({ type: 'search', value })}
+          searchRef={searchRef}
+          themeName={themeName}
+          onToggleTheme={toggleTheme}
+          live={live}
+          liveError={liveError}
+          limit={pageSize}
+          onLoadMore={() => setPageSize((n) => n + 40)}
+          userName={userName}
+        />
+      )}
+      <div style={{ ...col(), flexGrow: 1, minWidth: 0, height: '100%' }}>
+        {selected ? (
+          <>
+            <SessionHeader compact={compact} session={selected} panelOpen={state.panelOpen} onTogglePanel={() => dispatch({ type: 'panel', open: !state.panelOpen })} />
+            <virtual-list key={selected.id} testId="transcript" alignment="top" followTail estimatedItemHeight={160} overdraw={600} style={{ flexGrow: 1, minHeight: 0, paddingTop: 14, paddingBottom: 12 }}>
+              {selected.live && !selected.live.loaded && selected.events.length === 0
+                ? [
+                    <div key="loading" style={{ ...row({ justifyContent: 'center' }), height: 80 }}>
+                      <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 13.5 }}>Loading conversation…</text>
+                    </div>,
+                  ]
+                : selected.events.map((e) => <EventView key={e.id} event={e} sessionId={selected.id} onToggleWork={onToggleWork} />)}
+            </virtual-list>
+            <div style={{ ...col({ alignItems: 'center' }), paddingLeft: 28, paddingRight: 28, paddingTop: 4, paddingBottom: 16, flexShrink: 0 }}>
+              <StatusFooter session={selected} />
+              <Composer {...composer} />
+            </div>
+          </>
+        ) : (
+          <HomeView composer={{ ...composer, repo: state.repo, repos, onRepo: (repo) => dispatch({ type: 'repo', repo }) }} kind={kind} onKind={setKind} />
+        )}
+      </div>
+      {selected && !compact && (
+        <motion.div initial={false} animate={{ width: state.panelOpen ? PANEL_WIDTH : 0 }} transition={{ duration: 0.25, ease: 'easeOut' }} style={{ height: '100%', overflow: 'hidden', flexShrink: 0 }}>
+          <div style={{ ...col(), width: PANEL_WIDTH, height: '100%', backgroundColor: C.canvas, borderLeftWidth: 1, borderColor: C.border }}>
+            {selected.live ? (
+              <LivePanel session={selected} sessions={state.sessions} tab={state.panelTab} onTab={(tab) => dispatch({ type: 'panel', tab })} onSelect={select} />
+            ) : (
+              <DemoPanel session={selected} tab={state.panelTab} onTab={(tab) => dispatch({ type: 'panel', tab })} />
+            )}
+          </div>
+        </motion.div>
+      )}
+    </div>
+  )
+}
