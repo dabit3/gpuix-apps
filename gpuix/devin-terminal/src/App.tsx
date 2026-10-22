@@ -40,7 +40,7 @@ import type { DevinApi } from './api'
 import { eventsFromMessages, sessionFromApi, statusLine } from './live'
 import type { ApiPlaybook, ApiSession } from './api'
 import { ActionMenu, AutomationsView, Btn, copyText, CustomizeView, Field, notificationsFor, NotificationsView, ReviewView, SecurityView, SettingsView, useSticky, WEB, type MenuAction, type View } from './views'
-import { originalPath, previewPath, shotsFrom, type PreviewDeps, type Shot } from './computer'
+import { clearQuarantine, originalPath, previewPath, shotsFrom, type PreviewDeps, type Shot } from './computer'
 import { loadPrefs, savePrefs, type Prefs } from './prefs'
 
 export { C }
@@ -1072,7 +1072,7 @@ function ComputerPanel({ session, client, pollMs, previews }: { session: Session
     if (!client?.attachmentUrl) return fallback()
     setOpening(true)
     originalPath(s, { ...previews, resolve: (a) => client.attachmentUrl!(a) })
-      .then((file) => (file ? openUrl(file) : fallback()))
+      .then((file) => (file ? (clearQuarantine(file), openUrl(file)) : fallback()))
       .finally(() => setOpening(false))
   }
   const ready = preview && shot && preview.id === shot.attachment_id ? preview : null

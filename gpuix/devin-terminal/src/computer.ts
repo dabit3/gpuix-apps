@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, renameSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 import type { ApiAttachment } from './api'
@@ -81,7 +81,8 @@ export function originalPath(a: Shot, deps: PreviewDeps): Promise<string | null>
       mkdirSync(dir, { recursive: true })
       const res = await (deps.fetch ?? fetch)(await deps.resolve(a))
       if (!res.ok) return null
-      writeFileSync(file, new Uint8Array(await res.arrayBuffer()))
+      writeFileSync(`${file}.part`, new Uint8Array(await res.arrayBuffer()))
+      renameSync(`${file}.part`, file)
       return file
     } catch {
       return null
@@ -91,4 +92,12 @@ export function originalPath(a: Shot, deps: PreviewDeps): Promise<string | null>
   })()
   inflight.set(file, job)
   return job
+}
+
+/** A viewer killed mid-open can leave a quarantine flag that makes macOS call our own cached file "damaged". */
+export function clearQuarantine(file: string) {
+  if (process.platform !== 'darwin' || typeof Bun === 'undefined') return
+  try {
+    Bun.spawnSync(['xattr', '-d', 'com.apple.quarantine', file], { stdout: 'ignore', stderr: 'ignore' })
+  } catch {}
 }
