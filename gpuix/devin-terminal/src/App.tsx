@@ -921,6 +921,9 @@ function allSteps(s: Session): Step[] {
   return s.events.flatMap((e) => (e.kind === 'work' ? e.steps : []))
 }
 
+/** Newest PRs that get their own tab; older ones stay reachable from the Session tab and the session ⋯ menu. */
+const MAX_PR_TABS = 3
+
 function PanelTabs({ tabs, tab, onTab }: { tabs: { id: string; label: string; icon: IconName }[]; tab: string; onTab: (t: string) => void }) {
   return (
     <div style={{ ...row({ gap: 2 }), height: 48, paddingLeft: 10, paddingRight: 10, flexShrink: 0, borderBottomWidth: 1, borderColor: C.border, overflow: 'hidden' }}>
@@ -1002,7 +1005,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 
 function LivePanel({ session, sessions, tab, onTab, onSelect, client, pollMs, previews }: { session: Session; sessions: Session[]; tab: PanelTab; onTab: (t: PanelTab) => void; onSelect: (id: string) => void; client: DevinApi | null; pollMs: number; previews?: Omit<PreviewDeps, 'resolve'> }) {
   const live = session.live!
-  const tabs = [{ id: 'computer', label: 'Computer', icon: 'monitor' as IconName }, { id: 'details', label: 'Session', icon: 'list' as IconName }, ...live.prs.map((p, i) => ({ id: `pr-${i}`, label: `#${prLabel(p.url).number}`, icon: 'pr' as IconName }))]
+  const tabs = [{ id: 'computer', label: 'Computer', icon: 'monitor' as IconName }, { id: 'details', label: 'Session', icon: 'list' as IconName }, ...live.prs.map((p, i) => ({ id: `pr-${i}`, label: `#${prLabel(p.url).number}`, icon: 'pr' as IconName })).slice(-MAX_PR_TABS)]
   const current = tabs.some((t) => t.id === tab) ? tab : 'computer'
   const children = sessions.filter((s) => s.live?.parentId === session.id)
   const pr = current.startsWith('pr-') ? live.prs[Number(current.slice(3))] : undefined
