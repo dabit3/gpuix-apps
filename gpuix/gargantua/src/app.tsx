@@ -200,7 +200,7 @@ export function App({ source, theme: t, initial, size: fixed, onProbes, peers, s
           <Pill t={t} id="disk" on={settings.disk} label="Disk" k="K" onClick={() => toggle('disk')} />
           <Pill t={t} id="look" on={settings.look === 'physical'} label={settings.look === 'physical' ? 'Physical' : 'Interstellar'} k="I" onClick={look} />
           <Pill t={t} id="drop" on={false} label="Drop" k="B" onClick={drop} />
-          <Pill t={t} id="dive" on={!!d} label={d ? (d.phase === 'fall' ? 'Eject' : 'Diving') : 'Dive'} k={d ? 'E' : 'D'} onClick={dive} />
+          {!d || d.phase === 'fall' ? <Pill t={t} id="dive" on={!!d} label={d ? 'Eject' : 'Dive'} k={d ? 'E' : 'D'} onClick={dive} /> : null}
           {!tiny ? <Pill t={t} id="pause" on={settings.paused} label={settings.paused ? 'Paused' : 'Pause'} k="␣" onClick={() => toggle('paused')} /> : null}
           {!tiny ? <Pill t={t} id="snap" on={false} label="Snap" k="S" onClick={screenshot} /> : null}
           <Pill t={t} id="help" on={help} label="Help" k="H" onClick={() => setHelp((x) => !x)} />
