@@ -40,10 +40,10 @@ Press `Cmd-D` in Ghostty and run `krieg map` in the new pane. The game publishes
   ['cells', 6, 11, 0], ['level', 0.16, 0.08], ['ramp', 0x000000, 0x71b7ff], ['glow', 0.25], ['blend', 1],
   ```
 - **Level** (`src/gen/level.ts`): a seeded 4×3 room graph (DFS spanning tree plus extra loops), corridors, doors, a locked key door, pillars, crates, themed rooms, up to 3 point lights per room baked into a lightmap. Tests check it's identical per seed and that the exit is only reachable with the key.
-- **Renderer** (`src/engine/raycast.ts`): DDA walls, perspective floor/ceiling casting, baked lightmap + dynamic lights (muzzle flash, rockets, explosions, sentry bolts), distance fog, emissive texels, depth-sorted billboards with hit flash and a dither dissolve on death, view-model bob/kick, quarter-res bright-pass bloom and a vignette that keeps the HUD readable.
+- **Renderer** (`src/engine/raycast.ts`): DDA walls, perspective floor/ceiling casting, baked lightmap + dynamic lights (muzzle flash, tracer impacts, rockets, explosions, sentry bolts), distance fog, emissive texels, depth-sorted billboards with hit flash and a dither dissolve on death, depth-tested bullet tracers projected from world space, an additive muzzle flare anchored on the barrel, view-model bob/kick/sway, quarter-res bright-pass bloom and a vignette that keeps the HUD readable.
 - **Sprites** (`src/gen/sprites.ts`): the crawling spider bot (walk/attack frames), floating sentry (idle/charging), pickups, projectiles, explosions and both weapons are drawn by code into small RGBA canvases.
 - **AI** (`src/game/world.ts`): idle → patrol → chase → attack, line-of-sight raycasts, a BFS flow field to the player for pathing around walls, separation steering. Spiders bite at melee range; sentries keep distance and fire dodgeable bolts.
-- **Weapons**: hitscan pulse rifle and a rocket launcher with splash damage. Health, ammo and rocket pickups.
+- **Weapons**: hitscan pulse rifle and a rocket launcher with splash damage. Each rifle shot fires a tracer from the barrel to the impact point, throws sparks (walls), ichor or shards (enemies) as bouncing particles, knocks the enemy back and opens the crosshair into a hit marker (red on a kill). Kills burst into debris; rockets add camera shake. Movement eases in and out instead of snapping. Health, ammo and rocket pickups.
 - **Audio** (`src/audio/synth.ts`): saw/square/sine/noise oscillators, ADSR, a one-pole filter and a delay line, rendered to 16-bit WAVs in `$TMPDIR` and played with macOS `/usr/bin/afplay`. A tracker song (~58 s, loops) is encoded as pattern arrays; SFX for shots, hits, deaths, steps, pickups, doors.
 
 ## Size budget
@@ -59,7 +59,7 @@ krieg size budget (minified, GPUIX/React external)
   gen/sprites.ts            3.8 KB      gen/texops.ts             3.6 KB
   gen/materials.ts          2.3 KB      cli.ts / scene / size / live / rng / boot / theme  7.5 KB
 
-  bundle (cli.ts)          ~61 KB   gzip ~24 KB   budget 64 KB   OK
+  bundle (cli.ts)          ~64 KB   gzip ~26 KB   budget 64 KB   OK
 ```
 
 Run `krieg size` for the exact current numbers.

@@ -10,9 +10,7 @@ import { scene } from './game/scene'
 import { WEAPONS, type Input } from './game/world'
 import { writeLive } from './live'
 import { MONO, T } from './theme'
-import { appendFileSync } from 'node:fs'
 
-const DEBUG = process.env.KRIEG_DEBUG
 
 export interface Opts { seed: number; mute: boolean; god: boolean; scale: number; size?: { bytes: number; gzip: number } }
 type Mode = 'title' | 'play' | 'lab'
@@ -62,6 +60,7 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
         inp.look = (k.has('up') ? -1 : 0) + (k.has('down') ? 1 : 0)
         inp.fire = k.has('f') || k.has('enter') || k.has('mouse')
         inp.jump = k.has('space'); inp.crouch = k.has('c')
+        w.p.sway = Math.max(-1, Math.min(1, w.p.sway - look.current.dx * 0.008 - inp.turn * dt * 3))
         w.p.angle += look.current.dx * 0.006
         w.p.pitch = Math.max(-0.35, Math.min(0.35, w.p.pitch + look.current.dy * 0.0016))
         look.current.dx = look.current.dy = 0
@@ -74,7 +73,7 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
       const S = sz.current, sc = scaleRef.current
       ren.resize(Math.floor(S.width / sc), Math.floor(S.height / sc))
       const sc2 = scene(w, g.current.sprites, t)
-      ren.render(w.level, g.current.mats, sc2.cam, sc2.sprites, sc2.dyn, m === 'play' ? sc2.vm : null, m === 'title' ? [10, 12, 16, 0.35] : sc2.tint)
+      ren.render(w.level, g.current.mats, sc2.cam, sc2.sprites, sc2.dyn, m === 'play' ? sc2.vm : null, m === 'title' ? [10, 12, 16, 0.35] : sc2.tint, m === 'play' ? sc2.tr : [])
       img.current?.setImagePixels(ren.W, ren.H, ren.buf, { format: 'bgra' })
       frames++
       if (now - fpsT > 500) { fps = (frames * 1000) / (now - fpsT); frames = 0; fpsT = now }
@@ -92,7 +91,6 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
 
   const onKeyDown = (e: any) => {
     const n = keyName(e)
-    if (DEBUG) appendFileSync(DEBUG, `down ${JSON.stringify({ key: e.key, keyChar: e.keyChar })} -> ${n}\n`)
     const w = g.current.world
     if (modeRef.current === 'title') { if (n === 'enter' || n === 'space') start(); else if (n === 't') setMode('lab'); return }
     if (modeRef.current === 'lab') { if (n === 't' || n === 'escape' || n === 'enter') setMode('play'); return }
@@ -109,7 +107,6 @@ export function App({ opts, game }: { opts: Opts; game?: Boot }) {
     held.current.add(n)
   }
   const onKeyUp = (e: any) => {
-    if (DEBUG) appendFileSync(DEBUG, `up ${JSON.stringify({ key: e.key, keyChar: e.keyChar })} -> ${keyName(e)}\n`)
     held.current.delete(keyName(e))
   }
   const onMouseDown = (e: any) => {
@@ -149,6 +146,7 @@ function snap(b: Boot, fps: number, ms: number, rw = 0, rh = 0) {
   return {
     fps, ms, rw, rh, hp: Math.ceil(p.hp), ammo: p.ammo, rockets: p.rockets, weapon: p.weapon, key: p.hasKey, kills: w.kills, total: w.enemies.length,
     time: w.time, state: w.state, toast: w.toast.t > 0 ? w.toast.text : '', seed: w.level.seed, timings: b.timings,
+    hit: p.hitT, kill: p.killT,
     alerted: w.enemies.filter((e) => e.state === 'chase' || e.state === 'attack').length,
   }
 }
@@ -168,13 +166,14 @@ function Bar({ v, max, color, w }: { v: number; max: number; color: string; w: n
 function Hud({ hud, W, H, fs, small, perf }: { hud: HudState; W: number; H: number; fs: number; small: boolean; perf: boolean }) {
   const pad = small ? 10 : 18
   const hpColor = hud.hp > 50 ? T.green : hud.hp > 25 ? T.amber : T.red
+  // Hit marker: the crosshair opens up and turns amber on a hit, red on a kill.
+  const sp = Math.round(Math.max(hud.hit, hud.kill) * 4), xc = hud.kill > 0.05 ? T.red : hud.hit > 0.05 ? T.amber : T.fg
   return (
     <>
-      <div style={{ ...ov, left: W / 2 - 9, top: H / 2 - 9, width: 18, height: 18 }}>
-        <div style={{ position: 'absolute', left: 8, top: 0, width: 2, height: 6, backgroundColor: T.fg }} />
-        <div style={{ position: 'absolute', left: 8, top: 12, width: 2, height: 6, backgroundColor: T.fg }} />
-        <div style={{ position: 'absolute', left: 0, top: 8, width: 6, height: 2, backgroundColor: T.fg }} />
-        <div style={{ position: 'absolute', left: 12, top: 8, width: 6, height: 2, backgroundColor: T.fg }} />
+      <div style={{ ...ov, left: W / 2 - 13, top: H / 2 - 13, width: 26, height: 26 }}>
+        {[[12, 4 - sp, 2, 6], [12, 16 + sp, 2, 6], [4 - sp, 12, 6, 2], [16 + sp, 12, 6, 2]].map(([l, t, w, h], i) => (
+          <div key={i} style={{ position: 'absolute', left: l, top: t, width: w, height: h, backgroundColor: xc }} />
+        ))}
       </div>
       <div style={{ ...ov, left: pad, top: pad, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <text style={txt(T.fg, fs + 2, { fontWeight: 700 })}>{`KRIEG`}</text>

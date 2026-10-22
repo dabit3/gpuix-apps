@@ -9,10 +9,13 @@ export interface Sprite { w: number; h: number; px: Uint32Array } // alpha 255 =
 export interface Cam { x: number; y: number; angle: number; z: number; pitch: number }
 export interface SpriteDraw { x: number; y: number; z0: number; z1: number; w: number; img: Sprite; flash: number; dissolve: number }
 export interface DynLight { x: number; y: number; r: number; g: number; b: number; radius: number }
-export interface Viewmodel { img: Sprite; ox: number; oy: number; scale: number; flash: number }
+export interface Viewmodel { img: Sprite; ox: number; oy: number; scale: number; flash: number; muzzle?: Sprite; tip?: number[] }
+export interface Seg { ax: number; ay: number; az: number; bx: number; by: number; bz: number } // tail → head
 
 const FOG = [10, 12, 16]
 const FOG_FAR = 15
+const NB = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+const pack = (r: number, g: number, b: number) => 0xff000000 | ((r > 255 ? 255 : r) << 16) | ((g > 255 ? 255 : g) << 8) | (b > 255 ? 255 : b)
 
 export class Renderer {
   W = 0; H = 0
@@ -37,7 +40,7 @@ export class Renderer {
     this.bb = new Float32Array(this.bw * this.bh * 3); this.bt = new Float32Array(this.bw * this.bh * 3)
   }
 
-  render(l: Level, mats: Texture[], cam: Cam, sprites: SpriteDraw[], dyn: DynLight[], vm: Viewmodel | null, tint: [number, number, number, number] | null) {
+  render(l: Level, mats: Texture[], cam: Cam, sprites: SpriteDraw[], dyn: DynLight[], vm: Viewmodel | null, tint: [number, number, number, number] | null, tr: Seg[] = []) {
     const t0 = performance.now()
     const { W, H, u32, zbuf, top, bot } = this
     const f = H * 0.95
@@ -48,6 +51,11 @@ export class Renderer {
     const z = cam.z
     const lm = l.lightmap, LW = MW * LMR, LH = MH * LMR
     const nd = dyn.length
+    const lmi = (x: number, y: number) => (Math.min(LH - 1, Math.max(0, Math.floor(y * LMR))) * LW + Math.min(LW - 1, Math.max(0, Math.floor(x * LMR)))) * 3
+    const lit = (x: number, y: number, r: number, g: number, b: number) => {
+      for (const L of dyn) { const d = Math.hypot(x - L.x, y - L.y); if (d < L.radius) { const a = (1 - d / L.radius) ** 2 * 2; r += L.r * a; g += L.g * a; b += L.b * a } }
+      return [r, g, b] as const
+    }
     // Walls.
     for (let x = 0; x < W; x++) {
       const c = (2 * (x + 0.5)) / W - 1
@@ -88,15 +96,9 @@ export class Renderer {
       top[x] = y0; bot[x] = y1
       // Light at the hit point, nudged back toward the camera so it samples the open cell in front of the face.
       const hx = cam.x + rdx * perp * 0.995, hy = cam.y + rdy * perp * 0.995
-      const lx = Math.min(LW - 1, Math.max(0, Math.floor(hx * LMR))), ly = Math.min(LH - 1, Math.max(0, Math.floor(hy * LMR)))
-      const li = (ly * LW + lx) * 3
+      const li = lmi(hx, hy)
       const shadeSide = side === 1 ? 0.82 : 1
-      let lr = lm[li]! * shadeSide, lg = lm[li + 1]! * shadeSide, lb = lm[li + 2]! * shadeSide
-      for (let k = 0; k < nd; k++) {
-        const L = dyn[k]!
-        const dd = Math.hypot(hx - L.x, hy - L.y)
-        if (dd < L.radius) { const a = (1 - dd / L.radius) ** 2 * 2; lr += L.r * a; lg += L.g * a; lb += L.b * a }
-      }
+      const [lr, lg, lb] = lit(hx, hy, lm[li]! * shadeSide, lm[li + 1]! * shadeSide, lm[li + 2]! * shadeSide)
       const fog = Math.min(1, perp / FOG_FAR) ** 1.4
       const tex = mats[mat]!, ts = tex.size, tm = ts - 1
       const tx = Math.min(tm, Math.floor(u * ts))
@@ -167,14 +169,8 @@ export class Renderer {
       const x0 = Math.max(0, Math.floor(scx - sw / 2)), x1 = Math.min(W, Math.ceil(scx + sw / 2))
       const y0 = Math.max(0, Math.floor(sTop)), y1 = Math.min(H, Math.ceil(sBot))
       if (x0 >= x1 || y0 >= y1) continue
-      const lx = Math.min(LW - 1, Math.max(0, Math.floor(s.x * LMR))), ly = Math.min(LH - 1, Math.max(0, Math.floor(s.y * LMR)))
-      const li = (ly * LW + lx) * 3
-      let lr = lm[li]! + 0.15, lg = lm[li + 1]! + 0.15, lb = lm[li + 2]! + 0.15
-      for (let k = 0; k < nd; k++) {
-        const L = dyn[k]!
-        const dd = Math.hypot(s.x - L.x, s.y - L.y)
-        if (dd < L.radius) { const a = (1 - dd / L.radius) ** 2 * 2; lr += L.r * a; lg += L.g * a; lb += L.b * a }
-      }
+      const li = lmi(s.x, s.y)
+      const [lr, lg, lb] = lit(s.x, s.y, lm[li]! + 0.15, lm[li + 1]! + 0.15, lm[li + 2]! + 0.15)
       const fog = Math.min(1, tY / FOG_FAR) ** 1.4, nf = 1 - fog
       const fr = fog * FOG[0]!, fg = fog * FOG[1]!, fb = fog * FOG[2]!
       const img = s.img, iw = img.w, ih = img.h
@@ -196,29 +192,56 @@ export class Renderer {
           }
           if (a === 255) { r *= lr; g *= lg; b *= lb }
           if (fl2 > 0) { r += (255 - r) * fl2; g += (255 - g) * fl2; b += (255 - b) * fl2 }
-          r = r * nf + fr; g = g * nf + fg; b = b * nf + fb
-          u32[y * W + x] = 0xff000000 | ((r > 255 ? 255 : r) << 16) | ((g > 255 ? 255 : g) << 8) | (b > 255 ? 255 : b)
+          u32[y * W + x] = pack(r * nf + fr, g * nf + fg, b * nf + fb)
         }
+      }
+    }
+    // Bullet tracers: projected world segments, depth-tested per column, brightening toward the head.
+    const add = (x: number, y: number, k: number) => {
+      if (x < 0 || y < 0 || x >= W || y >= H) return
+      const i = y * W + x, p = u32[i]!
+      u32[i] = pack(((p >> 16) & 255) + 255 * k, ((p >> 8) & 255) + 228 * k, (p & 255) + 160 * k)
+    }
+    const depth = (x: number, y: number) => inv * (-ply * (x - cam.x) + plx * (y - cam.y))
+    for (const g of tr) {
+      let { ax, ay, az, bx, by, bz } = g
+      let da = depth(ax, ay), db = depth(bx, by)
+      if (da < 0.12 && db < 0.12) continue
+      if (da < 0.12) { const k = (0.12 - da) / (db - da); ax += (bx - ax) * k; ay += (by - ay) * k; az += (bz - az) * k; da = 0.12 }
+      if (db < 0.12) { const k = (0.12 - db) / (da - db); bx += (ax - bx) * k; by += (ay - by) * k; bz += (az - bz) * k; db = 0.12 }
+      const x0 = (W / 2) * (1 + inv * (dy * (ax - cam.x) - dx * (ay - cam.y)) / da), y0 = hor - ((az - z) * f) / da
+      const x1 = (W / 2) * (1 + inv * (dy * (bx - cam.x) - dx * (by - cam.y)) / db), y1 = hor - ((bz - z) * f) / db
+      const n = Math.min(2000, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))) + 1)
+      for (let i = 0; i <= n; i++) {
+        const u = i / n, d = 1 / ((1 - u) / da + u / db), x = Math.round(x0 + (x1 - x0) * u), y = Math.round(y0 + (y1 - y0) * u)
+        if (x < 0 || x >= W || d > zbuf[x]! + 0.05) continue
+        const k = (0.2 + 0.8 * u * u) * (1 - Math.min(1, d / FOG_FAR) * 0.5)
+        add(x, y, k); add(x + 1, y, k); add(x, y + 1, k * 0.8)
+        for (const [ox, oy] of NB) add(x + ox! * 2, y + oy! * 2, k * 0.3)
       }
     }
     // Viewmodel (no depth test), lit by the light at the player.
     if (vm) {
-      const lx = Math.min(LW - 1, Math.max(0, Math.floor(cam.x * LMR))), ly = Math.min(LH - 1, Math.max(0, Math.floor(cam.y * LMR)))
-      const li = (ly * LW + lx) * 3
+      const li = lmi(cam.x, cam.y)
       const lr = Math.min(1.6, lm[li]! + 0.35 + vm.flash), lg = Math.min(1.6, lm[li + 1]! + 0.35 + vm.flash * 0.8), lb = Math.min(1.6, lm[li + 2]! + 0.35 + vm.flash * 0.5)
       const h = Math.round(H * vm.scale), w = Math.round((h * vm.img.w) / vm.img.h)
       const ox = Math.round(W / 2 - w / 2 + vm.ox * H), oy = Math.round(H - h + vm.oy * H)
-      const img = vm.img
-      for (let y = Math.max(0, oy); y < Math.min(H, oy + h); y++) {
-        const iy = Math.floor(((y - oy) / h) * img.h)
-        for (let x = Math.max(0, ox); x < Math.min(W, ox + w); x++) {
-          const p = img.px[iy * img.w + Math.floor(((x - ox) / w) * img.w)]!
-          const a = p >>> 24
-          if (a === 0) continue
+      // Additive when k > 0 (muzzle flare), otherwise lit by the light at the player.
+      const blit = (img: Sprite, x0: number, y0: number, w: number, h: number, k: number) => {
+        for (let y = Math.max(0, y0); y < Math.min(H, y0 + h); y++) for (let x = Math.max(0, x0); x < Math.min(W, x0 + w); x++) {
+          const p = img.px[Math.floor(((y - y0) / h) * img.h) * img.w + Math.floor(((x - x0) / w) * img.w)]!, a = p >>> 24
+          if (!a) continue
           let r = (p >> 16) & 255, g = (p >> 8) & 255, b = p & 255
-          if (a === 255) { r *= lr; g *= lg; b *= lb }
-          u32[y * W + x] = 0xff000000 | ((r > 255 ? 255 : r) << 16) | ((g > 255 ? 255 : g) << 8) | (b > 255 ? 255 : b)
+          if (k) { const q = u32[y * W + x]!; r = ((q >> 16) & 255) + r * k; g = ((q >> 8) & 255) + g * k; b = (q & 255) + b * k }
+          else if (a === 255) { r *= lr; g *= lg; b *= lb }
+          u32[y * W + x] = pack(r, g, b)
         }
+      }
+      blit(vm.img, ox, oy, w, h, 0)
+      const mz = vm.muzzle, tip = vm.tip
+      if (mz && tip && vm.flash > 0.05) {
+        const ms = Math.round(h * 0.6 * (0.55 + 0.45 * vm.flash))
+        blit(mz, Math.round(ox + tip[0]! * w - ms / 2), Math.round(oy + tip[1]! * h - ms * (40 / 48)), ms, ms, vm.flash)
       }
     }
     if (this.bloom) this.applyBloom()
@@ -271,16 +294,17 @@ export class Renderer {
         bb[i] += r * k; bb[i + 1] += g * k; bb[i + 2] += b * k
       }
     }
-    for (let pass = 0; pass < 2; pass++) {
+    // Two separable 5-tap box blurs: even passes horizontal bb → bt, odd passes vertical bt → bb.
+    for (let pass = 0; pass < 4; pass++) {
+      const v = pass & 1, src = v ? bt : bb, dst = v ? bb : bt
       for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
         let r = 0, g = 0, b = 0, n = 0
-        for (let k = -2; k <= 2; k++) { const xx = x + k; if (xx < 0 || xx >= bw) continue; const i = (y * bw + xx) * 3; r += bb[i]!; g += bb[i + 1]!; b += bb[i + 2]!; n++ }
-        const o = (y * bw + x) * 3; bt[o] = r / n; bt[o + 1] = g / n; bt[o + 2] = b / n
-      }
-      for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
-        let r = 0, g = 0, b = 0, n = 0
-        for (let k = -2; k <= 2; k++) { const yy = y + k; if (yy < 0 || yy >= bh) continue; const i = (yy * bw + x) * 3; r += bt[i]!; g += bt[i + 1]!; b += bt[i + 2]!; n++ }
-        const o = (y * bw + x) * 3; bb[o] = r / n; bb[o + 1] = g / n; bb[o + 2] = b / n
+        for (let k = -2; k <= 2; k++) {
+          const xx = v ? x : x + k, yy = v ? y + k : y
+          if (xx < 0 || xx >= bw || yy < 0 || yy >= bh) continue
+          const i = (yy * bw + xx) * 3; r += src[i]!; g += src[i + 1]!; b += src[i + 2]!; n++
+        }
+        const o = (y * bw + x) * 3; dst[o] = r / n; dst[o + 1] = g / n; dst[o + 2] = b / n
       }
     }
     const S = 1.6

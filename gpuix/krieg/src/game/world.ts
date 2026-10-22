@@ -7,7 +7,9 @@ export type AiState = 'idle' | 'patrol' | 'chase' | 'attack' | 'dead'
 export interface Enemy { id: number; kind: EnemyKind; x: number; y: number; hp: number; maxHp: number; state: AiState; t: number; cool: number; flash: number; dissolve: number; anim: number; tx: number; ty: number; room: number; lastSeen: number }
 export interface Pickup { kind: PickupKind; x: number; y: number; taken: boolean }
 export interface Proj { kind: 'bolt' | 'rocket' | 'ebolt'; x: number; y: number; z: number; vx: number; vy: number; life: number }
-export interface Fx { kind: 'boom' | 'spark'; x: number; y: number; z: number; t: number }
+// 'p' = physics particle: c 0 spark, 1 spider ichor, 2 sentry shard, 3 smoke/dust.
+export interface Fx { kind: 'boom' | 'p'; x: number; y: number; z: number; t: number; vx?: number; vy?: number; vz?: number; c?: number; life?: number }
+export interface Tracer { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number; t: number; len: number }
 export interface Input { fwd: number; strafe: number; turn: number; look: number; fire: boolean; jump: boolean; crouch: boolean }
 export type GameEvent = 'shoot' | 'launch' | 'hit' | 'die' | 'pickup' | 'key' | 'door' | 'hurt' | 'boom' | 'step' | 'eshoot' | 'win' | 'lose' | 'empty' | 'swap' | 'locked'
 
@@ -21,15 +23,17 @@ const STATS: Record<EnemyKind, { hp: number; speed: number; radius: number; z0: 
   sentry: { hp: 70, speed: 1.3, radius: 0.36, z0: 0.42, z1: 0.92 },
 }
 export const enemyStats = (k: EnemyKind) => STATS[k]
+export const TRACER_SPEED = 60, TRACER_LEN = 3
 
 export class World {
   level: Level
   rng: Rng
-  p = { x: 0, y: 0, angle: 0, pitch: 0, z: 0.5, vz: 0, hp: 100, ammo: 80, rockets: 6, weapon: 0, hasKey: false, cool: 0, kick: 0, flash: 0, hurt: 0, bob: 0, stepAcc: 0 }
+  p = { x: 0, y: 0, angle: 0, pitch: 0, z: 0.5, vz: 0, hp: 100, ammo: 80, rockets: 6, weapon: 0, hasKey: false, cool: 0, kick: 0, flash: 0, hurt: 0, bob: 0, stepAcc: 0, vx: 0, vy: 0, shake: 0, hitT: 0, killT: 0, sway: 0 }
   enemies: Enemy[]
   pickups: Pickup[]
   projs: Proj[] = []
   fx: Fx[] = []
+  tracers: Tracer[] = []
   kills = 0
   time = 0
   state: 'play' | 'won' | 'dead' = 'play'
@@ -103,6 +107,7 @@ export class World {
     if (this.toast.t > 0) this.toast.t -= dt
     const p = this.p
     p.flash = Math.max(0, p.flash - dt * 8); p.kick = Math.max(0, p.kick - dt * 5); p.hurt = Math.max(0, p.hurt - dt * 2)
+    p.shake = Math.max(0, p.shake - dt * 3); p.hitT = Math.max(0, p.hitT - dt * 5); p.killT = Math.max(0, p.killT - dt * 2.5); p.sway *= Math.max(0, 1 - dt * 8)
     this.updateDoors(dt)
     this.updateFx(dt)
     if (this.state !== 'play') { this.updateEnemies(dt); return }
@@ -115,8 +120,10 @@ export class World {
     const sp = (crouch ? 1.7 : 3.6) * dt
     const cs = Math.cos(p.angle), sn = Math.sin(p.angle)
     const mf = inp.fwd / len, ms = inp.strafe / len
-    const mx = (cs * mf - sn * ms) * sp, my = (sn * mf + cs * ms) * sp
-    this.move(p, mx, my, 0.32, true)
+    // Velocity eases toward the input direction so starts and stops feel weighted instead of snapping.
+    const k = Math.min(1, dt * 14)
+    p.vx += ((cs * mf - sn * ms) * sp - p.vx) * k; p.vy += ((sn * mf + cs * ms) * sp - p.vy) * k
+    this.move(p, p.vx, p.vy, 0.32, true)
     const moving = Math.abs(inp.fwd) + Math.abs(inp.strafe) > 0
     if (moving && p.vz === 0) {
       p.bob += dt * 9; p.stepAcc += sp
@@ -157,7 +164,7 @@ export class World {
     const p = this.p
     const w = WEAPONS[p.weapon]!
     if (p.weapon === 0 ? p.ammo <= 0 : p.rockets <= 0) { p.cool = 0.3; this.events.push('empty'); this.say(p.weapon === 0 ? 'NO CELLS' : 'NO ROCKETS'); return }
-    p.cool = w.cooldown; p.kick = 1; p.flash = 1
+    p.cool = w.cooldown; p.kick = 1; p.flash = 1; p.shake = Math.max(p.shake, p.weapon ? 0.5 : 0.18)
     const dx = Math.cos(p.angle), dy = Math.sin(p.angle)
     if (p.weapon === 1) {
       p.rockets--
@@ -178,12 +185,16 @@ export class World {
       const along = ex * dx + ey * dy
       if (along <= 0 || along >= bd) continue
       const perp = Math.abs(ex * dy - ey * dx)
-      const zz = aimZ + p.pitch * along * 0
       // Slight cone widening with distance: terminal mouse-drag aim is coarser than pointer lock.
-      if (perp < st.radius + 0.06 + along * 0.025 && zz > st.z0 - 0.35 && zz < st.z1 + 0.35) { best = e; bd = along }
+      if (perp < st.radius + 0.06 + along * 0.025 && aimZ > st.z0 - 0.35 && aimZ < st.z1 + 0.35) { best = e; bd = along }
     }
-    if (best) this.damage(best, w.damage)
-    this.fx.push({ kind: 'spark', x: p.x + dx * (bd - 0.1), y: p.y + dy * (bd - 0.1), z: best ? (STATS[best.kind].z0 + STATS[best.kind].z1) / 2 : p.z, t: 0 })
+    const hx = p.x + dx * (bd - 0.06), hy = p.y + dy * (bd - 0.06)
+    let hz = Math.max(0.03, Math.min(0.97, p.z + p.pitch * bd / 0.95))
+    if (best) { const st = STATS[best.kind]; hz = Math.max(st.z0 + 0.08, Math.min(st.z1 - 0.06, hz)); this.damage(best, w.damage, dx, dy); this.burst(hx, hy, hz, 7, best.kind === 'spider' ? 1 : 2, 2.2) }
+    else { this.burst(hx, hy, hz, 9, 0, 2.6); this.burst(hx, hy, hz, 2, 3, 0.5) }
+    // Tracer starts at the barrel (forward and slightly right/below the eye) and races to the impact point.
+    const ox = p.x + dx * 0.35 - dy * 0.07, oy = p.y + dy * 0.35 + dx * 0.07
+    this.tracers.push({ x0: ox, y0: oy, z0: p.z - 0.02, x1: hx, y1: hy, z1: hz, t: 0.016, len: Math.hypot(hx - ox, hy - oy) })
   }
 
   rayWall(x: number, y: number, dx: number, dy: number) {
@@ -191,12 +202,24 @@ export class World {
     return 40
   }
 
-  damage(e: Enemy, n: number) {
+  burst(x: number, y: number, z: number, n: number, c: number, v: number) {
+    for (let i = 0; i < n; i++) {
+      const a = this.rng() * 6.283, s = v * (0.3 + this.rng())
+      this.fx.push({ kind: 'p', x, y, z, t: 0, vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: (this.rng() * 1.2 - 0.2) * v * (c === 3 ? 0.3 : 1), c, life: c === 3 ? 0.7 : 0.25 + this.rng() * 0.35 })
+    }
+  }
+
+  damage(e: Enemy, n: number, kx = 0, ky = 0) {
     if (e.state === 'dead') return
-    e.hp -= n; e.flash = 1
+    e.hp -= n; e.flash = 1; this.p.hitT = 1
+    if (kx || ky) this.move(e, kx * 0.14, ky * 0.14, STATS[e.kind].radius * 0.7, false)
     e.lastSeen = this.time
     if (e.state === 'idle' || e.state === 'patrol') e.state = 'chase'
-    if (e.hp <= 0) { e.state = 'dead'; e.dissolve = 0.001; this.kills++; this.events.push('die') }
+    if (e.hp <= 0) {
+      e.state = 'dead'; e.dissolve = 0.001; this.kills++; this.p.killT = 1; this.events.push('die')
+      const st = STATS[e.kind], z = (st.z0 + st.z1) / 2
+      this.burst(e.x, e.y, z, 16, e.kind === 'spider' ? 1 : 2, 2.8); this.burst(e.x, e.y, z, 5, 0, 3); this.burst(e.x, e.y, z, 4, 3, 0.8)
+    }
     else this.events.push('hit')
   }
 
@@ -293,12 +316,12 @@ export class World {
       const nx = q.x + q.vx * dt, ny = q.y + q.vy * dt
       let hit = solidAt(this.level, nx, ny)
       if (q.kind === 'ebolt') {
-        if (Math.hypot(nx - p.x, ny - p.y) < 0.35) { this.hurt(9); q.life = 0; this.fx.push({ kind: 'spark', x: nx, y: ny, z: q.z, t: 0 }); continue }
+        if (Math.hypot(nx - p.x, ny - p.y) < 0.35) { this.hurt(9); q.life = 0; this.burst(nx, ny, q.z, 5, 0, 1.5); continue }
       } else for (const e of this.enemies) if (e.state !== 'dead' && Math.hypot(e.x - nx, e.y - ny) < STATS[e.kind].radius + 0.1) hit = true
       if (hit || q.life <= 0) {
         q.life = 0
         if (q.kind === 'rocket') this.explode(q.x, q.y)
-        else this.fx.push({ kind: 'spark', x: q.x, y: q.y, z: q.z, t: 0 })
+        else this.burst(q.x, q.y, q.z, 6, q.kind === 'bolt' ? 2 : 0, 1.8)
         continue
       }
       q.x = nx; q.y = ny
@@ -308,6 +331,8 @@ export class World {
 
   private explode(x: number, y: number) {
     this.fx.push({ kind: 'boom', x, y, z: 0.45, t: 0 })
+    this.burst(x, y, 0.45, 18, 0, 5); this.burst(x, y, 0.4, 8, 3, 1.2)
+    this.p.shake = Math.max(this.p.shake, Math.max(0, 1.2 - Math.hypot(this.p.x - x, this.p.y - y) / 8))
     this.events.push('boom')
     for (const e of this.enemies) {
       const d = Math.hypot(e.x - x, e.y - y)
@@ -318,7 +343,20 @@ export class World {
   }
 
   private updateFx(dt: number) {
-    for (const f of this.fx) f.t += dt
-    this.fx = this.fx.filter((f) => f.t < (f.kind === 'boom' ? 0.5 : 0.15))
+    for (const f of this.fx) {
+      f.t += dt
+      if (f.kind !== 'p') continue
+      const smoke = f.c === 3
+      f.vz! -= (smoke ? -0.6 : 7) * dt
+      const nx = f.x + f.vx! * dt, ny = f.y + f.vy! * dt
+      if (solidAt(this.level, nx, f.y)) f.vx! *= -0.4; else f.x = nx
+      if (solidAt(this.level, f.x, ny)) f.vy! *= -0.4; else f.y = ny
+      f.z += f.vz! * dt
+      if (f.z < 0.02) { f.z = 0.02; f.vz = -f.vz! * 0.35; f.vx! *= 0.6; f.vy! *= 0.6 }
+      if (smoke) { f.vx! *= 1 - dt * 3; f.vy! *= 1 - dt * 3 }
+    }
+    this.fx = this.fx.filter((f) => f.t < (f.kind === 'boom' ? 0.5 : f.life!))
+    for (const r of this.tracers) r.t += dt
+    this.tracers = this.tracers.filter((r) => r.t * TRACER_SPEED < r.len + TRACER_LEN)
   }
 }

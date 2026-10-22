@@ -42,6 +42,23 @@ describe('gameplay', () => {
     expect(w.kills).toBe(1)
     expect(w.p.ammo).toBeLessThan(80)
   })
+  test('rifle shot leaves a barrel-to-impact tracer, impact particles and a hit marker', () => {
+    const w = new World(1337)
+    w.god = true
+    const e = facing(w, 'spider')
+    w.step(1 / 60, { ...idle, fire: true })
+    expect(w.tracers.length).toBe(1)
+    const tr = w.tracers[0]!
+    expect(Math.hypot(tr.x0 - w.p.x, tr.y0 - w.p.y)).toBeLessThan(0.5)
+    expect(Math.hypot(tr.x1 - e.x, tr.y1 - e.y)).toBeLessThan(0.6)
+    expect(w.fx.filter((f) => f.kind === 'p').length).toBeGreaterThan(4)
+    expect(w.p.hitT).toBeGreaterThan(0.9)
+    const s = scene(w, boot(1337, 32).sprites, 0)
+    expect(s.tr.length).toBeGreaterThan(0)
+    for (let i = 0; i < 60; i++) w.step(1 / 60, idle)
+    expect(w.tracers.length).toBe(0)
+    expect(w.fx.length).toBe(0)
+  })
   test('rocket explodes with splash damage', () => {
     const w = new World(1337)
     w.god = true; w.swap(1)

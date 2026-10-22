@@ -41,21 +41,23 @@ function wav(buf: Float32Array) {
   return b
 }
 
+// Positional voice: wave, f0, f1 (0 = no sweep), attack, decay, sustain, release, len, cutoff, volume.
+const V = (wave: Wave, f0: number, f1: number, a: number, d: number, s: number, r: number, len: number, cut: number, vol: number): Voice => ({ wave, f0, f1: f1 || undefined, a, d, s, r, len, cut, vol })
 const mix = (...vs: Voice[]) => { const len = Math.max(...vs.map((v) => v.len + v.r)); const o = new Float32Array(Math.ceil(len * SR)); for (const v of vs) synth(v, o); return o }
 
 export const SFX: Record<string, () => Float32Array> = {
-  shoot: () => mix({ wave: 'square', f0: 880, f1: 220, a: 0.002, d: 0.05, s: 0.2, r: 0.04, len: 0.07, cut: 0.5, vol: 0.35 }, { wave: 'noise', f0: 1, a: 0.001, d: 0.04, s: 0, r: 0.02, len: 0.04, cut: 0.6, vol: 0.3 }),
-  launch: () => mix({ wave: 'noise', f0: 2, a: 0.01, d: 0.3, s: 0.1, r: 0.15, len: 0.35, cut: 0.15, vol: 0.7 }, { wave: 'saw', f0: 160, f1: 60, a: 0.005, d: 0.2, s: 0, r: 0.1, len: 0.25, cut: 0.2, vol: 0.4 }),
-  boom: () => delay(mix({ wave: 'noise', f0: 3, a: 0.002, d: 0.6, s: 0, r: 0.3, len: 0.6, cut: 0.08, vol: 1 }, { wave: 'sine', f0: 90, f1: 30, a: 0.002, d: 0.5, s: 0, r: 0.2, len: 0.5, vol: 0.8 }), 0.09, 0.3),
-  hit: () => mix({ wave: 'square', f0: 300, f1: 120, a: 0.001, d: 0.06, s: 0, r: 0.03, len: 0.06, cut: 0.3, vol: 0.35 }),
-  die: () => delay(mix({ wave: 'saw', f0: 500, f1: 40, a: 0.005, d: 0.5, s: 0.2, r: 0.2, len: 0.5, cut: 0.25, vol: 0.45 }, { wave: 'noise', f0: 4, a: 0.01, d: 0.3, s: 0, r: 0.2, len: 0.3, cut: 0.2, vol: 0.3 }), 0.12, 0.35),
-  pickup: () => mix({ wave: 'square', f0: 660, a: 0.002, d: 0.05, s: 0.6, r: 0.05, len: 0.07, cut: 0.4, vol: 0.25 }, { wave: 'square', f0: 990, a: 0.08, d: 0.05, s: 0.6, r: 0.08, len: 0.16, cut: 0.4, vol: 0.25 }),
-  key: () => delay(mix({ wave: 'sine', f0: 523, a: 0.01, d: 0.1, s: 0.7, r: 0.3, len: 0.2, vol: 0.4 }, { wave: 'sine', f0: 784, a: 0.12, d: 0.1, s: 0.7, r: 0.4, len: 0.4, vol: 0.4 }), 0.15, 0.4),
-  door: () => mix({ wave: 'saw', f0: 70, f1: 110, a: 0.05, d: 0.3, s: 0.6, r: 0.2, len: 0.5, cut: 0.05, vol: 0.5 }, { wave: 'noise', f0: 5, a: 0.05, d: 0.3, s: 0.5, r: 0.2, len: 0.5, cut: 0.04, vol: 0.4 }),
-  hurt: () => mix({ wave: 'saw', f0: 200, f1: 90, a: 0.002, d: 0.15, s: 0, r: 0.05, len: 0.15, cut: 0.3, vol: 0.5 }),
-  eshoot: () => mix({ wave: 'sine', f0: 1200, f1: 300, a: 0.002, d: 0.15, s: 0, r: 0.05, len: 0.15, vol: 0.3 }),
-  step: () => mix({ wave: 'noise', f0: 6, a: 0.002, d: 0.05, s: 0, r: 0.02, len: 0.05, cut: 0.06, vol: 0.35 }),
-  win: () => delay(mix(...[523, 659, 784, 1047].map((f, i) => ({ wave: 'square' as Wave, f0: f, a: 0.01 + i * 0.12, d: 0.1, s: 0.6, r: 0.3, len: 0.2 + i * 0.12, cut: 0.3, vol: 0.2 }))), 0.18, 0.4),
+  shoot: () => mix(V('noise', 1, 0, 0.001, 0.07, 0, 0.05, 0.07, 0.55, 0.75), V('square', 190, 55, 0.001, 0.06, 0, 0.03, 0.06, 0.25, 0.45)),
+  launch: () => mix(V('noise', 2, 0, 0.01, 0.3, 0.1, 0.15, 0.35, 0.15, 0.7), V('saw', 160, 60, 0.005, 0.2, 0, 0.1, 0.25, 0.2, 0.4)),
+  boom: () => delay(mix(V('noise', 3, 0, 0.002, 0.6, 0, 0.3, 0.6, 0.08, 1), V('sine', 90, 30, 0.002, 0.5, 0, 0.2, 0.5, 1, 0.8)), 0.09, 0.3),
+  hit: () => mix(V('square', 300, 120, 0.001, 0.06, 0, 0.03, 0.06, 0.3, 0.35)),
+  die: () => delay(mix(V('saw', 500, 40, 0.005, 0.5, 0.2, 0.2, 0.5, 0.25, 0.45), V('noise', 4, 0, 0.01, 0.3, 0, 0.2, 0.3, 0.2, 0.3)), 0.12, 0.35),
+  pickup: () => mix(V('square', 660, 0, 0.002, 0.05, 0.6, 0.05, 0.07, 0.4, 0.25), V('square', 990, 0, 0.08, 0.05, 0.6, 0.08, 0.16, 0.4, 0.25)),
+  key: () => delay(mix(V('sine', 523, 0, 0.01, 0.1, 0.7, 0.3, 0.2, 1, 0.4), V('sine', 784, 0, 0.12, 0.1, 0.7, 0.4, 0.4, 1, 0.4)), 0.15, 0.4),
+  door: () => mix(V('saw', 70, 110, 0.05, 0.3, 0.6, 0.2, 0.5, 0.05, 0.5), V('noise', 5, 0, 0.05, 0.3, 0.5, 0.2, 0.5, 0.04, 0.4)),
+  hurt: () => mix(V('saw', 200, 90, 0.002, 0.15, 0, 0.05, 0.15, 0.3, 0.5)),
+  eshoot: () => mix(V('sine', 1200, 300, 0.002, 0.15, 0, 0.05, 0.15, 1, 0.3)),
+  step: () => mix(V('noise', 6, 0, 0.002, 0.05, 0, 0.02, 0.05, 0.06, 0.35)),
+  win: () => delay(mix(...[523, 659, 784, 1047].map((f, i) => (V('square', f, 0, 0.01 + i * 0.12, 0.1, 0.6, 0.3, 0.2 + i * 0.12, 0.3, 0.2)))), 0.18, 0.4),
 }
 
 // Tracker loop: 4 patterns of 16 steps (bass, lead, drums) at 132 bpm, encoded as compact arrays.
@@ -71,13 +73,13 @@ export function song(loops = 1) {
   let n = 0
   for (let l = 0; l < loops; l++) for (const key of KEYS) for (const pi of ORDER) for (let s = 0; s < 16; s++, n++) {
     const at = Math.round(n * step * SR), hz = (k: number) => 55 * Math.pow(2, (k + key) / 12)
-    synth({ wave: 'saw', f0: hz(BASS[pi]![s]!), a: 0.005, d: 0.08, s: 0.4, r: 0.05, len: step * 0.9, cut: 0.12, vol: 0.22 }, out, at)
+    synth(V('saw', hz(BASS[pi]![s]!), 0, 0.005, 0.08, 0.4, 0.05, step * 0.9, 0.12, 0.22), out, at)
     const ld = LEAD[pi]![s]!
-    if (ld >= 0 && n >= 128) synth({ wave: 'square', f0: hz(ld), a: 0.01, d: 0.1, s: 0.5, r: 0.1, len: step * 1.8, cut: 0.18, vol: 0.09 }, out, at)
+    if (ld >= 0 && n >= 128) synth(V('square', hz(ld), 0, 0.01, 0.1, 0.5, 0.1, step * 1.8, 0.18, 0.09), out, at)
     const dr = DRUM[s]!
-    if (dr === 1) synth({ wave: 'sine', f0: 140, f1: 40, a: 0.001, d: 0.12, s: 0, r: 0.02, len: 0.12, vol: 0.5 }, out, at)
-    if (dr === 2) synth({ wave: 'noise', f0: 7, a: 0.001, d: 0.1, s: 0, r: 0.03, len: 0.1, cut: 0.4, vol: 0.25 }, out, at)
-    if (dr === 3) synth({ wave: 'noise', f0: 8, a: 0.001, d: 0.02, s: 0, r: 0.01, len: 0.02, cut: 0.9, vol: 0.08 }, out, at)
+    if (dr === 1) synth(V('sine', 140, 40, 0.001, 0.12, 0, 0.02, 0.12, 1, 0.5), out, at)
+    if (dr === 2) synth(V('noise', 7, 0, 0.001, 0.1, 0, 0.03, 0.1, 0.4, 0.25), out, at)
+    if (dr === 3) synth(V('noise', 8, 0, 0.001, 0.02, 0, 0.01, 0.02, 0.9, 0.08), out, at)
   }
   return delay(out, step * 3, 0.25)
 }

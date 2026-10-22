@@ -58,7 +58,7 @@ export interface SpriteSet {
   sentry: Sprite[] // idle, charging
   pickups: Record<'health' | 'ammo' | 'rockets' | 'key', Sprite>
   bolt: Sprite; rocket: Sprite; explosion: Sprite[]; exitPad: Sprite
-  rifle: Sprite; launcher: Sprite; flash: Sprite
+  rifle: Sprite; launcher: Sprite; muzzle: Sprite[]; dots: Sprite[] // dots: spark, ichor, shard, smoke
 }
 
 export function buildSprites(skin: Texture, metal: Texture): SpriteSet {
@@ -123,11 +123,20 @@ export function buildSprites(skin: Texture, metal: Texture): SpriteSet {
   launcher.ball(64, 18, 9, 4, 0x060806)
   launcher.rect(48, 44, 32, 6, 0xf0b72f, 1, 200)
   launcher.line(36, 80, 50, 60, 7, 0x2a2f38)
-  const flash = new Canvas(48, 48)
-  for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) {
-    const a = Math.atan2(y - 24, x - 24), d = Math.hypot(x - 24, y - 24) / 24
-    const ray = 0.55 + 0.45 * Math.cos(a * 5)
-    if (d < ray) flash.put(x, y, d < 0.3 ? 0xffffff : 0xffc860, 200)
-  }
-  return { spider, sentry, pickups, bolt, rocket, explosion, exitPad, rifle, launcher, flash }
+  // Muzzle flare: a hot core at the barrel (24,40) with a few randomised spikes; drawn additively.
+  const muzzle = [0, 1, 2].map((f) => {
+    const c = new Canvas(48, 48), sp = [0, 1, 2, 3, 4].map((k) => [(hash2(k, f, 9) - 0.5) * 1.3, 0.45 + hash2(f, k, 3) * 0.55])
+    for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) {
+      const a = Math.atan2(x - 24, 40 - y), d = Math.hypot(x - 24, (40 - y) * (y > 40 ? 2 : 1)) / 40
+      let r = 0.22
+      for (const [ak, lk] of sp) r = Math.max(r, lk! * Math.max(0, 1 - Math.abs(a - ak!) / 0.16))
+      const k = clamp(1 - d / r, 0, 1)
+      if (k <= 0) continue
+      c.put(x, y, k > 0.55 ? 0xfffbe8 : shade(k > 0.25 ? 0xffd27a : 0xff8a30, 0.5 + k), 200)
+    }
+    return c
+  })
+  const dot = (n: number, col: number, lit: boolean) => { const c = new Canvas(n, n); lit ? c.ball(n / 2, n / 2, n / 2, n / 2, col) : c.glowDot(n / 2, n / 2, n / 2, col); return c }
+  const dots = [dot(8, 0xffd890, false), dot(8, 0x8a2418, true), dot(8, 0x9fefff, false), dot(16, 0x5a5c62, true)]
+  return { spider, sentry, pickups, bolt, rocket, explosion, exitPad, rifle, launcher, muzzle, dots }
 }
