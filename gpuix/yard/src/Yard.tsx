@@ -371,7 +371,7 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
   }
 
   const clickRow = (e: Entry, i: number, clicks: number) => {
-    if (clicks >= 2 || (e.isDir && i === idx)) return enter(e)
+    if (clicks >= 2 || ((e.isDir || isPhoto(e)) && i === idx)) return enter(e)
     select(e.name)
   }
 

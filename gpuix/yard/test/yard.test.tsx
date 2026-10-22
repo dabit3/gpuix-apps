@@ -208,6 +208,13 @@ describeNative('yard in the GPU test renderer', () => {
     await click('thumb-winter-ridge.jpg')
     expect(text()).toContain('6/6')
     expect(text()).toContain('Fujifilm GFX100 II')
+    await click('current-row-0')
+    expect(text()).toContain('1/6')
+    expect(r().findByTestId('viewer')).toBeFalsy()
+    await click('current-row-0')
+    expect(r().findByTestId('viewer')).toBeTruthy()
+    expect(text()).toContain('1 of 6')
+    await press('escape')
   })
 
   it('creates a new folder and enters it while it is still empty', async () => {
