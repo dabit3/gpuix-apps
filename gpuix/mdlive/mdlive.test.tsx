@@ -5,8 +5,9 @@ import { copyFileSync, mkdtempSync, readFileSync, renameSync, writeFileSync } fr
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseArgs } from './mdlive'
-import { App, keyBus, keyName } from './src/App'
+import { App, keyBus, keyName, linkBus } from './src/App'
 import { changedBlock, parseBlocks, stats } from './src/doc'
+import { fuzzy, osc52, resolveLink } from './src/links'
 import { loadPalette } from './src/theme'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -43,6 +44,7 @@ function fixture() {
   const file = join(dir, 'notes.md')
   copyFileSync(join(import.meta.dir, 'examples/notes.md'), file)
   copyFileSync(join(import.meta.dir, 'examples/sync-diagram.png'), join(dir, 'sync-diagram.png'))
+  copyFileSync(join(import.meta.dir, 'examples/replay.md'), join(dir, 'replay.md'))
   return file
 }
 
@@ -151,4 +153,77 @@ test('clicking a task checkbox writes the toggled state back to the file', async
   await sleep(400)
   await app.getByTestId('task-receipts-upload-in-resumable-1-mb-chunks').click()
   await until(() => readFileSync(file, 'utf8').includes('- [ ] Receipts upload in resumable 1 MB chunks'))
+}, T)
+
+const visible = async (app: Awaited<ReturnType<typeof setup>>['app'], id: string) => {
+  try {
+    return !!(await app.getByTestId(id).bounds())
+  } catch {
+    return false
+  }
+}
+
+test('o opens the jump palette; fuzzy typing + Enter glides to the section', async () => {
+  const { app } = await setup()
+  expect((await app.getByTestId('h-open-questions').bounds())!.y).toBeGreaterThan(900)
+  key('o')
+  await app.getByTestId('palette-input').waitFor({ timeoutMs: 3000 })
+  await app.getByTestId('palette-input').fill('opq')
+  await app.getByTestId('pal-open-questions').waitFor({ timeoutMs: 3000 })
+  key('enter')
+  await until(async () => !(await visible(app, 'palette')))
+  await until(async () => (await app.getByTestId('h-open-questions').bounds())!.y < 200)
+  expect(fuzzy('opq', 'Open questions')).not.toBeNull()
+  expect(fuzzy('xyz', 'Open questions')).toBeNull()
+}, T)
+
+test('links: .md opens in place with Back, #anchors scroll, everything else is classified', async () => {
+  const { app, file, text } = await setup()
+  expect(await visible(app, 'back')).toBe(false)
+  linkBus.handler?.('replay.md')
+  await until(async () => (await text('file-name')) === 'replay.md')
+  await app.getByTestId('toc-results').waitFor({ timeoutMs: 5000 })
+  expect(await visible(app, 'back')).toBe(true)
+  key('backspace')
+  await until(async () => (await text('file-name')) === 'notes.md')
+  expect(await visible(app, 'back')).toBe(false)
+  linkBus.handler?.('#rollout')
+  await until(async () => (await app.getByTestId('h-rollout').bounds())!.y < 200)
+
+  expect(resolveLink(file, 'replay.md#results')).toMatchObject({ kind: 'doc', slug: 'results' })
+  expect(resolveLink(file, 'https://ledger.app')).toEqual({ kind: 'external', url: 'https://ledger.app' })
+  expect(resolveLink(file, 'nope.md').kind).toBe('missing')
+  expect(osc52('hi')).toBe('\x1b]52;c;aGk=\x07')
+}, T)
+
+test('with follow off, an off-screen save marks the block and offers an "Edited below" pill', async () => {
+  const { app, file, text } = await setup()
+  key('f')
+  await until(async () => (await text('status-follow')) === 'Not following edits')
+  const src = readFileSync(file, 'utf8')
+  writeFileSync(`${file}.tmp`, src.replace('## Open questions', '## Owners\n\nPriya owns the sync engine; Marco owns the migration.\n\n## Open questions'))
+  renameSync(`${file}.tmp`, file)
+  await app.getByTestId('h-owners').waitFor({ timeoutMs: 5000 })
+  await app.getByTestId('edit-pill').waitFor({ timeoutMs: 5000 })
+  expect(await text('edit-pill')).toBe('Edited below')
+  expect((await app.getByTestId('h-owners').bounds())!.y).toBeGreaterThan(900)
+  await app.getByTestId('edit-pill').click()
+  await until(async () => (await app.getByTestId('h-owners').bounds())!.y < 600)
+  await until(async () => !(await visible(app, 'edit-pill')))
+}, T)
+
+test('? shows the shortcuts sheet; in a narrow split t slides in a contents drawer', async () => {
+  const { app } = await setup(undefined, 700)
+  key('?')
+  await app.getByTestId('shortcuts').waitFor({ timeoutMs: 3000 })
+  key('x')
+  await until(async () => !(await visible(app, 'shortcuts')))
+  expect(await visible(app, 'toc-drawer')).toBe(false)
+  key('t')
+  await app.getByTestId('toc-d-rollout').waitFor({ timeoutMs: 3000 })
+  await sleep(400) // let the drawer finish sliding in
+  pump()
+  await app.getByTestId('toc-d-rollout').click()
+  await until(async () => !(await visible(app, 'toc-drawer')))
+  await until(async () => (await app.getByTestId('h-rollout').bounds())!.y < 200)
 }, T)

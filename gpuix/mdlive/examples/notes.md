@@ -54,7 +54,7 @@ export async function drain(outbox: Outbox, api: SyncApi) {
 | Receipt | Content-addressed blobs | Duplicate detection |
 | Comment | Append-only list        | None             |
 
-Field-level last-writer-wins covers 97% of real edits in our replay of last month's traffic. The remaining 3% are budget totals, which is why budgets use a counter instead.
+Field-level last-writer-wins covers 97% of real edits in our replay of last month's traffic. The remaining 3% are budget totals, which is why budgets use a counter instead. The full method is in [the replay write-up](replay.md).
 
 ## Rollout
 

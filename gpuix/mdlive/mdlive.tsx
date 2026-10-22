@@ -18,8 +18,10 @@ options
   -v, --version    print version
 
 keys
-  /  find      w  wide/narrow   t  contents   f  follow edits
-  j k  scroll  space  page      [ ]  prev/next section   ^C  quit
+  o  jump to section   /  find          [ ]  prev/next section
+  j k  scroll          space  page      g G  top/bottom
+  w  wide/narrow       t  contents      f  follow edits
+  ⌫  back              ?  all shortcuts ^C  quit
 
 Runs in Ghostty or kitty (kitty graphics protocol). Edit the file in another
 pane or editor; mdlive re-renders on every save.`

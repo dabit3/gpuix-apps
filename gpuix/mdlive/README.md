@@ -10,11 +10,19 @@ Demo (real time, real input in Ghostty): [`media/demo.mp4`](media/demo.mp4)
 
 ## Features
 
-- **Live reload**: watches the file's directory, so both in-place writes and editor atomic-rename saves (nvim, VS Code) are picked up. A status dot and "Updated just now" confirm each save.
-- **Follow edits**: on each save mdlive diffs the parsed blocks, scrolls to the first changed block and briefly highlights it. Toggle with `f` (a small toast confirms).
+- **Live reload**: watches the file's directory, so both in-place writes and editor atomic-rename saves (nvim, VS Code) are picked up. "Updated just now" confirms each save.
+- **Follow edits**: on each save mdlive diffs the parsed blocks, glides to the first changed block and washes it in blue. Toggle with `f` (a small toast confirms).
+- **Changes you can see**: every block you edited this session keeps a thin mark in the margin. With follow off, an off-screen save shows an "Edited below" / "Edited above" pill; click it to glide there.
+- **Jump to a section** (`o`): a Spotlight-style palette over the headings with fuzzy matching. Type `roll`, press Enter, and the document glides to Rollout.
+- **Links that work**: a link to another `.md` file opens it in place, with a back arrow in the header (or `Backspace`) that returns to the exact scroll position. `#anchor` links scroll to the heading; web links and other files open with the system handler.
+- **Smooth motion**: section jumps, find, top/bottom (`g`/`G`) and follow-to-edit all glide with a cubic ease; the app fades in on launch.
+- **Reading progress**: the header's bottom hairline fills in blue as you read.
+- **Copy code**: hover a code block for Copy, which turns into "Copied". It copies over OSC 52 in the terminal, so it also works over SSH.
+- **Image zoom**: click an image to view it full size over a dimmed backdrop; click or `Esc` to close.
+- **Shortcuts sheet** (`?`): every key in one overlay, and a one-time "Press ? for shortcuts" hint on launch instead of a permanent row of hints.
 - **GFM**: headings, emphasis, blockquotes, lists, tables, fenced code with syntax highlighting (`<code>`), local images (`<img>`, path resolved next to the file), task lists.
 - **Task lists you can click**: checkboxes toggle `[ ]` / `[x]` in the source file itself, so nvim sees the change too.
-- **Contents sidebar** with the active section highlighted as you scroll. Click to jump, or `[` / `]` for previous/next section. It hides itself when the pane gets narrow (a split) and comes back when you widen it.
+- **Contents sidebar** with the active section highlighted as you scroll. Click to jump, or `[` / `]` for previous/next section. In a narrow split it steps aside, and `t` slides it back in as a drawer over the document.
 - **Find in page** (`/`): live match count, `Enter` / `Shift-Enter` to step through matches, `Esc` to close.
 - **Reading modes**: a narrow 760 px column or wide full-pane layout (`w`, or `-w` on the command line).
 - **Word count and reading time** in the header, next to when the file was last updated.
@@ -46,11 +54,13 @@ options
   -v, --version    print version
 
 keys
-  /  find      w  wide/narrow   t  contents   f  follow edits
-  j k  scroll  space  page      [ ]  prev/next section   ^C  quit
+  o  jump to section   /  find          [ ]  prev/next section
+  j k  scroll          space  page      g G  top/bottom
+  w  wide/narrow       t  contents      f  follow edits
+  ⌫  back              ?  all shortcuts ^C  quit
 ```
 
-The split workflow from the demo: start `mdlive notes.md`, press **Cmd-D** in Ghostty, run `nvim notes.md` in the new pane, and save with `:w`.
+The split workflow from the demo: start `mdlive notes.md`, press **Cmd-D** in Ghostty, run `nvim notes.md` in the new pane, and save with `:w`. Note that Ghostty uses the first click in an unfocused split to focus it, so a click on mdlive from the nvim pane focuses it and the second click acts.
 
 Ghostty config used for the demo (`~/.config/ghostty/config`):
 
@@ -64,7 +74,7 @@ window-padding-y = 10
 ## Tests
 
 ```sh
-bun test           # 7 tests, GPU test renderer (@gpuix/react/testing)
+bun test           # 11 tests, GPU test renderer (@gpuix/react/testing)
 bun run typecheck
 ```
 
@@ -77,12 +87,16 @@ The tests mount the real `<App>` with `createTestRoot` and drive it with native 
 - Find: typing `budget` reports the match count, `Enter` advances, a nonsense query shows "No results".
 - Wide/narrow mode changes the column width; a narrow root hides the sidebar.
 - Clicking a task checkbox rewrites `[ ]` to `[x]` in the file on disk, and back.
+- `o` opens the jump palette; fuzzy typing filters headings and `Enter` scrolls to the section.
+- Links: a `.md` link opens the file in place with a Back button, Back returns; anchors, web URLs and missing files are classified correctly; OSC 52 encoding and fuzzy scoring.
+- With follow off, an off-screen save marks the changed block and shows an "Edited below" pill that scrolls there.
+- `?` shows the shortcuts sheet; in a narrow root `t` slides in the contents drawer and a row click jumps.
 
-`examples/notes.md` + `examples/sync-diagram.png` are the fixture (the PNG is drawn by `tools/make-diagram.swift`). `tools/input.swift` is the CGEvent helper used to drive Ghostty with real keystrokes, clicks, drags and scrolls when recording.
+`examples/notes.md`, `examples/replay.md` (the linked write-up) + `examples/sync-diagram.png` are the fixture (the PNG is drawn by `tools/make-diagram.swift`). `tools/input.swift` is the CGEvent helper used to drive Ghostty with real keystrokes, clicks, drags and scrolls when recording.
 
 ## GPUIX features used
 
-Terminal mode (`render(..., { terminal: true })`, `isTerminal()`), `<markdown>`, `<code>` with a custom syntax theme, `<img>` sized to the column, `<svg source>`, `useTextSearch` + `findRanges`, a single-owner scroll container with `renderer.scrollTo` / `getScrollOffset` and element bounds for section tracking, `onLayout` for responsive reflow, global `onKeyDown`, `GpuixTheme`, and the `@gpuix/react/testing` GPU test renderer.
+Terminal mode (`render(..., { terminal: true })`, `isTerminal()`), `<markdown>`, `<code>` with a custom syntax theme, `<img>` sized to the column, `<svg source>`, `useTextSearch` + `findRanges`, a single-owner scroll container with `renderer.scrollTo` / `getScrollOffset` and element bounds for section tracking, `onLayout` for responsive reflow, global `onKeyDown`, `motion.div` native animations (fade-in, palette, sheet, drawer, pill), `<markdown onLinkClick>`, OSC 52 clipboard, `<input onSubmit>`, `GpuixTheme`, and the `@gpuix/react/testing` GPU test renderer.
 
 ## Performance (Apple Paravirtual GPU on a macOS VM)
 
@@ -102,3 +116,6 @@ Terminal mode (`render(..., { terminal: true })`, `isTerminal()`), `<markdown>`,
 7. **Test renderer needs pumping.** After `nativeSimulateClick` / key events in `@gpuix/react/testing`, state-driven assertions only settle after `renderer.flush()` + `renderer.dispatchNativeEvents()` in the polling loop.
 8. **No VS Code integrated terminal.** Tried with VS Code 1.143.0 from `brew install --cask visual-studio-code`: `mdlive notes.md` in the integrated terminal starts (the tab title switches to `bun`) but the panel stays blank, because xterm.js's image addon speaks Sixel and the iTerm protocol, not the kitty graphics protocol that GPUIX 0.11.0 emits. Ctrl-C quits, though zsh then shows a stray `execute: 3u_` line, presumably a keyboard-protocol reset sequence xterm.js does not understand. So the embed demo is Ghostty-only; the README's kitty/Ghostty support list is accurate.
 9. **Terminal mode reports letter keys as `space`.** In Ghostty, pressing `w` delivers `onKeyDown` with `key: "space"` and `keyChar: "w"` (same for every printable letter), while the native window reports `key: "w"`. An app that switches on `e.key` treats every letter as a page-down. Repro: `render(<App/>, { terminal: true, onKeyDown: (e) => console.error(e.key, e.keyChar) })`, press a letter. Workaround: `keyName()` in `src/App.tsx` prefers a printable `keyChar`. Also, a focused root `div` with its own `onKeyDown` gets the same event as the global `render({ onKeyDown })`, so a key could be handled twice; mdlive now handles keys in one place only.
+10. **`MotionStyle` is narrower than `StyleDesc`.** `marginTop`/`marginBottom` aren't animatable (animate `top` on a relatively positioned wrapper instead), `motion.div` doesn't accept `testId`, and `cursor` has no `zoom-in`.
+11. **Enter on a focused `<input>` doesn't reach the global key handler in terminal mode.** It only fires the input's `onSubmit`, so a palette that handles Enter in `render({ onKeyDown })` does nothing in Ghostty while it works in the test renderer. mdlive's palette wires `onSubmit` and the input's own `onKeyDown` as well.
+12. **Spreading `useTextSearch().props` after your own `ref` replaces it.** The props carry a ref, so `<div ref={mine} {...search.props}>` leaves `mine` null and anything measuring that element silently falls back. Merge the refs in a callback placed after the spread.

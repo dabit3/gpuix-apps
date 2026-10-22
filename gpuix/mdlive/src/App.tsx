@@ -12,6 +12,8 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { copyText, fuzzy, openExternal, resolveLink } from './links'
+import { BACK_SVG, COPY_SVG, DONE_SVG, EditPill, ICON, Lightbox, Palette as JumpPalette, Progress, SEARCH_SVG, ShortcutsSheet, progressBus } from './overlays'
 import { changedBlock, docDir, headings, parseBlocks, searchableText, stats, toggleTask, type Block, type Task } from './doc'
 import { imageSize } from './imagesize'
 import { loadPalette, uiTheme, alpha, type Palette, type UiTheme } from './theme'
@@ -24,6 +26,9 @@ export type AppProps = {
   follow?: boolean
   palette?: Palette
 }
+
+/** Link activations from the document (tests call it directly). */
+export const linkBus: { handler: ((href: string) => void) | null } = { handler: null }
 
 /** Window-level key events land here (terminal + native window), and tests call it directly. */
 // GPUIX 0.11.0 terminal mode reports printable keys as key "space" with the
@@ -100,7 +105,8 @@ function mdTheme(t: UiTheme): GpuixTheme {
 
 export function App({ file, wide: wideInit = false, toc: tocInit = true, follow: followInit = true, palette }: AppProps) {
   const renderer = useGpuixRequired()
-  const path = resolve(file)
+  const [path, setPath] = useState(() => resolve(file))
+  const [history, setHistory] = useState<{ path: string; y: number }[]>([])
   const t = useMemo(() => uiTheme(palette ?? loadPalette()), [palette])
   const theme = useMemo(() => mdTheme(t), [t])
 
@@ -119,6 +125,14 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
   const [winW, setWinW] = useState(1200)
   const [winH, setWinH] = useState(800)
   const [colW, setColW] = useState(700)
+  const [changed, setChanged] = useState<ReadonlySet<string>>(() => new Set())
+  const [editHint, setEditHint] = useState<{ key: string; dir: 'up' | 'down' } | null>(null)
+  const [palOpen, setPalOpen] = useState(false)
+  const [palQuery, setPalQuery] = useState('')
+  const [palSel, setPalSel] = useState(0)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [drawer, setDrawer] = useState(false)
+  const [zoom, setZoom] = useState<{ src: string; alt?: string; w: number; h: number } | null>(null)
 
   const baseDir = docDir(path)
   const blocks = useMemo(() => parseBlocks(snap?.text ?? '', baseDir), [snap?.text, baseDir])
@@ -130,6 +144,11 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
   const blockRefs = useRef(new Map<string, PublicInstance>())
   const findRef = useRef<PublicInstance | null>(null)
   const rootRef = useRef<PublicInstance | null>(null)
+  const docRef = useRef<PublicInstance | null>(null)
+  const palRef = useRef<PublicInstance | null>(null)
+  const prevPath = useRef(path)
+  const pendingSlug = useRef<string | null>(null)
+  const pendingY = useRef<number | null>(null)
 
   // live reload
   useEffect(
@@ -160,6 +179,57 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
     [renderer],
   )
 
+  const maxScroll = useCallback(() => {
+    const sc = scrollRef.current
+    const d = docRef.current
+    const vb = sc && renderer.getElementBounds?.(sc.id)
+    const db = d && renderer.getElementBounds?.(d.id)
+    return vb && db ? Math.max(0, db.height - vb.height) : 1e7
+  }, [renderer])
+
+  const reportProgress = useCallback((y?: number) => {
+    const sc = scrollRef.current
+    if (!sc) return
+    const max = maxScroll()
+    const at = y ?? -(renderer.getScrollOffset?.(sc.id)?.[1] ?? 0)
+    progressBus.set?.(max > 0 && max < 1e7 ? at / max : 0)
+  }, [maxScroll, renderer])
+
+  const anim = useRef<{ timer: ReturnType<typeof setInterval>; to: number } | null>(null)
+  const glide = useCallback(
+    (target: number) => {
+      const sc = scrollRef.current
+      if (!sc) return
+      const from = -(renderer.getScrollOffset?.(sc.id)?.[1] ?? 0)
+      const to = Math.max(0, Math.min(maxScroll(), target))
+      if (anim.current) clearInterval(anim.current.timer)
+      anim.current = null
+      const dist = Math.abs(to - from)
+      if (dist < 1) return
+      const dur = Math.min(460, 160 + dist * 0.18)
+      const t0 = Date.now()
+      const timer = setInterval(() => {
+        const p = Math.min(1, (Date.now() - t0) / dur)
+        const e = 1 - Math.pow(1 - p, 3)
+        const y = from + (to - from) * e
+        renderer.scrollTo?.(sc.id, 0, -y)
+        reportProgress(y)
+        if (p >= 1) {
+          clearInterval(timer)
+          if (anim.current?.timer === timer) anim.current = null
+        }
+      }, 16)
+      anim.current = { timer, to }
+    },
+    [maxScroll, renderer, reportProgress],
+  )
+  useEffect(
+    () => () => {
+      if (anim.current) clearInterval(anim.current.timer)
+    },
+    [],
+  )
+
   const scrollToBlock = useCallback(
     (key: string, align = 0.3, onlyIfHidden = false) => {
       const g = geometry(key)
@@ -167,20 +237,20 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
       if (!g || !sc) return false
       if (onlyIfHidden && g.top >= 24 && g.top + Math.min(g.height, 120) <= g.viewport - 24) return true
       const target = Math.max(0, g.contentY - (align === 0 ? 20 : g.viewport * align))
-      renderer.scrollTo?.(sc.id, 0, -target)
+      glide(target)
       return true
     },
-    [geometry, renderer],
+    [geometry, glide],
   )
 
   const scrollBy = useCallback(
     (dy: number) => {
       const sc = scrollRef.current
       if (!sc) return
-      const off = renderer.getScrollOffset?.(sc.id)?.[1] ?? 0
-      renderer.scrollTo?.(sc.id, 0, Math.min(0, off - dy))
+      const cur = anim.current ? anim.current.to : -(renderer.getScrollOffset?.(sc.id)?.[1] ?? 0)
+      glide(cur + dy)
     },
-    [renderer],
+    [glide, renderer],
   )
 
   const updateActive = useCallback(() => {
@@ -197,18 +267,155 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
     const prev = prevBlocks.current
     prevBlocks.current = blocks
     if (prev === blocks) return
+    if (prevPath.current !== path) {
+      prevPath.current = path
+      const slug = pendingSlug.current
+      pendingSlug.current = null
+      const y = pendingY.current
+      pendingY.current = null
+      const h = slug ? blocks.find((x) => x.slug === slug) : null
+      if (h) setTimeout(() => scrollToBlock(h.key, 0), 80)
+      else if (y !== null)
+        setTimeout(() => {
+          const sc = scrollRef.current
+          const yy = Math.min(maxScroll(), y)
+          if (sc) renderer.scrollTo?.(sc.id, 0, -yy)
+          reportProgress(yy)
+          updateActive()
+        }, 60)
+      return
+    }
     const idx = changedBlock(prev, blocks)
     if (idx === null) return
     const b = blocks[idx]
     if (!b) return
     setFlash((f) => ({ key: b.key, n: (f?.n ?? 0) + 1 }))
-    if (!follow) return
+    setChanged((s) => new Set(s).add(b.key))
+    if (!follow) {
+      const tm = setTimeout(() => {
+        const g = geometry(b.key)
+        if (g && (g.top + g.height < 0 || g.top > g.viewport - 40)) setEditHint({ key: b.key, dir: g.top < 0 ? 'up' : 'down' })
+      }, 60)
+      return () => clearTimeout(tm)
+    }
+    setEditHint(null)
     const tm = setTimeout(() => {
       scrollToBlock(b.key, 0.3, true)
       setTimeout(updateActive, 60)
     }, 50)
     return () => clearTimeout(tm)
-  }, [blocks, follow, scrollToBlock, updateActive])
+  }, [blocks, follow, geometry, maxScroll, path, renderer, reportProgress, scrollToBlock, updateActive])
+
+  const onScroll = useCallback(() => {
+    updateActive()
+    if (!anim.current) reportProgress()
+    setEditHint((h) => {
+      if (!h) return h
+      const g = geometry(h.key)
+      return g && g.top + g.height > 0 && g.top < g.viewport - 40 ? null : h
+    })
+  }, [geometry, reportProgress, updateActive])
+
+  const navigate = useCallback(
+    (next: string, slug?: string, push = true, y: number | null = null) => {
+      const sc0 = scrollRef.current
+      const here = sc0 ? -(renderer.getScrollOffset?.(sc0.id)?.[1] ?? 0) : 0
+      if (push) setHistory((h) => [...h, { path, y: here }])
+      pendingSlug.current = slug ?? null
+      pendingY.current = y
+      const s = readSnapshot(next)
+      setPath(next)
+      setSnap(s)
+      setUpdatedAt(s?.mtime ?? Date.now())
+      setFlash(null)
+      setChanged(new Set())
+      setEditHint(null)
+      setActiveKey(null)
+      if (anim.current) clearInterval(anim.current.timer)
+      anim.current = null
+      if (scrollRef.current) renderer.scrollTo?.(scrollRef.current.id, 0, 0)
+      progressBus.set?.(0)
+    },
+    [path, renderer],
+  )
+  const goBack = useCallback(() => {
+    const prev = history[history.length - 1]
+    if (!prev) return
+    setHistory((h) => h.slice(0, -1))
+    navigate(prev.path, undefined, false, prev.y)
+  }, [history, navigate])
+
+  const onLink = useCallback(
+    (href: string) => {
+      const r = resolveLink(path, href)
+      if (r.kind === 'anchor') {
+        const h = blocks.find((x) => x.slug === r.slug)
+        if (h) {
+          scrollToBlock(h.key, 0)
+          setActiveKey(h.key)
+        }
+      } else if (r.kind === 'doc') navigate(r.path, r.slug)
+      else if (r.kind === 'external') {
+        openExternal(r.url)
+        setToast({ msg: 'Opened in browser', n: Date.now() })
+      } else setToast({ msg: `Can't find ${basename(r.path)}`, n: Date.now() })
+    },
+    [blocks, navigate, path, scrollToBlock],
+  )
+  const linkRef = useRef(onLink)
+  linkRef.current = onLink
+  useEffect(() => {
+    linkBus.handler = onLink
+    return () => {
+      if (linkBus.handler === onLink) linkBus.handler = null
+    }
+  }, [onLink])
+  const stableLink = useCallback((href: string) => linkRef.current(href), [])
+  const stableZoom = useCallback((z: { src: string; alt?: string; w: number; h: number }) => setZoom(z), [])
+
+  useEffect(() => {
+    const tm = setTimeout(() => setToast({ msg: 'Press ? for shortcuts', n: Date.now() }), 700)
+    return () => clearTimeout(tm)
+  }, [])
+
+  // jump-to-section palette
+  const palItems = useMemo(() => {
+    const all = headings(blocks, 4)
+    if (!palQuery.trim()) return all
+    return all
+      .map((h) => ({ h, s: fuzzy(palQuery, h.title) }))
+      .filter((x) => x.s !== null)
+      .sort((a, b) => b.s! - a.s!)
+      .map((x) => x.h)
+  }, [blocks, palQuery])
+  const openPalette = useCallback(() => {
+    setPalQuery('')
+    setPalSel(Math.max(0, headings(blocks, 4).findIndex((h) => h.key === activeKey)))
+    setPalOpen(true)
+    setTimeout(() => palRef.current && renderer.focusElement?.(palRef.current.id), 40)
+  }, [activeKey, blocks, renderer])
+  const closeOverlay = useCallback(() => {
+    setPalOpen(false)
+    setSheetOpen(false)
+    setZoom(null)
+    setDrawer(false)
+    setTimeout(() => rootRef.current && renderer.focusElement?.(rootRef.current.id), 20)
+  }, [renderer])
+  const jumpTo = useCallback(
+    (key: string) => {
+      scrollToBlock(key, 0)
+      setActiveKey(key)
+    },
+    [scrollToBlock],
+  )
+  const pick = useCallback(
+    (key: string) => {
+      closeOverlay()
+      setTimeout(() => jumpTo(key), 30)
+    },
+    [closeOverlay, jumpTo],
+  )
+  const lastPalKey = useRef({ k: '', t: 0 })
 
   useEffect(() => {
     const tm = setTimeout(updateActive, 80)
@@ -218,12 +425,12 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
   const onToggleTask = useCallback(
     (line: number) => {
       try {
-        const src = readFileSync(file, 'utf8')
+        const src = readFileSync(path, 'utf8')
         const next = toggleTask(src, line)
-        if (next !== src) writeFileSync(file, next)
+        if (next !== src) writeFileSync(path, next)
       } catch {}
     },
-    [file],
+    [path],
   )
 
   // find-in-page
@@ -277,14 +484,34 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
     (e: KeyEvent) => {
       const k = keyName(e)
       const m = (e as { modifiers?: { shift?: boolean; ctrl?: boolean; cmd?: boolean } }).modifiers ?? {}
+      if (zoom || sheetOpen) {
+        closeOverlay()
+        return
+      }
+      if (palOpen) {
+        const now = Date.now()
+        const dup = lastPalKey.current.k === k && now - lastPalKey.current.t < 25
+        lastPalKey.current = { k, t: now }
+        if (dup) return
+        if (k === 'escape') closeOverlay()
+        else if (k === 'down' || (k === 'n' && m.ctrl)) setPalSel((i) => Math.min(palItems.length - 1, i + 1))
+        else if (k === 'up' || (k === 'p' && m.ctrl)) setPalSel((i) => Math.max(0, i - 1))
+        else if (k === 'enter') {
+          const h = palItems[palSel]
+          if (h) pick(h.key)
+        }
+        return
+      }
       if (k === 'escape') {
-        if (findOpen) closeFind()
+        if (drawer) closeOverlay()
+        else if (findOpen) closeFind()
         return
       }
       if (typing()) {
         if (k === 'enter') findNext(!!m.shift)
         return
       }
+      if (k === '?' || (k === '/' && m.shift)) return setSheetOpen(true)
       if ((k === 'f' && (m.ctrl || m.cmd)) || k === '/') return openFind()
       if (m.ctrl || m.cmd) return
       const vh = scrollRef.current ? (renderer.getElementBounds?.(scrollRef.current.id)?.height ?? 600) : 600
@@ -293,7 +520,15 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
           setWide((v) => !v)
           break
         case 't':
-          setTocOpen((v) => !v)
+          if (winW < TOC_MIN_WINDOW) setDrawer((v) => !v)
+          else setTocOpen((v) => !v)
+          break
+        case 'o':
+        case ':':
+          openPalette()
+          break
+        case 'backspace':
+          goBack()
           break
         case 'f':
           setFollow((v) => !v)
@@ -322,10 +557,8 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
         case 'g':
         case 'home':
         case 'end': {
-          const toEnd = k === 'end' || (k === 'g' && m.shift) || e.key === 'G'
-          if (toEnd) scrollBy(1e7)
-          else if (scrollRef.current) renderer.scrollTo?.(scrollRef.current.id, 0, 0)
-          setTimeout(updateActive, 60)
+          const toEnd = k === 'end' || (k === 'g' && m.shift) || e.key === 'G' || (e as { keyChar?: string | null }).keyChar === 'G'
+          glide(toEnd ? maxScroll() : 0)
           break
         }
         case ']':
@@ -342,7 +575,7 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
           process.exit(0)
       }
     },
-    [activeKey, closeFind, findNext, findOpen, follow, openFind, query, renderer, scrollBy, scrollToBlock, toc, typing, updateActive],
+    [activeKey, closeFind, closeOverlay, drawer, findNext, findOpen, follow, glide, goBack, maxScroll, openFind, openPalette, palItems, palOpen, palSel, pick, query, renderer, scrollBy, scrollToBlock, sheetOpen, toc, typing, winW, zoom],
   )
   useEffect(() => {
     keyBus.handler = onKey
@@ -351,10 +584,12 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
     }
   }, [onKey])
 
-  const showToc = tocOpen && toc.length > 0 && winW >= TOC_MIN_WINDOW
+  const narrow = winW < TOC_MIN_WINDOW
+  const showToc = tocOpen && toc.length > 0 && !narrow
   const compact = winW < 640
   const padX = compact ? 20 : wide ? 48 : 40
   const term = isTerminal()
+  const toastVisible = !!toast && now - toast.n < 2200
   const macWindow = process.platform === 'darwin' && !term
 
   return (
@@ -389,8 +624,12 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
           borderBottomWidth: 1,
           borderColor: t.hairline,
           userSelect: 'none',
+          position: 'relative',
         }}
       >
+        {history.length > 0 && (
+          <IconButton t={t} testId="back" icon={BACK_SVG} active={false} onClick={goBack} />
+        )}
         <text testId="file-name" style={{ color: t.text, fontSize: 13.5, fontWeight: 600 }}>
           {basename(path)}
         </text>
@@ -418,13 +657,16 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
           {`${st.minutes} min read`}
         </text>
         <div style={{ width: 8 }} />
-        {!compact && (
-          <>
-            <IconButton t={t} testId="width-toggle" icon={WIDE_SVG} active={wide} onClick={() => setWide((v) => !v)} />
-            <IconButton t={t} testId="toc-toggle" icon={SIDEBAR_SVG} active={showToc} onClick={() => setTocOpen((v) => !v)} />
-          </>
-        )}
+        {!compact && <IconButton t={t} testId="width-toggle" icon={WIDE_SVG} active={wide} onClick={() => setWide((v) => !v)} />}
+        <IconButton
+          t={t}
+          testId="toc-toggle"
+          icon={SIDEBAR_SVG}
+          active={narrow ? drawer : showToc}
+          onClick={() => (narrow ? setDrawer((v) => !v) : setTocOpen((v) => !v))}
+        />
         <IconButton t={t} testId="find-toggle" icon={SEARCH_SVG} active={findOpen} onClick={() => (findOpen ? closeFind() : openFind())} />
+        <Progress t={t} width={winW} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'row', flexGrow: 1, minHeight: 0 }}>
@@ -460,10 +702,7 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
                 slug={h.slug}
                 level={h.level}
                 active={h.key === activeKey}
-                onClick={() => {
-                  scrollToBlock(h.key, 0)
-                  setActiveKey(h.key)
-                }}
+                onClick={() => jumpTo(h.key)}
               />
             ))}
           </div>
@@ -474,12 +713,18 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
           <div
             ref={scrollRef}
             testId="doc-scroll"
-            onScrollChange={updateActive}
+            onScrollChange={onScroll}
             style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, overflow: 'scroll', alignItems: 'center' }}
           >
             <div
               testId="doc"
               {...search.props}
+              ref={(el: PublicInstance | null) => {
+                docRef.current = el
+                const r = (search.props as { ref?: unknown }).ref
+                if (typeof r === 'function') r(el)
+                else if (r && typeof r === 'object') (r as { current: unknown }).current = el
+              }}
               onLayout={(e) => setColW(e.width ?? 700)}
               style={{
                 display: 'flex',
@@ -497,6 +742,13 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
                   {`Waiting for ${basename(path)} to appear…`}
                 </text>
               )}
+              <motion.div
+                key={path}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+                style={{ display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0 }}
+              >
               {blocks.map((b) => (
                 <BlockView
                   key={b.key}
@@ -505,13 +757,17 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
                   theme={theme}
                   maxW={Math.max(120, colW - padX * 2)}
                   flashN={flash?.key === b.key ? flash.n : 0}
+                  changed={changed.has(b.key)}
                   onToggleTask={onToggleTask}
+                  onLink={stableLink}
+                  onZoom={stableZoom}
                   registerRef={(el) => {
                     if (el) blockRefs.current.set(b.key, el)
                     else blockRefs.current.delete(b.key)
                   }}
                 />
               ))}
+              </motion.div>
             </div>
           </div>
 
@@ -547,15 +803,88 @@ export function App({ file, wide: wideInit = false, toc: tocInit = true, follow:
           </motion.div>
         </div>
       )}
+
+      {editHint && !toastVisible && (
+        <EditPill
+          t={t}
+          dir={editHint.dir}
+          onClick={() => {
+            scrollToBlock(editHint.key, 0.3)
+            setEditHint(null)
+          }}
+        />
+      )}
+
+      {drawer && narrow && (
+        <div style={{ position: 'absolute', left: 0, right: 0, top: BAR_H, bottom: 0 }}>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.16 }}
+            onClick={closeOverlay}
+            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: alpha(t.bg, 0.6) }}
+          />
+          <motion.div
+            initial={{ left: -Math.min(280, winW - 48) }}
+            animate={{ left: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              width: Math.min(280, winW - 48),
+              display: 'flex',
+              flexDirection: 'column',
+              paddingTop: 22,
+              paddingLeft: 10,
+              paddingRight: 10,
+              backgroundColor: t.raised,
+              borderRightWidth: 1,
+              borderColor: t.hairline,
+              boxShadow: [{ offsetX: 12, offsetY: 0, blurRadius: 40, spreadRadius: 0, color: '#00000080' }],
+              overflow: 'scroll',
+              userSelect: 'none',
+            }}
+          >
+            <text testId="toc-drawer" style={{ color: t.text3, fontSize: 12, fontWeight: 500, paddingLeft: 20, paddingBottom: 10 }}>Contents</text>
+            {toc.map((h) => (
+              <TocRow key={h.key} t={t} title={h.title} slug={`d-${h.slug}`} level={h.level} active={h.key === activeKey} onClick={() => pick(h.key)} />
+            ))}
+          </motion.div>
+        </div>
+      )}
+
+      {palOpen && (
+        <JumpPalette
+          t={t}
+          items={palItems}
+          sel={Math.min(palSel, Math.max(0, palItems.length - 1))}
+          query={palQuery}
+          setQuery={(q) => {
+            setPalQuery(q)
+            setPalSel(0)
+          }}
+          inputRef={palRef}
+          onPick={(h) => pick(h.key)}
+          onHover={setPalSel}
+          onClose={closeOverlay}
+          onSubmit={() => {
+            const h = palItems[Math.min(palSel, palItems.length - 1)]
+            if (h) pick(h.key)
+          }}
+          onKey={onKey}
+          winW={winW}
+          winH={winH}
+        />
+      )}
+      {sheetOpen && <ShortcutsSheet t={t} onClose={closeOverlay} winW={winW} />}
+      {zoom && <Lightbox t={t} {...zoom} winW={winW} winH={winH} onClose={closeOverlay} />}
     </div>
   )
 }
 
-const ICON = (body: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="#000" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
 const WIDE_SVG = ICON('<path d="M2.5 8h11M5 5.5 2.5 8 5 10.5M11 5.5 13.5 8 11 10.5"/>')
 const SIDEBAR_SVG = ICON('<rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2"/><path d="M6 2.75v10.5"/>')
-const SEARCH_SVG = ICON('<circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3 3"/>')
 
 function IconButton({ t, icon, active, onClick, testId }: { t: UiTheme; icon: string; active: boolean; onClick: () => void; testId: string }) {
   const [hover, setHover] = useState(false)
@@ -626,14 +955,20 @@ const BlockView = memo(function BlockView({
   theme,
   maxW,
   flashN,
+  changed,
   registerRef,
   onToggleTask,
+  onLink,
+  onZoom,
 }: {
   block: Block
   t: UiTheme
   theme: GpuixTheme
   maxW: number
   flashN: number
+  changed: boolean
+  onLink: (href: string) => void
+  onZoom: (z: { src: string; alt?: string; w: number; h: number }) => void
   registerRef: (el: PublicInstance | null) => void
   onToggleTask: (line: number) => void
 }) {
@@ -647,6 +982,9 @@ const BlockView = memo(function BlockView({
       testId={b.kind === 'heading' ? `h-${b.slug}` : undefined}
       style={{ display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, paddingTop: gapTop, paddingBottom: 14, position: 'relative', flexShrink: 0 }}
     >
+      {changed && (
+        <div style={{ position: 'absolute', left: -16, top: gapTop + 2, bottom: 16, width: 2, borderRadius: 1, backgroundColor: alpha(t.blue, 0.5) }} />
+      )}
       {flashN > 0 && (
         <motion.div
           key={flashN}
@@ -662,15 +1000,15 @@ const BlockView = memo(function BlockView({
       {b.kind === 'code' ? (
         <CodeCard b={b} t={t} theme={theme} />
       ) : b.kind === 'img' ? (
-        <ImageBlock b={b} t={t} maxW={maxW} />
+        <ImageBlock b={b} t={t} maxW={maxW} onZoom={onZoom} />
       ) : b.kind === 'tasks' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', minWidth: 0 }}>
           {b.tasks!.map((task) => (
-            <TaskRow key={task.line} task={task} t={t} theme={theme} onToggle={onToggleTask} />
+            <TaskRow key={task.line} task={task} t={t} theme={theme} onToggle={onToggleTask} onLink={onLink} />
           ))}
         </div>
       ) : (
-        <markdown source={b.src} theme={theme} style={{ width: '100%', minWidth: 0 }} />
+        <markdown source={b.src} theme={theme} onLinkClick={(e) => e.value && onLink(String(e.value))} style={{ width: '100%', minWidth: 0 }} />
       )}
     </div>
   )
@@ -679,7 +1017,7 @@ const BlockView = memo(function BlockView({
 const CHECK_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path d="M2.5 6.2 5 8.6 9.6 3.6" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
-function TaskRow({ task, t, theme, onToggle }: { task: Task; t: UiTheme; theme: GpuixTheme; onToggle: (line: number) => void }) {
+function TaskRow({ task, t, theme, onToggle, onLink }: { task: Task; t: UiTheme; theme: GpuixTheme; onToggle: (line: number) => void; onLink: (href: string) => void }) {
   const [hover, setHover] = useState(false)
   const slug = task.text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
   return (
@@ -709,24 +1047,40 @@ function TaskRow({ task, t, theme, onToggle }: { task: Task; t: UiTheme; theme: 
         )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, flexShrink: 1, minWidth: 0, opacity: task.checked ? 0.45 : 1 }}>
-        <markdown source={task.checked ? `~~${task.text}~~` : task.text} theme={theme} style={{ width: '100%', minWidth: 0 }} />
+        <markdown source={task.checked ? `~~${task.text}~~` : task.text} theme={theme} onLinkClick={(e) => e.value && onLink(String(e.value))} style={{ width: '100%', minWidth: 0 }} />
       </div>
     </div>
   )
 }
 
 function CodeCard({ b, t, theme }: { b: Block; t: UiTheme; theme: GpuixTheme }) {
+  const [hover, setHover] = useState(false)
+  const [copied, setCopied] = useState(0)
+  useEffect(() => {
+    if (!copied) return
+    const tm = setTimeout(() => setCopied(0), 1600)
+    return () => clearTimeout(tm)
+  }, [copied])
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, borderRadius: 10, backgroundColor: t.surface, overflow: 'hidden', position: 'relative' }}>
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={{ display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, borderRadius: 10, backgroundColor: t.surface, overflow: 'hidden', position: 'relative' }}>
       <code code={b.src} language={b.lang} theme={theme} style={{ paddingTop: 16, paddingBottom: 16, paddingLeft: 18, paddingRight: 18, minWidth: 0, fontFamily: 'Menlo' }} />
-      {b.lang && (
-        <text style={{ position: 'absolute', top: 10, right: 14, color: t.text3, fontSize: 11.5, fontFamily: 'Menlo', userSelect: 'none' }}>{b.lang}</text>
+      {hover || copied ? (
+        <div
+          testId={`copy-${b.lang ?? 'code'}`}
+          onClick={() => copyText(b.src, isTerminal()) && setCopied(Date.now())}
+          style={{ position: 'absolute', top: 8, right: 8, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingLeft: 9, paddingRight: 10, borderRadius: 7, backgroundColor: t.raised, borderWidth: 1, borderColor: t.hairline, cursor: 'pointer', userSelect: 'none' }}
+        >
+          <svg source={copied ? DONE_SVG : COPY_SVG} style={{ width: 13, height: 13, color: copied ? t.green : t.text2 }} />
+          <text testId={`copy-label-${b.lang ?? 'code'}`} style={{ color: copied ? t.text : t.text2, fontSize: 12 }}>{copied ? 'Copied' : 'Copy'}</text>
+        </div>
+      ) : (
+        b.lang && <text style={{ position: 'absolute', top: 10, right: 14, color: t.text3, fontSize: 11.5, fontFamily: 'Menlo', userSelect: 'none' }}>{b.lang}</text>
       )}
     </div>
   )
 }
 
-function ImageBlock({ b, t, maxW }: { b: Block; t: UiTheme; maxW: number }) {
+function ImageBlock({ b, t, maxW, onZoom }: { b: Block; t: UiTheme; maxW: number; onZoom: (z: { src: string; alt?: string; w: number; h: number }) => void }) {
   const size = useMemo(() => (b.path && !/^(https?:|data:)/.test(b.path) ? imageSize(b.path) : null), [b.path])
   if (!size) {
     return (
@@ -739,7 +1093,9 @@ function ImageBlock({ b, t, maxW }: { b: Block; t: UiTheme; maxW: number }) {
   const h = Math.round((w / size.width) * size.height)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
-      <img src={b.path!} style={{ width: w, height: h, borderRadius: 10 }} />
+      <div testId="image" onClick={() => onZoom({ src: b.path!, alt: b.alt, w: size.width, h: size.height })} style={{ display: 'flex', cursor: 'pointer' }}>
+        <img src={b.path!} style={{ width: w, height: h, borderRadius: 10 }} />
+      </div>
       {b.alt && <text style={{ color: t.text3, fontSize: 12.5 }}>{b.alt}</text>}
     </div>
   )
