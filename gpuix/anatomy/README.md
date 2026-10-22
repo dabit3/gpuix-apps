@@ -11,7 +11,8 @@ anatomy ~/code/hono            # the anatomy of a codebase: top modules as a run
 
 ![Anatomy in Ghostty](media/screenshot.png)
 
-Demo: [`media/demo.mp4`](media/demo.mp4) (Ghostty, GitHub Dark High Contrast, real input, real time).
+Demos (Ghostty, GitHub Dark High Contrast, real input, real time): [`media/demo.mp4`](media/demo.mp4) is codebase mode on
+[Hono](https://github.com/honojs/hono); [`media/demo-machine.mp4`](media/demo-machine.mp4) is machine mode (a V8 engine).
 
 ## Run
 
@@ -53,6 +54,8 @@ The app reflows to the pane: the part tree and inspector collapse below 760 px a
 ## Codebase mode
 
 Point it at a directory and it draws the codebase as a machine:
+
+![Hono's codebase in Ghostty](media/codebase.png)
 
 ```sh
 anatomy .                        # this repo
