@@ -59,7 +59,15 @@ export function designCodebase(cb: Codebase, opts: CodeDesignOptions = {}): Mach
     const nbrs = cb.edges.filter((e) => e.from === cur || e.to === cur).map((e) => ({ m: e.from === cur ? e.to : e.from, w: e.weight })).sort((x, y) => y.w - x.w)
     for (const { m } of nbrs) if (!seen.has(m)) { seen.add(m); parentOf.set(m, cur); queue.push(m) }
   }
-  const idOf = new Map(order.map((m, i) => [m.path, `mod-${i}-${slug(m.path)}`]))
+  // Ids come from paths, not ranks, so a selection survives a rescan that reorders modules or files.
+  const used = new Set<string>()
+  const uniq = (base: string) => {
+    let id = base
+    for (let n = 2; used.has(id); n++) id = `${base}-${n}`
+    used.add(id)
+    return id
+  }
+  const idOf = new Map(order.map((m) => [m.path, uniq(`mod-${slug(m.path)}`)]))
   const pitch = new Map(order.map((m) => [m.path, radiusOf(m) * 0.36]))
   const teethOf = (m: CodeModule) => Math.max(12, Math.min(64, Math.round(14 + 44 * Math.sqrt(m.loc / maxLoc))))
   const hottest = [...mods].sort((x, y) => y.churn - x.churn)[0]!
@@ -99,7 +107,7 @@ export function designCodebase(cb: Codebase, opts: CodeDesignOptions = {}): Mach
       const hot = opts.hot?.has(f.path)
       const col = hot ? C.orange : KIND_COLOR[f.kind]
       const desc = `${f.path} · ${fmtLoc(f.loc)} lines · imported by ${plural(f.importedBy, 'file')} · ${plural(f.churn, 'change')} recently${hot ? ' · just changed' : ''}.`
-      const fid = `${id}-f${k}`
+      const fid = uniq(`${id}-f-${slug(f.path.slice(f.path.lastIndexOf('/') + 1))}`)
       const h = 14 + 86 * s
       let geo: Geometry
       let anim: Animation | undefined

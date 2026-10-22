@@ -119,6 +119,17 @@ describe('codebase designer', () => {
     expect(spec.annotations!.some((n) => n.part === p.id && n.text === 'just changed')).toBe(true)
   })
 
+  it('keeps part ids stable when a rescan reorders files', () => {
+    const cb = scanCodebase(fixture())
+    const ids = (hot?: Set<string>) =>
+      new Map(designCodebase(cb, { hot }).parts.filter((p) => p.id.includes('-f-')).map((p) => [p.description.split(' ')[0], p.id]))
+    const before = ids()
+    const after = ids(new Set(['src/utils/strings.ts']))
+    expect(before.size).toBeGreaterThan(3)
+    expect(new Set(before.values()).size).toBe(before.size)
+    for (const [path, id] of before) expect(after.get(path)).toBe(id)
+  })
+
   it('routes directories to codebase mode and keeps json/description modes', () => {
     const dir = fixture()
     expect(isCodebaseDir(dir)).toBe(true)
