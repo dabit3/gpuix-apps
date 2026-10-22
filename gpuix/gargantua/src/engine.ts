@@ -228,7 +228,8 @@ export class Engine {
       lens: s.lens, disk: s.disk, look: s.look === 'interstellar' ? 1 : 0, n, d1, d2,
       t: (this.now() / 1000) * DISK_RATE % 1e6,
       temp: s.look === 'interstellar' ? 6500 : diskTemp(s.scene, s.mass),
-      gain: sc.gain, opacity: 1.6, orders, sky: 1, starGain: 1,
+      // Beaming spans ~g⁴ ≈ 50× across the disk; expose for the bright side so the receding side reads dim.
+      gain: sc.gain * (s.look === 'physical' ? 0.2 : 1), opacity: 1.6, orders, sky: 1, starGain: 1,
     }
   }
 
@@ -268,7 +269,7 @@ export class Engine {
     const flash = d?.phase === 'flash' ? Math.max(0, 1 - d.clock / 1.4) * 2.5 : d?.phase === 'inside' && d.inside > 0.9 ? (d.inside - 0.9) * 25 : 0
     const sc = SCENES[this.settings.scene]
     const bloomBuf = this.bloomBuf
-    await this.split(h, (y0, y1) => ({ kind: 'post', hdr, bloom: bloomBuf, bw, bh, out, w, h, y0, y1, exposure: sc.exposure, bloomGain: 0.75, flash }), 2)
+    await this.split(h, (y0, y1) => ({ kind: 'post', hdr, bloom: bloomBuf, bw, bh, out, w, h, y0, y1, exposure: sc.exposure, bloomGain: this.settings.look === 'physical' ? 1.2 : 0.75, flash }), 2)
     return { trace: t1 - t0, table: tTable, post: performance.now() - t1 }
   }
 
