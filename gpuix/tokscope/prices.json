@@ -1,11 +1,50 @@
 {
   "note": "USD per 1M tokens, matched by substring of the model id (first match wins). Edit to match your provider's current price sheet.",
   "models": [
-    { "match": "opus", "label": "Opus", "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.5 },
-    { "match": "sonnet", "label": "Sonnet", "input": 3, "output": 15, "cacheWrite": 3.75, "cacheRead": 0.3 },
-    { "match": "haiku", "label": "Haiku", "input": 1, "output": 5, "cacheWrite": 1.25, "cacheRead": 0.1 },
-    { "match": "", "label": "Default", "input": 3, "output": 15, "cacheWrite": 3.75, "cacheRead": 0.3 }
+    {
+      "match": "opus",
+      "label": "Opus",
+      "input": 5,
+      "output": 25,
+      "cacheWrite": 6.25,
+      "cacheRead": 0.5
+    },
+    {
+      "match": "sonnet",
+      "label": "Sonnet",
+      "input": 3,
+      "output": 15,
+      "cacheWrite": 3.75,
+      "cacheRead": 0.3
+    },
+    {
+      "match": "haiku",
+      "label": "Haiku",
+      "input": 1,
+      "output": 5,
+      "cacheWrite": 1.25,
+      "cacheRead": 0.1
+    },
+    {
+      "match": "gpt",
+      "label": "GPT (assumed)",
+      "input": 1.25,
+      "output": 10,
+      "cacheWrite": 1.25,
+      "cacheRead": 0.125
+    },
+    {
+      "match": "",
+      "label": "Default",
+      "input": 3,
+      "output": 15,
+      "cacheWrite": 3.75,
+      "cacheRead": 0.3
+    }
   ],
-  "route": { "match": "haiku", "label": "Haiku" },
+  "route": {
+    "match": "haiku",
+    "label": "Haiku"
+  },
   "cacheTTLMinutes": 5
 }

@@ -11,7 +11,10 @@ usage
   tokscope --audit [paths...]   write AUDIT.md and exit, no UI
 
 paths   Claude Code transcript dirs or .jsonl files.
-        default: ~/.claude/projects if it exists, else the bundled sample/
+        Reads Claude Code (.jsonl), Codex CLI rollouts (.jsonl) and ATIF
+        trajectories (.json, e.g. devin --export), detected per file.
+        default: ~/.claude/projects, ~/.codex/sessions and
+        ~/.local/share/devin/exports that exist, else the bundled sample/
 
 options
   -o, --out <file>      where AUDIT.md is written      (default ./AUDIT.md)
@@ -26,6 +29,8 @@ keys
 
 examples
   tokscope ~/.claude/projects
+  tokscope ~/.codex/sessions
+  tokscope run.json             # devin --export run.json -- <task>
   tokscope sample/
   tokscope sample/ live/        # then, in a split pane: bun replay`
 
@@ -46,8 +51,8 @@ if (values.help) {
 }
 
 const root = resolve(import.meta.dir, '..')
-const claude = join(homedir(), '.claude', 'projects')
-const paths = positionals.length ? positionals.map((p) => resolve(p.replace(/^~(?=$|\/)/, homedir()))) : [existsSync(claude) ? claude : join(root, 'sample')]
+const found = [join(homedir(), '.claude', 'projects'), join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'sessions'), join(homedir(), '.local', 'share', 'devin', 'exports')].filter((p) => existsSync(p))
+const paths = positionals.length ? positionals.map((p) => resolve(p.replace(/^~(?=$|\/)/, homedir()))) : found.length ? found : [join(root, 'sample')]
 const auditPath = resolve(values.out ?? 'AUDIT.md')
 
 const { loadPrices } = await import('../src/prices')

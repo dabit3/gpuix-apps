@@ -40,7 +40,7 @@ export function requestEntries(r: Request, prefix: { system: number; tools: numb
   const billed = totalInput(r.usage)
   const est: Entry[] = [
     { seg: 'system', tokens: r.estSystem >= 0 ? r.estSystem : prefix.system },
-    { seg: 'tools', tokens: r.estTools >= 0 ? r.estTools : prefix.tools },
+    { seg: 'tools', tokens: r.estSystem >= 0 && r.estTools >= 0 ? r.estTools : prefix.tools },
     ...r.chain.map((it) => ({ seg: it.seg, tokens: it.estTokens, ref: it.uuid })),
   ]
   const sum = est.reduce((a, e) => a + e.tokens, 0) || 1
@@ -51,12 +51,16 @@ export function requestEntries(r: Request, prefix: { system: number; tools: numb
 /** For transcripts without request shapes, infer the stable prefix from the smallest unexplained input. */
 export function inferPrefix(s: Session, systemShare = 0.25): { system: number; tools: number } {
   let best = Infinity
+  let known = -1
   for (const r of s.requests) {
-    if (r.estSystem >= 0) return { system: r.estSystem, tools: r.estTools }
+    if (r.estSystem >= 0 && r.estTools >= 0) return { system: r.estSystem, tools: r.estTools }
+    if (r.estSystem >= 0) known = r.estSystem
     const msgs = r.chain.reduce((a, it) => a + it.estTokens, 0)
     best = Math.min(best, totalInput(r.usage) - msgs)
   }
   const p = Number.isFinite(best) ? Math.max(best, 1500) : 8000
+  // System prompt known (e.g. Codex logs it), tool schemas not: tools get the unexplained rest.
+  if (known >= 0) return { system: known, tools: Math.max(0, p - known) }
   return { system: p * systemShare, tools: p * (1 - systemShare) }
 }
 

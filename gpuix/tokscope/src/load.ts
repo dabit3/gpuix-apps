@@ -1,7 +1,9 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
 import { analyzeSession } from './analyze'
 import { parseTranscript } from './parse'
+import { isAtif, parseAtif } from './parse-atif'
+import { isCodex, parseCodex } from './parse-codex'
 import type { PriceSheet } from './prices'
 import type { Session } from './types'
 
@@ -15,7 +17,7 @@ export function findTranscripts(paths: string[]): string[] {
       return
     }
     if (st.isFile()) {
-      if (p.endsWith('.jsonl')) out.push(p)
+      if (p.endsWith('.jsonl') || (p.endsWith('.json') && isAtif(head(p)))) out.push(p)
       return
     }
     if (!st.isDirectory() || depth > 6) return
@@ -26,6 +28,26 @@ export function findTranscripts(paths: string[]): string[] {
   }
   for (const p of paths) walk(resolve(p), 0)
   return [...new Set(out)].sort()
+}
+
+function head(file: string, n = 4096): string {
+  try {
+    const fd = openSync(file, 'r')
+    const buf = Buffer.alloc(n)
+    const len = readSync(fd, buf, 0, n, 0)
+    closeSync(fd)
+    return buf.subarray(0, len).toString('utf8')
+  } catch {
+    return ''
+  }
+}
+
+export type Format = 'claude' | 'codex' | 'atif'
+
+export function detectFormat(file: string): Format {
+  const h = head(file)
+  if (file.endsWith('.json') || isAtif(h)) return 'atif'
+  return isCodex(h.split('\n', 1)[0] ?? '') ? 'codex' : 'claude'
 }
 
 function projectName(file: string): string {
@@ -55,10 +77,13 @@ export function loadSessions(paths: string[], sheet: PriceSheet): { sessions: Se
     const c = cache.get(f)
     if (c && c.size === st.size && c.mtime === st.mtimeMs) continue
     changed = true
-    const ss = parseTranscript(readFileSync(f, 'utf8'), f, st.mtimeMs)
-    const sub = f.includes(`${sep}subagents${sep}`)
+    const fmt = detectFormat(f)
+    const text = readFileSync(f, 'utf8')
+    const ss = fmt === 'codex' ? parseCodex(text, f, st.mtimeMs) : fmt === 'atif' ? parseAtif(text, f, st.mtimeMs) : parseTranscript(text, f, st.mtimeMs)
+    const sub = fmt === 'claude' && f.includes(`${sep}subagents${sep}`)
     for (const s of ss) {
-      s.project = projectName(f)
+      s.harness = fmt
+      if (fmt === 'claude') s.project = projectName(f)
       if (sub) s.id = `${s.id}/${basename(f, '.jsonl')}`
       analyzeSession(s, sheet)
     }

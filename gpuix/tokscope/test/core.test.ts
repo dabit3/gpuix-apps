@@ -6,7 +6,7 @@ import { loadSessions, resetCache } from '../src/load'
 import { parseTranscript } from '../src/parse'
 import { DEFAULT_PRICES } from '../src/prices'
 
-const SAMPLE = join(import.meta.dir, '..', 'sample')
+const SAMPLE = join(import.meta.dir, '..', 'sample', 'projects')
 
 function load() {
   resetCache()
@@ -100,5 +100,45 @@ describe('bundled sample', () => {
     for (let i = 1; i < fixes.length; i++) expect(fixes[i - 1]!.savings).toBeGreaterThanOrEqual(fixes[i]!.savings)
     const md = auditMarkdown(sessions, DEFAULT_PRICES, ['sample/'])
     for (const h of ['## Request assembly', '## Baseline', '### Cost by segment', '## Biggest offenders', '## Findings', '## Shipped vs. flagged', '## Next 3 ideas', '## Price sheet']) expect(md).toContain(h)
+  })
+})
+
+describe('other harnesses', () => {
+  const ROOT = join(import.meta.dir, '..', 'sample')
+  it('detects Codex rollouts and ATIF exports next to Claude Code transcripts', () => {
+    resetCache()
+    const { sessions } = loadSessions([ROOT], DEFAULT_PRICES)
+    const by = (h: string) => sessions.filter((s) => s.harness === h)
+    expect(by('claude').length).toBe(7)
+    expect(by('codex').length).toBe(1)
+    expect(by('atif').length).toBe(1)
+    expect(by('atif')[0]!.agent).toBe('devin')
+  })
+
+  it('bills Codex usage: input_tokens already contains cache reads and writes', () => {
+    resetCache()
+    const codex = loadSessions([join(ROOT, 'codex')], DEFAULT_PRICES).sessions[0]!
+    expect(codex.project).toBe('billing-service')
+    expect(codex.models).toEqual(['gpt-6.1-sol'])
+    expect(codex.requests.length).toBe(10)
+    const r = codex.requests[1]!
+    expect(r.usage.input).toBe(3)
+    expect(r.usage.cacheRead).toBeGreaterThan(0)
+    const segIn = r.seg.system + r.seg.tools + r.seg.history + r.seg.context + r.seg.toolResults
+    expect(segIn).toBeCloseTo(r.usage.input + r.usage.cacheRead + r.usage.cacheWrite, 3)
+    expect(codex.requests.some((q) => q.cacheBreak)).toBe(true)
+    expect(repeatedCalls([codex]).length).toBeGreaterThan(0)
+  })
+
+  it('parses ATIF metrics: prompt_tokens includes cached_tokens, writes come from extra', () => {
+    resetCache()
+    const d = loadSessions([join(ROOT, 'devin')], DEFAULT_PRICES).sessions[0]!
+    expect(d.requests.length).toBe(8)
+    const r = d.requests[2]!
+    expect(r.usage.cacheWrite).toBeGreaterThan(0)
+    expect(r.usage.input).toBe(3)
+    expect(d.reportedCostUSD).toBeGreaterThan(0)
+    expect(d.toolCalls.some((c) => c.name === 'read')).toBe(true)
+    expect(d.title).toContain('pagination')
   })
 })

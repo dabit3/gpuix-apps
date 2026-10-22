@@ -1,8 +1,8 @@
 # tokscope
 
 A token-efficiency audit for agent transcripts, rendered inside the terminal with
-[GPUIX](https://github.com/remorses/gpuix). Point it at Claude Code transcripts
-(`~/.claude/projects`) or the bundled sample logs. It shows where the money goes by
+[GPUIX](https://github.com/remorses/gpuix). Point it at Claude Code, Codex CLI or
+Devin CLI transcripts, or the bundled sample logs. It shows where the money goes by
 prompt segment, what the cache saved and where it broke, which tool results cost the
 most to carry, and a ranked list of fixes. It writes the whole thing as `AUDIT.md`.
 
@@ -75,6 +75,22 @@ bottom of each bar and what the turn added is bright. Type is Geist and Geist Mo
 from the [`geist`](https://www.npmjs.com/package/geist) package (SIL OFL), registered
 at startup with `registerFont`; `<code>` and `<markdown>` share a monochrome theme.
 
+## Supported harnesses
+
+The format is detected per file, so one run can mix all three.
+
+| Harness | Where | Per-request usage | Notes |
+|---|---|---|---|
+| Claude Code | `~/.claude/projects/**/*.jsonl` | assistant `message.usage` (input, cache write, cache read, output) | Sub-agents from `subagents/`; system prompt and tool schemas from `api-request-shape` lines when present |
+| Codex CLI | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | `token_usage_record` per response (falls back to `token_count.last_token_usage`) | `input_tokens` already includes `cached_input_tokens` and `cache_write_input_tokens`. System prompt size from `session_meta.base_instructions`; tool schemas aren't logged, so they get the unexplained rest of the prefix. Encrypted reasoning is sized from its ciphertext |
+| Devin CLI | `devin --export <file>.json -- <task>` (ATIF-v1.7); `~/.local/share/devin/exports` is scanned if it exists | step `metrics`: `prompt_tokens` (includes `cached_tokens`), `completion_tokens`, `extra.cache_creation_input_tokens` | Any ATIF trajectory works (Harbor agents too). System prompt from leading system steps, tool schemas from `agent.tool_definitions`, embedded `subagent_trajectories` become sub-agent sessions |
+
+The Codex parser was checked against a real Codex CLI 0.163 rollout. The Devin parser follows
+the ATIF RFC and the field names in the Devin CLI 3000.11 binary, but hasn't been run on a
+real `devin --export` file yet (the CLI needs a signed-in account). `sample/codex` and
+`sample/devin` are synthetic (`sample/generate-multi.ts`). GPT prices in `prices.json` are
+placeholders like the rest of the sheet.
+
 ## How the numbers are made
 
 - Claude Code writes one JSONL line per content block. tokscope dedupes assistant blocks
@@ -114,8 +130,7 @@ Cut, and said so in AUDIT.md: the eval set, the 3× baseline runs, confidence in
 and quality deltas. tokscope can't run tasks, so it can't show "no significant quality
 drop". Its savings are projections to confirm with an eval, which means the prompt's
 second acceptance criterion is not met here. Also cut: latency, retrieval chunk/top-k
-analysis (no retrieval in Claude Code transcripts beyond injected context), other
-harness formats.
+analysis (no retrieval in these transcripts beyond injected context).
 
 The bundled `sample/` is synthetic (`sample/generate.ts`, seeded): six tasks across three
 fake projects plus one sub-agent, with planted problems (a cache-busting timestamp, huge

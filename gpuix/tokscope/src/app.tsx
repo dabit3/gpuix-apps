@@ -79,6 +79,7 @@ function shortPath(p: string): string {
   return p.replace(process.env.HOME ?? '~', '~')
 }
 
+const harnessLabel = (s: Session) => (s.harness === 'codex' ? 'Codex' : s.harness === 'atif' ? (/devin/i.test(s.agent ?? '') ? 'Devin' : s.agent ?? 'ATIF') : 'Claude Code')
 const cleanPath = (s: string) => s.replace('/Users/sam/code/', '').replace(process.env.HOME ?? '#', '~')
 const pct = (a: number, b: number) => `${((a / (b || 1)) * 100).toFixed(1)}%`
 
@@ -250,7 +251,7 @@ export function App({ paths, sheet, auditPath, watch = true, initial }: AppProps
           {narrow && (
             <Switcher
               title={current ? current.title : `All sessions · ${sessions.length}`}
-              sub={current ? `${current.project} · ${current.requests.length} requests` : `${t.requests} requests`}
+              sub={current ? `${harnessLabel(current)} · ${current.project} · ${current.requests.length} requests` : `${t.requests} requests`}
               cost={t.cost}
               onPrev={() => step(-1)}
               onNext={() => step(1)}
@@ -359,7 +360,7 @@ function Sidebar({ sessions, sel, onSel, pulse, now }: { sessions: Session[]; se
           active={sel === s.id}
           onClick={() => onSel(s.id)}
           title={s.title}
-          sub={`${s.project} · ${s.requests.length} requests`}
+          sub={`${harnessLabel(s)} · ${s.project} · ${s.requests.length} requests`}
           cost={sessionCost(s)}
           flash={pulse?.id === s.id && now - pulse.at < 1500}
           side={s.id.includes('/')}
@@ -426,7 +427,7 @@ function Empty({ paths }: { paths: string[] }) {
         Waiting for transcripts
       </Txt>
       <Txt c={C.fg3} s={12} mono>
-        {`watching ${paths.join(', ')} for *.jsonl`}
+        {`watching ${paths.map(shortPath).join(', ')} for Claude Code, Codex and ATIF transcripts`}
       </Txt>
     </div>
   )

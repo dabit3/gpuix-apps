@@ -73,6 +73,10 @@ export type Session = {
   reportedCostUSD?: number
   shapes: number
   mtime: number
+  /** which transcript format it came from */
+  harness?: 'claude' | 'codex' | 'atif'
+  /** agent name from an ATIF trajectory (e.g. devin) */
+  agent?: string
 }
 
 export type Totals = {

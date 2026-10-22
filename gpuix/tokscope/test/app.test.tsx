@@ -6,7 +6,7 @@ import { loadSessions, resetCache } from '../src/load'
 import { DEFAULT_PRICES } from '../src/prices'
 
 const d = hasNativeTestRenderer ? describe : describe.skip
-const SAMPLE = join(import.meta.dir, '..', 'sample')
+const SAMPLE = join(import.meta.dir, '..', 'sample', 'projects')
 
 d('dashboard (GPU test renderer)', () => {
   resetCache()

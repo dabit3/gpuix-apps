@@ -14,6 +14,7 @@ export const DEFAULT_PRICES: PriceSheet = {
     { match: 'opus', label: 'Opus', input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
     { match: 'sonnet', label: 'Sonnet', input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
     { match: 'haiku', label: 'Haiku', input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
+    { match: 'gpt', label: 'GPT (assumed)', input: 1.25, output: 10, cacheWrite: 1.25, cacheRead: 0.125 },
     { match: '', label: 'Default', input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
   ],
   route: { match: 'haiku', label: 'Haiku' },
