@@ -126,7 +126,8 @@ describeNative("Devin's computer panel", () => {
 
     await app.getByTestId('computer-open').click()
     await until(async () => opened.length > 0, 'open')
-    expect(opened.at(-1)).toBe('https://s3.example/a4')
+    expect(opened.at(-1)).toBe(path.join(dir, 'a4-deployed.png'))
+    expect(readFileSync(opened.at(-1)!).length).toBe(readFileSync(PNG).length)
 
     await app.getByTestId('tab-details').click()
     await until(async () => (await app.getByTestId('detail-status').count()) === 1, 'session details')

@@ -40,7 +40,7 @@ import type { DevinApi } from './api'
 import { eventsFromMessages, sessionFromApi, statusLine } from './live'
 import type { ApiPlaybook, ApiSession } from './api'
 import { ActionMenu, AutomationsView, Btn, copyText, CustomizeView, Field, notificationsFor, NotificationsView, ReviewView, SecurityView, SettingsView, useSticky, WEB, type MenuAction, type View } from './views'
-import { previewPath, shotsFrom, type PreviewDeps, type Shot } from './computer'
+import { originalPath, previewPath, shotsFrom, type PreviewDeps, type Shot } from './computer'
 import { loadPrefs, savePrefs, type Prefs } from './prefs'
 
 export { C }
@@ -1065,10 +1065,15 @@ function ComputerPanel({ session, client, pollMs, previews }: { session: Session
     }
   }, [shot?.attachment_id, client])
   const go = (i: number) => setPick(i >= n - 1 ? -1 : Math.max(0, i))
-  // app.devin.ai attachment links need a web-app login cookie, so open a fresh presigned URL instead.
+  const [opening, setOpening] = useState(false)
+  // app.devin.ai attachment links need a web-app login and S3 serves them as downloads, so fetch the original and open it locally.
   const openOriginal = (s: Shot) => {
-    if (!client?.attachmentUrl) return openUrl(session.live?.url ?? s.url)
-    client.attachmentUrl(s).then(openUrl, () => openUrl(session.live?.url ?? s.url))
+    const fallback = () => openUrl(session.live?.url ?? s.url)
+    if (!client?.attachmentUrl) return fallback()
+    setOpening(true)
+    originalPath(s, { ...previews, resolve: (a) => client.attachmentUrl!(a) })
+      .then((file) => (file ? openUrl(file) : fallback()))
+      .finally(() => setOpening(false))
   }
   const ready = preview && shot && preview.id === shot.attachment_id ? preview : null
   if (error && !shots) return <Empty text={error.slice(0, 80)} />
@@ -1119,7 +1124,7 @@ function ComputerPanel({ session, client, pollMs, previews }: { session: Session
             <Btn label="Jump to latest" testId="computer-latest" small onClick={() => setPick(-1)} />
           </div>
         )}
-        <Btn label="Open" icon="link" testId="computer-open" small onClick={() => openOriginal(shot)} />
+        <Btn label={opening ? 'Opening…' : 'Open'} icon="link" testId="computer-open" small onClick={() => !opening && openOriginal(shot)} />
       </div>
       <div style={{ ...col({ gap: 1 }), flexShrink: 0 }}>
         {recent.map(({ s, i }) => (

@@ -68,3 +68,27 @@ export function previewPath(a: Shot, deps: PreviewDeps): Promise<string | null> 
   inflight.set(file, job)
   return job
 }
+
+/** Downloads the full attachment (e.g. the whole recording) so it can be opened in a local viewer. */
+export function originalPath(a: Shot, deps: PreviewDeps): Promise<string | null> {
+  const dir = deps.dir ?? CACHE_DIR
+  const file = join(dir, `${a.attachment_id}-${safe(a.name)}`)
+  if (existsSync(file)) return Promise.resolve(file)
+  const hit = inflight.get(file)
+  if (hit) return hit
+  const job = (async () => {
+    try {
+      mkdirSync(dir, { recursive: true })
+      const res = await (deps.fetch ?? fetch)(await deps.resolve(a))
+      if (!res.ok) return null
+      writeFileSync(file, new Uint8Array(await res.arrayBuffer()))
+      return file
+    } catch {
+      return null
+    } finally {
+      inflight.delete(file)
+    }
+  })()
+  inflight.set(file, job)
+  return job
+}
