@@ -249,8 +249,9 @@ export function renderFrame(s: GameState, view: View, fb: FrameBuffers) {
     if (label) {
       const [cx, cy] = tc(hx, hy)
       const w = textWidth(label)
-      box2d(lum, hue, aw, ah, cx - w / 2 - 3 - ox, cy - 52 - oy, w + 6, 11, a?.hostile ? HUE_RED : HUE_GREEN)
-      drawText(lum, hue, aw, ah, label, cx - w / 2 - ox, cy - 50 - oy, 240, a?.hostile ? HUE_RED : HUE_GREEN)
+      const lx = Math.max(6, Math.min(aw - w - 6, cx - w / 2 - ox)), ly = Math.max(6, cy - 52 - oy)
+      box2d(lum, hue, aw, ah, lx - 3, ly, w + 6, 11, a?.hostile ? HUE_RED : HUE_GREEN)
+      drawText(lum, hue, aw, ah, label, lx, ly + 2, 240, a?.hostile ? HUE_RED : HUE_GREEN)
     }
   }
   // 4b. objective waypoint
