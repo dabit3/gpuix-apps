@@ -1,27 +1,28 @@
-// GitHub Dark High Contrast, as shipped in Ghostty.app, so the dashboard blends into the terminal.
+// Background, text and accents come from GitHub Dark High Contrast (as shipped in Ghostty.app) so the dashboard blends into the terminal.
 export const T = {
   bg: '#0a0c10',
-  panel: '#0f1318',
-  raised: '#151a21',
-  hover: '#1b212a',
-  selected: '#1d2633',
-  line: '#232a33',
-  lineStrong: '#3a424d',
+  surface: '#0e1116',
+  raised: '#151920',
+  hover: '#12161c',
+  selected: '#1a1f27',
+  line: '#1b2027',
+  lineStrong: '#2a3039',
   text: '#f0f3f6',
-  muted: '#9ea7b3',
-  faint: '#7a828e',
+  muted: '#9aa1aa',
+  faint: '#646b75',
   blue: '#71b7ff',
   cyan: '#39c5cf',
   green: '#26cd4d',
   yellow: '#f0b72f',
   red: '#ff9492',
-  orange: '#ffb757',
+  orange: '#f0b72f',
 } as const
 
 export const SANS = '.SystemUIFont'
 export const MONO = 'Menlo'
 
-export const ROLE_COLOR = { builder: T.blue, scout: T.cyan, advisor: T.yellow, other: T.muted } as const
+// Monochrome tiers with one accent for the advisor, the role this app is about.
+export const ROLE_COLOR = { builder: '#d6dce3', scout: '#6e7681', advisor: T.blue, other: T.faint } as const
 export const VERDICT_COLOR = { approve: T.green, revise: T.orange, block: T.red } as const
 
 export const fmtTokens = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
