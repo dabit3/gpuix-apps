@@ -87,8 +87,9 @@ export function designCodebase(cb: Codebase, opts: CodeDesignOptions = {}): Mach
     })
     if (parent) a.connections.push({ from: `${idOf.get(parent)!}-gear`, to: gid, type: 'belt', radiusFrom: pitch.get(parent)!, radiusTo: pr, color: C.gray })
 
-    // Biggest files stand around the gear.
-    const files = m.files.slice(0, FILES_PER_MODULE)
+    // Biggest files, plus any that just changed so a live edit always lights up something on screen.
+    const changed = m.files.filter((f) => opts.hot?.has(f.path))
+    const files = [...changed.slice(0, FILES_PER_MODULE), ...m.files.filter((f) => !opts.hot?.has(f.path))].slice(0, FILES_PER_MODULE)
     const maxF = Math.max(1, ...m.files.map((f) => f.loc))
     files.forEach((f, k) => {
       const ang = (k / files.length) * TAU + 0.4
@@ -120,7 +121,7 @@ export function designCodebase(cb: Codebase, opts: CodeDesignOptions = {}): Mach
       }
       const y = geo.type === 'sphere' ? 6 + 10 * s + 6 : geo.type === 'box' ? (8 + 20 * s) / 2 + 5 : geo.type === 'spring' ? 5 : h / 2 + 5
       const mat = hot ? glow(col, { effect: 'electric', effectTarget: [-fp[0], 12 - y, -fp[2]] }) : f.kind === 'entry' ? glow(col) : wire(col)
-      a.add(fid, f.path.split('/').pop()!, desc, geo, mat, { parent: id, pos: [fp[0], y, fp[2]], anim, explode: [fp[0] * 1.4, 40 + 30 * s, fp[2] * 1.4], note: hot ? 'just changed' : undefined })
+      a.add(fid, fileLabel(f.path), desc, geo, mat, { parent: id, pos: [fp[0], y, fp[2]], anim, explode: [fp[0] * 1.4, 40 + 30 * s, fp[2] * 1.4], note: hot ? 'just changed' : undefined })
     })
     if (m.files.length > files.length) a.annotations.push({ part: id, text: `+${m.files.length - files.length} more files` })
     if (m === hottest && m.churn > 0) a.add(`${id}-heat`, `${moduleLabel(m.path)} · hot spot`, `The most-edited module: ${plural(m.churn, 'file change')} in the last ${cb.commits} commits.`, { type: 'torus', radius: pr * 0.7, tube: 3, segments: 32 }, glow(C.orange, { effect: 'fire', effectTarget: [0, 1, 0] }), { parent: id, pos: [0, 26, 0], explode: [0, 80, 0], note: 'hot spot' })
@@ -149,9 +150,18 @@ export function designCodebase(cb: Codebase, opts: CodeDesignOptions = {}): Mach
   })
 
   const extent = Math.max(...[...pos.values()].map((p) => Math.hypot(p[0], p[2]))) + 260
-  const langs = cb.languages.slice(0, 2).map((l) => `${LANG[l.ext] ?? l.ext} ${Math.round((l.loc / Math.max(1, cb.totalLoc)) * 100)}%`).join(', ')
+  const byLang = new Map<string, number>()
+  for (const l of cb.languages) { const n = LANG[l.ext] ?? l.ext; byLang.set(n, (byLang.get(n) ?? 0) + l.loc) }
+  const langs = [...byLang.entries()].sort((x, y) => y[1] - x[1]).filter(([, loc], i) => i === 0 || loc / Math.max(1, cb.totalLoc) >= 0.01).slice(0, 2).map(([n, loc]) => `${n} ${Math.round((loc / Math.max(1, cb.totalLoc)) * 100)}%`).join(', ')
   const rest = cb.rest.modules ? ` · top ${mods.length} of ${mods.length + cb.rest.modules} modules` : ''
   return a.spec({ name: `${cb.name} · codebase`, description: `${plural(cb.files.length, 'file')} · ${fmtLoc(cb.totalLoc)} lines · ${langs}${rest} · belts = drive tree, packets = imports`, unit: 'mm', camera: { view: 'iso', yaw: -0.2, zoom: 1.05 } }, Math.ceil(extent))
+}
+
+/** Basename, or `dir/index.ts` for generic names so the tree stays readable. */
+export function fileLabel(path: string): string {
+  const seg = path.split('/')
+  const base = seg[seg.length - 1]!
+  return /^(index|mod|__init__|main|lib|types)\.[a-z]+$/.test(base) && seg.length > 1 ? `${seg[seg.length - 2]}/${base}` : base
 }
 
 function topLanguage(files: CodeFile[]): string | undefined {

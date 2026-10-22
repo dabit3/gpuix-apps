@@ -6,6 +6,7 @@ terminal** over the Kitty graphics protocol.
 ```sh
 anatomy "a V8 engine"
 anatomy specs/v8.json          # edits to the file hot-reload
+anatomy ~/code/hono            # the anatomy of a codebase: top modules as a running machine
 ```
 
 ![Anatomy in Ghostty](media/screenshot.png)
@@ -28,6 +29,7 @@ anatomy examples/turbofan.json
 | Command | What it does |
 | --- | --- |
 | `anatomy "<description>"` | design a machine from a one-liner and open it |
+| `anatomy <dir> [--top N]` | the anatomy of a codebase (see below); source edits rescan live |
 | `anatomy <spec.json>` | open a spec; the file is watched and hot-reloads (invalid edits keep the last good machine and show the issue) |
 | `anatomy gen "<description>" -o specs/x.json` | write a designed spec |
 | `anatomy validate <spec.json>...` | AJV schema + mechanical checks, exit 1 on issues |
@@ -47,6 +49,36 @@ sed -i '' 's/"rpm": 40/"rpm": 120/' specs/machine.json       # or tweak it: the 
 ```
 
 The app reflows to the pane: the part tree and inspector collapse below 760 px and the camera re-fits tall panes.
+
+## Codebase mode
+
+Point it at a directory and it draws the codebase as a machine:
+
+```sh
+anatomy .                        # this repo
+anatomy ~/code/hono --top 8      # top 8 modules (3-24, default 12); n / b or the toolbar − + change it live
+```
+
+| Codebase | Machine |
+| --- | --- |
+| a module (directory, split recursively until the top N are balanced) | a station: a ring housing sized by lines of code |
+| the most depended-on module | the engine at the centre, the only part with its own rpm |
+| how modules depend on each other | belts: every station is driven from the engine through the module it imports most, so pulley ratios follow size (small modules spin fast) |
+| imports between modules | arcing wires with glowing packets riding them; more packets and a brighter wire for heavier traffic |
+| a module's biggest files (up to 6) | parts on the station: cylinders (source, height = lines), springs (tests), beacons (entry points), cells (types), blocks (config) |
+| the most-edited module (git log, last 400 commits) | a fire ring: the hot spot |
+| a file you just saved | glows orange with an electric arc for 9 s |
+
+Ranking: a module's score is its lines of code × (1 + 0.8·log(1 + modules importing it) + 0.15·log(1 + recent changes)); files
+within a module rank by lines × (1 + log(1 + importers)), with tests discounted. Imports are found with per-language regexes
+(TS/JS incl. `require`, dynamic `import()` and workspace package names, Python, Go, Rust `mod`/`use`, C/C++ `#include "…"`)
+and resolved to files in the repo; external packages are ignored. `node_modules`, build output, vendored code, `.d.ts` and
+minified files are skipped, and git-ignored files are left out when the folder is a git checkout.
+
+Everything else works the same: play/pause/step/speed run the drive train and packets, `e` or the slider expands the
+stations apart, click any part for its path, line count, importers and recent changes, double-click to fly to it.
+**Split a pane and edit code**: the app watches the tree, rescans in ~50-200 ms (Hono: 450 files, 83k lines) and lights up
+what changed. `anatomy gen <dir> -o x.json` and `anatomy snap <dir>` work too, and the output is a normal machine spec.
 
 ## The skill
 

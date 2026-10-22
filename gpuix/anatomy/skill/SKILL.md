@@ -14,6 +14,12 @@ GPUIX terminal runtime. Run every command from the `anatomy/` folder.
 mechanical watches, turbofans, steam locomotives and planetary gearsets. If it prints `wrote ...`, start from that
 file (edit it to match the request) and skip to step 4. If it says "No built-in designer", write the spec yourself.
 
+## Codebases
+
+For "the anatomy of this repo/app", don't write a spec: run `anatomy <dir> [--top N]`. It scans files, lines and imports,
+ranks the top modules and builds the machine itself (see the README's Codebase mode). `anatomy gen <dir> -o x.json` writes
+that spec if the user wants to hand-tune it.
+
 ## 1. Decompose (12–60 parts)
 
 Housing → subassemblies → moving parts, using `parentId`. Name real components: crankshaft, cam lobe, escape wheel,
