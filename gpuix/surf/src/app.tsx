@@ -145,6 +145,9 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
   const [, setRev] = useState(0)
   const [cursor, setCursor] = useState<CursorValue>('default')
   const [hasFrame, setHasFrame] = useState(false)
+  // CSS size of the frame on screen: the image is drawn 1:1 at that size and clicks map against it, so a frame from before a resize is never stretched
+  const [shown, setShown] = useState<{ width: number; height: number } | null>(null)
+  const shownRef = useRef(shown)
   const lastCursor = useRef({ at: 0, x: -1, y: -1 })
   const meter = useRef(paint ?? new RateMeter())
 
@@ -174,6 +177,8 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
       if (!f || !img.current) return
       const t0 = performance.now()
       img.current.setImage(f.bytes)
+      const cur = shownRef.current
+      if (!cur || cur.width !== f.cssWidth || cur.height !== f.cssHeight) { shownRef.current = { width: f.cssWidth, height: f.cssHeight }; setShown(shownRef.current) }
       s.paintMs = performance.now() - t0
       s.painted++
       meter.current.tick()
@@ -187,7 +192,10 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
 
   useEffect(() => { if (b && s.focus === 'page') ui.focusPage() }, [b])
 
-  const pageX = (e: EventPayload) => mapPoint(e.x ?? 0, e.y ?? 0, s.box, b?.viewport ?? { width: 1, height: 1 })
+  const pageX = (e: EventPayload) => {
+    const v = shownRef.current ?? b?.viewport ?? { width: 1, height: 1 }
+    return mapPoint(e.x ?? 0, e.y ?? 0, { x: s.box.x, y: s.box.y, width: v.width, height: v.height }, v)
+  }
 
   const onMouseDown = (e: EventPayload) => {
     if (!b) return
@@ -266,7 +274,7 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
         onLayout={(e: EventPayload) => s.layout({ x: e.x ?? 0, y: e.y ?? 0, width: e.width ?? 0, height: e.height ?? 0 })}
         style={{ position: 'relative', display: 'flex', flexGrow: 1, minHeight: 0, backgroundColor: '#ffffff', overflow: 'hidden' }}
       >
-        <img ref={img} testId="page-img" style={{ position: 'absolute', left: 0, top: 0, width: vp ? vp.width : '100%', height: vp ? vp.height : '100%' }} />
+        <img ref={img} testId="page-img" style={{ position: 'absolute', left: 0, top: 0, width: shown ? shown.width : vp ? vp.width : '100%', height: shown ? shown.height : vp ? vp.height : '100%' }} />
         <div testId="page-input" onMouseDown={onMouseDown} onMouseUp={onMouseUp} onMouseMove={onMouseMove} onScroll={onScroll} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, cursor }} />
         {!hasFrame ? (
           <div testId="splash" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: t.bg, pointerEvents: 'none' }}>

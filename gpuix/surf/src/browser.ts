@@ -19,7 +19,8 @@ export interface Tab {
   crashed: boolean
 }
 
-export interface Frame { bytes: Uint8Array; width: number; height: number; tabId: string; receivedAt: number; ack: () => void }
+/** width/height are the encoded pixels; cssWidth/cssHeight the CSS viewport Chrome rendered the frame at. */
+export interface Frame { bytes: Uint8Array; width: number; height: number; cssWidth: number; cssHeight: number; tabId: string; receivedAt: number; ack: () => void }
 export interface Viewport { width: number; height: number; deviceScaleFactor: number; frameWidth: number; frameHeight: number }
 
 const QUALITY = 82
@@ -47,6 +48,8 @@ export class Browser {
   private closing = false
   private titleAt = 0
   private titleTimer: ReturnType<typeof setTimeout> | null = null
+  private wantViewport: Viewport | null = null
+  private viewportJob: Promise<void> | null = null
 
   constructor(readonly cdp: Cdp) {}
 
@@ -200,15 +203,26 @@ export class Browser {
   }
 
   /** Resizes every tab's viewport; the active tab's screencast restarts at the new frame size. */
-  async setViewport(v: Viewport) {
-    const same = v.width === this.viewport.width && v.height === this.viewport.height && v.deviceScaleFactor === this.viewport.deviceScaleFactor
-    this.viewport = v
-    if (same) return
-    await this.fitWindow()
-    await Promise.all(this.tabs.map((t) => this.applyViewport(t)))
-    const a = this.active
-    if (a) { await this.cdp.send('Page.stopScreencast', {}, a.sessionId).catch(() => {}); await this.startScreencast(a) }
-    this.changed()
+  /** Latest wins: resizes arrive faster than Chrome applies them, so updates run one at a time and only the newest pending size is applied next. */
+  setViewport(v: Viewport): Promise<void> {
+    this.wantViewport = v
+    if (!this.viewportJob) this.viewportJob = this.drainViewport().finally(() => { this.viewportJob = null; if (this.wantViewport) void this.setViewport(this.wantViewport) })
+    return this.viewportJob
+  }
+
+  private async drainViewport() {
+    while (this.wantViewport) {
+      const v = this.wantViewport
+      this.wantViewport = null
+      const same = v.width === this.viewport.width && v.height === this.viewport.height && v.deviceScaleFactor === this.viewport.deviceScaleFactor
+      this.viewport = v
+      if (same) continue
+      await this.fitWindow()
+      await Promise.all(this.tabs.map((t) => this.applyViewport(t)))
+      const a = this.active
+      if (a) { await this.cdp.send('Page.stopScreencast', {}, a.sessionId).catch(() => {}); await this.startScreencast(a) }
+      this.changed()
+    }
   }
 
   private onScreencast(p: { data: string; sessionId: number; metadata: { deviceWidth: number; deviceHeight: number } }, sid?: string) {
@@ -221,7 +235,7 @@ export class Browser {
     const bytes = decodeBase64(p.data)
     // replaced (dropped) frames must still be acked or Chrome stops sending
     const size = imageSize(bytes)
-    const stale = this.frames.push({ bytes, width: size?.width ?? this.viewport.frameWidth, height: size?.height ?? this.viewport.frameHeight, tabId: tab.id, receivedAt: now, ack })
+    const stale = this.frames.push({ bytes, width: size?.width ?? this.viewport.frameWidth, height: size?.height ?? this.viewport.frameHeight, cssWidth: p.metadata?.deviceWidth || this.viewport.width, cssHeight: p.metadata?.deviceHeight || this.viewport.height, tabId: tab.id, receivedAt: now, ack })
     stale?.ack()
     this.fps.tick(now)
     // document.title set by script doesn't always produce targetInfoChanged; repaints are a cheap hint to re-read it

@@ -11,6 +11,8 @@ export type Focus = 'page' | 'omnibox' | 'find'
 export interface SessionOptions { urls: string[]; dpr: number; chrome?: string; profile?: string; ipc?: boolean }
 
 /** Owns Chrome, the CDP browser, the UI focus state and the control socket for one surf window. */
+const RESIZE_MS = 50
+
 export class Session {
   chrome: ChromeProcess | null = null
   browser: Browser | null = null
@@ -28,6 +30,7 @@ export class Session {
   private listeners = new Set<() => void>()
   private ipc: ReturnType<typeof serve> | null = null
   private resizeTimer: ReturnType<typeof setTimeout> | null = null
+  private resizedAt = 0
   private closed = false
 
   constructor(readonly opts: SessionOptions) { this.dpr = opts.dpr }
@@ -54,23 +57,21 @@ export class Session {
     this.ping()
   }
 
-  /** Called from the page container's onLayout; Chrome's viewport follows after a short debounce so divider drags stay smooth. */
+  /** Called from the page container's onLayout. Chrome follows live while a divider or window edge is dragged, at most every RESIZE_MS, plus once at the final size. */
   layout(box: Box) {
     const same = box.x === this.box.x && box.y === this.box.y && box.width === this.box.width && box.height === this.box.height
     this.box = box
-    if (same) return
-    if (this.resizeTimer) clearTimeout(this.resizeTimer)
-    this.resizeTimer = setTimeout(() => { this.resizeTimer = null; this.fitViewport() }, 90)
+    if (same || this.resizeTimer) return
+    const wait = RESIZE_MS - (performance.now() - this.resizedAt)
+    if (wait <= 0) { this.resizedAt = performance.now(); this.fitViewport(); return }
+    this.resizeTimer = setTimeout(() => { this.resizeTimer = null; this.resizedAt = performance.now(); this.fitViewport() }, wait)
   }
 
-  /** Sizes Chrome's viewport to the page box at this terminal's pixel ratio. */
+  /** Sizes Chrome's viewport to the page box at this terminal's pixel ratio; Browser skips sizes it already has. */
   fitViewport() {
     const b = this.browser
     if (!b || this.box.width < 8 || this.box.height < 8) return
-    const v = viewportFor(this.box, this.dpr)
-    const cur = b.viewport
-    if (cur.width === v.width && cur.height === v.height && cur.deviceScaleFactor === v.deviceScaleFactor) return
-    void b.setViewport(v).then(() => this.ping())
+    void b.setViewport(viewportFor(this.box, this.dpr)).then(() => this.ping())
   }
 
   async go(input: string) {
