@@ -4,18 +4,13 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "jsxImportSource": "devin-zoom",
+    "jsxImportSource": "#zoom",
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
     "types": [
       "bun"
-    ],
-    "paths": {
-      "devin-zoom/*": [
-        "./src/zoom/*"
-      ]
-    }
+    ]
   },
   "include": [
     "src",

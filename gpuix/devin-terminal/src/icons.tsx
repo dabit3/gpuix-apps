@@ -1,3 +1,4 @@
+/** @jsxImportSource #zoom */
 import iconCompose from '../assets/icons/square-pen.svg' with { type: 'text' }
 import iconSearch from '../assets/icons/search.svg' with { type: 'text' }
 import iconPanelRight from '../assets/icons/panel-right.svg' with { type: 'text' }

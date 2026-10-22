@@ -38,6 +38,8 @@ Credentials come from `DEVIN_API_KEY` + `DEVIN_ORG_ID`, or from `~/.config/devin
 
 Don't pipe anything into `devin-tui`: GPUIX 0.11.0 treats a stdin pipe as the automation protocol, and terminal mode needs the TTY. Ctrl-C quits and restores the prompt.
 
+Zoom (75–200%, remembered between launches): ⌘+ / ⌘− / ⌘0 or ⌃+ / ⌃− / ⌃0. Ghostty keeps ⌘+ / ⌘− for its own font size, so in terminal mode `devin-tui` watches the terminal's cell size and steps its zoom with Ghostty's font. The zoom runtime is wired with a `/** @jsxImportSource #zoom */` pragma plus the `#zoom/*` import in `package.json`, so it works from any working directory (Bun only applies `tsconfig.json` when launched from this folder).
+
 ## Live mode (Devin API v3)
 
 `src/api.ts` is a small client for the organization endpoints, authenticated with a bearer token:
@@ -83,7 +85,7 @@ Everything in the sidebar, the composer and the session header does something. P
 | Composer + / / | Attach a repo, a playbook or a linked session; slash commands (`/new`, `/ask`, `/theme`, `/automate`, `/review`, `/settings`) | `repos`, `playbook_id`, `session_links` on create |
 | Agent / Ask | Ask starts a session told to answer only, tagged `ask` | `POST /sessions` |
 | Mode picker | Fusion, Ultra, Normal, Lite (`devin_mode`) | |
-| Settings | Preferences (theme, default mode, default repo, saved locally in `~/.config/devin-tui/prefs.json`), Devin API, keyboard shortcuts; everything else opens app.devin.ai | |
+| Settings | Preferences (theme, default mode, default repo, zoom, saved locally in `~/.config/devin-tui/prefs.json`), Devin API, keyboard shortcuts; everything else opens app.devin.ai | |
 | Sidebar icon, More, Help | Hide/show the sidebar; DeepWiki, Oncall, docs, app.devin.ai | |
 
 The mic and voice buttons were removed: GPUIX has no audio capture in a terminal app.

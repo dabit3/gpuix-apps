@@ -1,3 +1,4 @@
+/** @jsxImportSource #zoom */
 // Full-page views behind the sidebar nav, Settings and the bell. Everything here talks to the real Devin v3 API when one is configured.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, type StyleDesc } from '@gpuix/react'
@@ -716,6 +717,7 @@ export const SHORTCUTS: [string, string][] = [
   ['⌘,', 'Settings'],
   ['⌘B', 'Show / hide sidebar'],
   ['⌘.', 'Show / hide the right panel'],
+  ['⌘+ / ⌘− / ⌘0', 'Zoom in / out / reset (also ⌃+ / ⌃− / ⌃0)'],
   ['Ctrl-C', 'Quit and restore the terminal'],
 ]
 
@@ -822,7 +824,7 @@ export function SettingsView(p: SettingsProps) {
           <SettingRow label="Appearance" hint="Also ⇧⌘L. Defaults to your Ghostty theme.">
             <Pills testId="pref-theme" value={p.themeName} onChange={p.onTheme} items={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]} />
           </SettingRow>
-          <SettingRow label="Zoom" hint="Also ⌃+ / ⌃− / ⌃0 (Ghostty keeps ⌘+ for its own font size). Scales the whole app.">
+          <SettingRow label="Zoom" hint="Also ⌘+ / ⌘− / ⌘0 (in Ghostty the app follows its font size) or ⌃+ / ⌃− / ⌃0. Scales the whole app.">
             <div style={row({ gap: 6 })}>
               <Btn small label="−" testId="zoom-out" disabled={(p.zoom ?? 1) <= 0.75} onClick={() => p.onZoom?.(stepZoom(p.zoom ?? 1, -1))} />
               <Btn small label={`${Math.round((p.zoom ?? 1) * 100)}%`} testId="zoom-reset" onClick={() => p.onZoom?.(1)} />

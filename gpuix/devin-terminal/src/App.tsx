@@ -1,3 +1,4 @@
+/** @jsxImportSource #zoom */
 import React, { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { readFileSync } from 'fs'
 import {
@@ -43,6 +44,7 @@ import { ActionMenu, AutomationsView, Btn, copyText, CustomizeView, Field, notif
 import { clearQuarantine, originalPath, previewPath, shotsFrom, type PreviewDeps, type Shot } from './computer'
 import { loadPrefs, savePrefs, type Prefs } from './prefs'
 import { getZoom, setZoom, stepZoom } from './zoom/scale'
+import { applyFontChange, cellSize, readTerminalGrid, TerminalFontTracker } from './zoom/terminal-font'
 import { EnvironmentView, PrReview, ReposView, SessionExtras, SessionsView, UsageView, type SessionsFilter } from './more'
 
 export { C }
@@ -1309,6 +1311,8 @@ export interface DevinAppProps {
   theme?: ThemeName
   userName?: string
   pollMs?: number
+  /** Terminal mode: turn the terminal's own font-size shortcuts (Ghostty ⌘+ / ⌘− / ⌘0) into app zoom. */
+  followTerminalFont?: boolean
   /** Repository preselected for new sessions. */
   initialRepo?: string
 }
@@ -1324,6 +1328,7 @@ export function DevinApp({
   theme = 'dark',
   userName = 'Nader Dabit',
   pollMs = 3000,
+  followTerminalFont = false,
   orgId = null,
   baseUrl = 'https://api.devin.ai',
   keyHint = null,
@@ -1403,7 +1408,7 @@ export function DevinApp({
 
   // Reflow for narrow hosts (a Ghostty split): drop the right panel, then shrink and finally hide the sidebar.
   const [zoom, setZoomState] = useState(getZoom())
-  const { width: rawWidth } = useWindowSize()
+  const { width: rawWidth, height: rawHeight } = useWindowSize()
   // Layout breakpoints work in zoomed points, like browser zoom.
   const hostWidth = rawWidth / zoom
   const compact = hostWidth > 0 && hostWidth < 1080
@@ -1795,6 +1800,19 @@ export function DevinApp({
     setZoomState(getZoom())
     updatePrefs({ zoom: getZoom() })
   }
+  const fontTracker = useRef<TerminalFontTracker | null>(null)
+  useEffect(() => {
+    if (!followTerminalFont) return
+    const grid = readTerminalGrid()
+    const cell = grid && cellSize({ width: rawWidth, height: rawHeight }, grid)
+    if (!cell) return
+    if (!fontTracker.current) {
+      fontTracker.current = new TerminalFontTracker(cell)
+      return
+    }
+    const change = fontTracker.current.update(cell)
+    if (change) changeZoom(applyFontChange(getZoom(), change))
+  }, [followTerminalFont, rawWidth, rawHeight])
   const navigate = (v: View, tab?: string) => {
     if (v === 'customize' && (tab === 'knowledge' || tab === 'playbooks')) setCustomizeTab(tab)
     if (v === 'sessions') setSessionsTab((s) => ({ filter: (tab as SessionsFilter) ?? 'all', n: s.n + 1 }))
