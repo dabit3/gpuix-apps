@@ -231,7 +231,7 @@ export function App({ source, theme: t, initial, size: fixed, onRipples, peers, 
                   <div
                     testId={`track-${T.key}`}
                     onMouseDown={(e: { x?: number; button?: number | null }) => { if (e.button != null && e.button !== 0) return; slide.current = T.key; setRow(i); slideTo(T.key, e.x ?? 0) }}
-                    style={{ width: TRACK_W, height: 18, display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }}
+                    style={{ width: TRACK_W, height: 18, display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative', backgroundColor: alpha(t.bg, 0.01) }}
                   >
                     <div style={{ position: 'absolute', left: 0, top: 7, width: TRACK_W, height: 4, borderRadius: 2, backgroundColor: alpha(t.fg, 0.14), pointerEvents: 'none' }} />
                     <div style={{ position: 'absolute', left: 0, top: 7, width: Math.max(4, f * TRACK_W), height: 4, borderRadius: 2, backgroundColor: sel ? t.accent : alpha(t.accent, 0.6), pointerEvents: 'none' }} />

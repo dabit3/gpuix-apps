@@ -27,6 +27,7 @@ caustic drop [x z] [-n count]   drop ripples into every running caustic
 caustic rain on|off             start or stop rain in every running caustic
 
 -q, --quality <lite|full>  start quality (default lite)
+-s, --scene <name>         pool | lagoon | sunset | night (default pool)
 -r, --rain                 start with rain on
     --no-ball              start without the floating ball
     --sun <deg>            sun elevation, 30-88 (default 64)
@@ -49,10 +50,26 @@ caustic rain on|off             start or stop rain in every running caustic
 | `[` `]` | sun elevation (caustics move and stretch) |
 | `-` `=` | water depth (caustics focus and defocus) |
 | `s` | snapshot: full-pane-resolution PNG into the current directory |
+| `3` `4` `5` `6`, `n` | scene: noon pool, lagoon, golden hour, night swim; `n` cycles |
+| `t` | sandbox panel (9 sliders) |
+| arrows (sandbox open) | up/down pick a slider, left/right adjust it; drag a slider track with the mouse |
 | `h` | key help |
 | Ctrl-C | quit, terminal restored |
 
 Every key also has a button in the top bar. Ghostty owns the Cmd shortcuts, so the app uses plain keys only.
+
+### Scenes and the sandbox
+
+Four looks, each its own sun, sky, water colour and floor (`-s, --scene` or keys `3`-`6`):
+
+- **noon pool**: high sun, white tile, sharp cyan caustics.
+- **lagoon**: green-turquoise water over procedural sand ripples.
+- **golden hour**: low warm sun, long stretched caustics, strong RGB dispersion in FULL.
+- **night swim**: moonlight plus two underwater wall lamps that light the floor from below the surface.
+
+`t` opens the sandbox from the original prompt's FULL mode: sun elevation and azimuth, water depth, IOR (1.0 = no
+caustics at all, past ~1.4 the ripples focus above the floor), wind swell (directional procedural waves added to the
+surface normals on top of the simulation), wave speed, wave life (damping), absorption and light-shaft gain.
 
 ### Split panes
 
@@ -127,11 +144,11 @@ separates R from B.
 | --- | --- |
 | GPU ping-pong height field, 256² LITE / 1024² FULL | CPU height field, 128² LITE / 256² FULL |
 | light-space mesh warp, area ratio via `dFdx/dFdy`, 128² / 512² grids | photon splatting with the same area-ratio result: 288² / 400² photons into 192² / 320² textures |
-| caustics projected on floor and walls, depth attenuation, FULL dispersion | floor caustics, depth focusing, Beer–Lambert, FULL RGB dispersion (walls get light and shadow, not caustics) |
+| caustics projected on floor and walls, depth attenuation, FULL dispersion | floor caustics, depth focusing, Beer–Lambert, FULL RGB dispersion that follows the IOR slider (walls get light and shadow, not caustics) |
 | raymarched volumetric shafts at half res + bilateral upsample | short raymarch per underwater pixel in FULL, no separate pass |
 | Fresnel reflection of an HDRI / cubemap + screen-space refraction | Fresnel reflection of a procedural sky, refraction traced directly |
 | ACES, bloom, vignette, film grain | ACES (LUT); the deck fades into the terminal background |
-| lil-gui sandbox: light angle/colour, absorption, wave speed, IOR, pool shape | keys + buttons: quality, rain, ball, shafts, pause, sun angle, depth, snapshot |
+| lil-gui sandbox: light angle/colour, absorption, wave speed, IOR, pool shape | in-app sandbox: sun elevation/azimuth, depth, IOR, wind swell, wave speed, wave life, absorption, shaft gain; 4 scene presets set light colour and water colour (no cylinder pool) |
 | auto GPU benchmark picks LITE/FULL | starts LITE; `-q full` or `2` |
 | drag-to-orbit, rain toggle, screenshot button, perf overlay | all kept (snapshot writes a PNG, the HUD shows fps and per-stage ms) |
 | static site on GitHub Pages | a CLI, `caustic`, that draws in your terminal; split panes share ripples |
@@ -149,8 +166,8 @@ window (1413×840 pane pixels), 6 render workers:
 
 | | traced at | ray trace | caustics | fps in Ghostty |
 | --- | --- | --- | --- | --- |
-| LITE | 989×588 | ~6-9 ms | ~2 ms | 56-60 |
-| FULL | 1130×672 | ~13-18 ms | ~8-10 ms | 48-60 |
+| LITE | 989×588 | ~5-9 ms | ~2 ms | 53-60 |
+| FULL | 1130×672 | ~16 ms | ~6-7 ms | 60-63 (noon pool and night swim, second pass) |
 | split, both panes | 491×588 + 562×672 | 3 + 4 ms | 2 + 8 ms | 59 + 60 |
 
 Headless (no terminal) the pipelined engine measured 60.7 fps LITE and 59.5 fps FULL. The frame loop is capped near
