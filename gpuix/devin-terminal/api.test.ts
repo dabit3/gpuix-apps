@@ -13,7 +13,7 @@ describe('Devin API client', () => {
       calls.push({ url, method: init.method ?? 'GET', auth: new Headers(init.headers).get('Authorization'), body: init.body as string | undefined })
       if (url.includes('/messages?first=100&after=c1')) return Response.json({ items: [{ event_id: 'b', created_at: 2, message: 'two', source: 'devin' }], has_next_page: false })
       if (url.includes('/messages')) return Response.json({ items: [{ event_id: 'a', created_at: 1, message: 'one', source: 'user' }], has_next_page: true, end_cursor: 'c1' })
-      if (url.endsWith('/sessions?first=5')) return Response.json({ items: [], has_next_page: true })
+      if (url.endsWith('/sessions?first=5&is_archived=false')) return Response.json({ items: [], has_next_page: true })
       if (init.method === 'POST') return Response.json({ session_id: 'devin-x', status: 'new' })
       return new Response('nope', { status: 404 })
     }) as unknown as typeof fetch
@@ -25,7 +25,7 @@ describe('Devin API client', () => {
     await client.sendMessage('devin-x', 'more')
     await expect(client.getSession('missing')).rejects.toThrow('Devin API 404')
 
-    expect(calls[0]).toMatchObject({ url: 'https://api.devin.ai/v3/organizations/org-1/sessions?first=5', auth: 'Bearer tok' })
+    expect(calls[0]).toMatchObject({ url: 'https://api.devin.ai/v3/organizations/org-1/sessions?first=5&is_archived=false', auth: 'Bearer tok' })
     expect(JSON.parse(calls[3]!.body!)).toEqual({ prompt: 'hi', devin_mode: 'fast', repos: ['acme/web'], tags: ['devin-tui'] })
     expect(calls[4]).toMatchObject({ url: 'https://api.devin.ai/v3/organizations/org-1/sessions/devin-x/messages', method: 'POST' })
   })

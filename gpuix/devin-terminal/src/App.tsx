@@ -42,6 +42,7 @@ import type { ApiPlaybook, ApiSession } from './api'
 import { ActionMenu, AutomationsView, Btn, copyText, CustomizeView, Field, notificationsFor, NotificationsView, ReviewView, SecurityView, SettingsView, useSticky, WEB, type MenuAction, type View } from './views'
 import { clearQuarantine, originalPath, previewPath, shotsFrom, type PreviewDeps, type Shot } from './computer'
 import { loadPrefs, savePrefs, type Prefs } from './prefs'
+import { EnvironmentView, PrReview, ReposView, SessionExtras, SessionsView, UsageView, type SessionsFilter } from './more'
 
 export { C }
 
@@ -279,7 +280,7 @@ function Sidebar({
   onLoadMore: () => void
   userName: string
   view: View
-  onNav: (v: View) => void
+  onNav: (v: View, tab?: string) => void
   notifCount: number
   onHideSidebar: () => void
   onShortcuts: () => void
@@ -329,6 +330,10 @@ function Sidebar({
           side="right"
           triggerStyle={{ justifyContent: 'flex-start', gap: 11, width: narrow ? width - 16 : SIDEBAR_WIDTH - 16, height: 32, paddingLeft: 10, paddingRight: 10, marginLeft: 8 }}
           items={[
+            { id: 'sessions', label: 'All sessions', icon: 'list', run: () => onNav('sessions') },
+            { id: 'usage', label: 'Usage', icon: 'zap', run: () => onNav('usage') },
+            { id: 'repos', label: 'Repositories', icon: 'folder', run: () => onNav('repos') },
+            { id: 'environment', label: 'Environment', icon: 'laptop', run: () => onNav('environment') },
             { id: 'wiki', label: 'DeepWiki', icon: 'library', run: () => openUrl(`${WEB}/wiki`) },
             { id: 'oncall', label: 'Oncall', icon: 'bell', run: () => openUrl(`${WEB}/oncall`) },
             { id: 'web', label: 'Open app.devin.ai', icon: 'share', run: () => openUrl(WEB) },
@@ -352,6 +357,8 @@ function Sidebar({
             items={[
               { id: 'collapse', label: 'Collapse all', icon: 'chevronRight', run: () => setExpanded({}) },
               { id: 'expand', label: 'Expand all', icon: 'chevronDown', run: () => setExpanded(Object.fromEntries(state.sessions.filter((x) => x.live?.childIds.length).map((x) => [x.id, true]))) },
+              { id: 'all', label: 'View all sessions', icon: 'list', run: () => onNav('sessions', 'all') },
+              { id: 'archived', label: 'Archived sessions', icon: 'folder', run: () => onNav('sessions', 'archived') },
               { id: 'notifications', label: 'Notifications', icon: 'bell', run: () => onNav('notifications') },
               { id: 'web', label: 'Open sessions on web', icon: 'share', run: () => openUrl(WEB) },
             ]}
@@ -986,6 +993,7 @@ function LivePanel({ session, sessions, tab, onTab, onSelect, client, pollMs, pr
               <Icon name="link" size={13} color={C.secondary} />
               <text style={{ fontFamily: SANS, color: C.text, fontSize: 13 }}>Open on GitHub</text>
             </Button>
+            <PrReview key={pr.url} url={pr.url} client={client} canRun={(pr.state ?? 'open') === 'open'} />
           </div>
         ) : (
           <>
@@ -1007,6 +1015,7 @@ function LivePanel({ session, sessions, tab, onTab, onSelect, client, pollMs, pr
                 <text style={{ fontFamily: SANS, color: C.accent, fontSize: 13, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{live.url ? live.url.replace('https://', '') : 'Starting…'}</text>
               </div>
             </DetailRow>
+            <SessionExtras session={session} client={client} />
             {children.length > 0 && (
               <div style={col({ gap: 2, paddingTop: 14 })}>
                 <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 12.5, paddingBottom: 6 }}>{`Child sessions · ${children.length}`}</text>
@@ -1311,6 +1320,8 @@ export function DevinApp({
   const viewRef = useRef(view)
   viewRef.current = view
   const [customizeTab, setCustomizeTab] = useState<'playbooks' | 'knowledge'>('playbooks')
+  const [sessionsTab, setSessionsTab] = useState<{ filter: SessionsFilter; n: number }>({ filter: 'all', n: 0 })
+  const [extraRepos, setExtraRepos] = useState<string[]>([])
   const [settingsKey, setSettingsKey] = useState(0)
   const [sidebarHidden, setSidebarHidden] = useState(false)
   const [renaming, setRenaming] = useState(false)
@@ -1364,8 +1375,9 @@ export function DevinApp({
     const set = new Set<string>()
     for (const s of state.sessions) for (const p of s.live?.prs ?? []) set.add(prLabel(p.url).repo)
     if (initialRepo) set.add(initialRepo)
+    for (const r of extraRepos) set.add(r)
     return [NO_REPO, ...[...set].filter((r) => r.includes('/')).sort()]
-  }, [live, state.sessions, initialRepo])
+  }, [live, state.sessions, initialRepo, extraRepos])
 
   useEffect(() => {
     const r = renderer as unknown as { registerFont?: (bytes: Uint8Array) => void } | null
@@ -1419,6 +1431,9 @@ export function DevinApp({
       try {
         const res = await client.listSessions(100)
         if (alive) dispatch({ type: 'merge', sessions: res.items.map((s) => fromApi(s)) })
+        // Sessions archived elsewhere (web app, Slack) after launch drop out of the sidebar.
+        const gone = client.listArchived ? await client.listArchived(100) : []
+        if (alive && gone.length) dispatch({ type: 'prune', ids: gone.map((s) => s.session_id.replace(/^devin-/, '')) })
       } catch (error) {
         if (alive) setLiveError((error as Error).message)
       }
@@ -1731,10 +1746,36 @@ export function DevinApp({
   }
   const navigate = (v: View, tab?: string) => {
     if (v === 'customize' && (tab === 'knowledge' || tab === 'playbooks')) setCustomizeTab(tab)
+    if (v === 'sessions') setSessionsTab((s) => ({ filter: (tab as SessionsFilter) ?? 'all', n: s.n + 1 }))
     setView(v)
   }
   const viewEl =
-    view === 'automations' ? (
+    view === 'sessions' ? (
+      <SessionsView
+        key={sessionsTab.n}
+        sessions={byRecent(state.sessions)}
+        api={client}
+        fromApi={fromApi}
+        initialFilter={sessionsTab.filter}
+        narrow={tiny}
+        onOpen={(id) => (setView('home'), select(id))}
+        onUnarchived={(s) => (dispatch({ type: 'unhide', id: s.id }), dispatch({ type: 'merge', sessions: [s] }))}
+      />
+    ) : view === 'environment' ? (
+      <EnvironmentView api={client} narrow={tiny} />
+    ) : view === 'usage' ? (
+      <UsageView api={client} narrow={tiny} />
+    ) : view === 'repos' ? (
+      <ReposView
+        api={client}
+        narrow={tiny}
+        onStart={(repo) => {
+          setExtraRepos((r) => (r.includes(repo) ? r : [...r, repo]))
+          dispatch({ type: 'repo', repo })
+          newSession()
+        }}
+      />
+    ) : view === 'automations' ? (
       <AutomationsView api={client} narrow={tiny} />
     ) : view === 'security' ? (
       <SecurityView api={client} sessions={state.sessions} narrow={tiny} />
