@@ -12,8 +12,8 @@ export type PlanItem = { text: string; done: boolean }
 export type Check = { name: string; state: 'pass' | 'pending' | 'fail'; detail: string }
 
 export type TranscriptEvent =
-  | { kind: 'user'; id: string; text: string; at: string }
-  | { kind: 'devin'; id: string; md: string; streaming?: boolean; fresh?: boolean }
+  | { kind: 'user'; id: string; text: string; at: string; name?: string; time?: string }
+  | { kind: 'devin'; id: string; md: string; streaming?: boolean; fresh?: boolean; time?: string }
   | { kind: 'plan'; id: string; items: PlanItem[] }
   | { kind: 'work'; id: string; seconds: number; steps: Step[]; open: boolean; active?: boolean }
   | {
