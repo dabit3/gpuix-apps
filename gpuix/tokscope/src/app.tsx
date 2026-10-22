@@ -304,7 +304,7 @@ function Kpis({ t, tasks, after, activeFixes, reported, compact, narrow }: { t: 
     ['Cache hit', `${(t.cacheHit * 100).toFixed(1)}%`, `${t.cacheBreaks} break${t.cacheBreaks === 1 ? '' : 's'}`],
     ['Input', fmtK(totalInput(t.usage)), `${fmtK(t.usage.cacheWrite)} written · ${fmtK(t.usage.input)} uncached`],
     ['Output', fmtK(t.usage.output), `${fmt$(t.segCost.output)} · ${((t.segCost.output / (t.cost || 1)) * 100).toFixed(0)}% of cost`],
-    ['With fixes', activeFixes ? fmt$(after / Math.max(1, tasks)) : '—', activeFixes ? `per task · −${(((t.cost - after) / (t.cost || 1)) * 100).toFixed(0)}% with ${activeFixes}` : 'toggle fixes in view 3', activeFixes ? C.green : C.fg4],
+    ['With fixes', activeFixes ? fmt$(after / Math.max(1, tasks)) : '—', activeFixes ? `per task · −${(((t.cost - after) / (t.cost || 1)) * 100).toFixed(0)}% with ${activeFixes}` : 'toggle fixes in view 3', activeFixes ? C.green : C.fg3],
   ]
   const items = narrow ? all.filter(([label]) => label !== 'Input' && label !== 'Output') : all
   return (
@@ -626,7 +626,7 @@ function Fixes({ fixes, enabled, toggle, cursor, setCursor, cost, after, tasks }
         </div>
         <div style={{ ...col, gap: 6 }}>
           <Label>With selected fixes</Label>
-          <Txt testId="fix-after" c={enabled.size ? C.green : C.fg4} s={26}>
+          <Txt testId="fix-after" c={enabled.size ? C.green : C.fg3} s={26}>
             {fmt$(after / Math.max(1, tasks))}
           </Txt>
         </div>
@@ -671,7 +671,7 @@ function Fixes({ fixes, enabled, toggle, cursor, setCursor, cost, after, tasks }
                   <Txt c={C.fg3} s={11} mono>
                     {f.flag}
                   </Txt>
-                  <Txt c={C.fg4} s={11} mono>
+                  <Txt c={C.fg3} s={11} mono>
                     {`${f.area.toLowerCase()} · ${pct(f.savings, cost)} of spend`}
                   </Txt>
                 </div>
