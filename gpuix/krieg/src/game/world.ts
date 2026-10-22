@@ -32,7 +32,7 @@ export const TRACER_SPEED = 60, TRACER_LEN = 3
 export class World {
   level: Level
   rng: Rng
-  p = { x: 0, y: 0, angle: 0, pitch: 0, z: 0.5, vz: 0, hp: 100, ammo: 80, shells: 24, rockets: 6, weapon: 0, hasKey: false, cool: 0, kick: 0, flash: 0, hurt: 0, bob: 0, stepAcc: 0, vx: 0, vy: 0, shake: 0, hitT: 0, killT: 0, sway: 0 }
+  p = { x: 0, y: 0, angle: 0, pitch: 0, z: 0.5, vz: 0, hp: 100, ammo: 80, shells: 24, rockets: 6, weapon: 0, hasKey: false, cool: 0, kick: 0, flash: 0, hurt: 0, bob: 0, stepAcc: 0, vx: 0, vy: 0, shake: 0, hitT: 0, killT: 0, sway: 0, raise: 0, pick: 0 }
   enemies: Enemy[]
   pickups: Pickup[]
   projs: Proj[] = []
@@ -112,7 +112,7 @@ export class World {
     if (this.toast.t > 0) this.toast.t -= dt
     const p = this.p
     p.flash = Math.max(0, p.flash - dt * 8); p.kick = Math.max(0, p.kick - dt * 5); p.hurt = Math.max(0, p.hurt - dt * 2)
-    p.shake = Math.max(0, p.shake - dt * 3); p.hitT = Math.max(0, p.hitT - dt * 5); p.killT = Math.max(0, p.killT - dt * 2.5); p.sway *= Math.max(0, 1 - dt * 8)
+    p.shake = Math.max(0, p.shake - dt * 3); p.hitT = Math.max(0, p.hitT - dt * 5); p.killT = Math.max(0, p.killT - dt * 2.5); p.sway *= Math.max(0, 1 - dt * 8); p.raise = Math.max(0, p.raise - dt * 4); p.pick = Math.max(0, p.pick - dt * 3)
     this.updateDoors(dt)
     this.updateFx(dt)
     if (this.state !== 'play') { this.updateEnemies(dt); return }
@@ -155,7 +155,7 @@ export class World {
       if (k.kind === 'shells') { p.shells += 12; this.say('+12 SHELLS') }
       if (k.kind === 'rockets') { p.rockets += 4; this.say('+4 ROCKETS') }
       if (k.kind === 'key') { p.hasKey = true; this.say('ACCESS KEY ACQUIRED'); this.events.push('key') }
-      k.taken = true; this.events.push('pickup')
+      k.taken = true; this.p.pick = 1; this.events.push('pickup')
     }
     this.flowT -= dt
     if (this.flowT <= 0) { this.flowT = 0.25; this.computeFlow() }
@@ -167,7 +167,7 @@ export class World {
 
   swap(w?: number) {
     const n = w ?? (this.p.weapon + 1) % 3
-    if (n !== this.p.weapon) { this.p.weapon = n; this.p.cool = 0.25; this.events.push('swap') }
+    if (n !== this.p.weapon) { this.p.weapon = n; this.p.cool = 0.25; this.p.raise = 1; this.events.push('swap') }
   }
 
   private fire() {

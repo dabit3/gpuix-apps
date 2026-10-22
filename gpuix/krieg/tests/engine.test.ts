@@ -170,3 +170,15 @@ describe('synth + size budget', () => {
     expect(r.bytes).toBeGreaterThan(r.packed)
   }, 30000)
 })
+
+test('viewmodels point forward: barrel tips converge just under the crosshair', () => {
+  const { guns } = boot(1337, 32).sprites
+  for (const set of guns) for (const g of set) {
+    expect(g.tip[0]!).toBeGreaterThan(0.42)
+    expect(g.tip[0]!).toBeLessThan(0.58)
+    expect(g.tip[1]!).toBeLessThan(0.5)
+    let top = g.h
+    for (let i = 0; i < g.px.length; i++) if (g.px[i]! >>> 24 && Math.abs((i % g.w) / g.w - 0.5) < 0.1) top = Math.min(top, Math.floor(i / g.w))
+    expect(top / g.h).toBeLessThan(0.45)
+  }
+})

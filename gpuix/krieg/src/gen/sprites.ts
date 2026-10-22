@@ -3,7 +3,8 @@
 import type { Sprite } from '../engine/raycast'
 import type { Texture } from './texops'
 import { clamp, hash2 } from './rng'
-import { buildFaces, buildMonster, buildProps, buildShotgun, type MonsterKind } from './monsters'
+import { buildFaces, buildMonster, buildProps, type MonsterKind } from './monsters'
+import { chaingun, launcher, shotgun, type GunSprite } from './guns'
 
 class Canvas implements Sprite {
   px: Uint32Array
@@ -55,10 +56,10 @@ function shade(c: number, k: number) {
 }
 
 export interface SpriteSet {
-  mon: Record<MonsterKind, Sprite[]>; faces: Sprite[]; barrel: Sprite; fireball: Sprite; shotgun: Sprite[]
+  mon: Record<MonsterKind, Sprite[]>; faces: Sprite[]; barrel: Sprite; fireball: Sprite; guns: GunSprite[][]
   pickups: Record<'health' | 'ammo' | 'shells' | 'rockets' | 'key', Sprite>
   bolt: Sprite; rocket: Sprite; explosion: Sprite[]; exitPad: Sprite
-  rifle: Sprite; launcher: Sprite; muzzle: Sprite[]; dots: Sprite[] // dots: spark, blood, ember, smoke, gib
+  muzzle: Sprite[]; dots: Sprite[] // dots: spark, blood, ember, smoke, gib
 }
 
 export function buildSprites(skin: Texture, metal: Texture): SpriteSet {
@@ -86,31 +87,14 @@ export function buildSprites(skin: Texture, metal: Texture): SpriteSet {
   })
   const exitPad = new Canvas(48, 16)
   for (let y = 0; y < 16; y++) for (let x = 0; x < 48; x++) { const d = Math.abs(Math.hypot((x - 24) / 24, (y - 8) / 8) - 0.8); if (d < 0.2) exitPad.put(x, y, 0x4ae168, 200) }
-  const hand = (c: Canvas, x: number, y: number, r: number) => { c.ball(x, y, r * 1.2, r, 0x3b342b); c.ball(x - r * 0.35, y - r * 0.4, r * 0.5, r * 0.32, 0x5a5044) }
-  const sleeve = (c: Canvas, x: number, y: number) => c.line(x - 14, 80, x, y, 8, 0x3a4630)
-  const shotgun = [buildShotgun(0), buildShotgun(1)]
-  const rifle = new Canvas(120, 80)
-  rifle.line(60, 80, 66, 24, 9, 0x2a3240)
-  rifle.rect(52, 30, 26, 50, 0x3a4452, 3)
-  rifle.rect(57, 8, 14, 30, 0x4a5568, 2)
-  rifle.rect(59, 2, 10, 8, 0x1a2029, 1)
-  rifle.rect(62, 40, 6, 3, 0x71b7ff, 1, 200)
-  rifle.rect(62, 48, 6, 3, 0x71b7ff, 1, 200)
-  for (let k = 0; k < 3; k++) rifle.line(58 + k * 4, 2, 58 + k * 4, 30, 2, 0x1a2029)
-  sleeve(rifle, 50, 64); hand(rifle, 52, 60, 8); sleeve(rifle, 76, 72); hand(rifle, 76, 68, 7)
-  const launcher = new Canvas(120, 80)
-  launcher.rect(44, 18, 40, 62, 0x2a3a2e, 4)
-  launcher.ball(64, 18, 16, 8, 0x1a2420)
-  launcher.ball(64, 18, 9, 4, 0x060806)
-  launcher.rect(48, 44, 32, 6, 0xf0b72f, 1, 200)
-  sleeve(launcher, 46, 64); hand(launcher, 46, 60, 9)
-  // Muzzle flare: a hot core at the barrel (24,40) with a few randomised spikes; drawn additively.
+  const guns = [[shotgun(0), shotgun(1)], [chaingun(0), chaingun(1), chaingun(2)], [launcher()]]
+  // Muzzle flare: a hot radial core with randomised spikes, centred on the sprite; drawn additively at the barrel tip.
   const muzzle = [0, 1, 2].map((f) => {
-    const c = new Canvas(48, 48), sp = [0, 1, 2, 3, 4].map((k) => [(hash2(k, f, 9) - 0.5) * 1.3, 0.45 + hash2(f, k, 3) * 0.55])
+    const c = new Canvas(48, 48), sp = [0, 1, 2, 3, 4, 5, 6].map((k) => [(k / 7) * 6.283 + hash2(k, f, 9) * 0.6, 0.45 + hash2(f, k, 3) * 0.55])
     for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) {
-      const a = Math.atan2(x - 24, 40 - y), d = Math.hypot(x - 24, (40 - y) * (y > 40 ? 2 : 1)) / 40
-      let r = 0.22
-      for (const [ak, lk] of sp) r = Math.max(r, lk! * Math.max(0, 1 - Math.abs(a - ak!) / 0.16))
+      const a = Math.atan2(y - 24, x - 24), d = Math.hypot(x - 24, (y - 24) * 1.4) / 24
+      let r = 0.3
+      for (const [ak, lk] of sp) { const da = Math.abs(((a - ak! + 9.42) % 6.283) - 3.14); r = Math.max(r, lk! * Math.max(0, 1 - da / 0.22)) }
       const k = clamp(1 - d / r, 0, 1)
       if (k <= 0) continue
       c.put(x, y, k > 0.55 ? 0xfffbe8 : shade(k > 0.25 ? 0xffd27a : 0xff8a30, 0.5 + k), 200)
@@ -119,5 +103,5 @@ export function buildSprites(skin: Texture, metal: Texture): SpriteSet {
   })
   const dot = (n: number, col: number, lit: boolean) => { const c = new Canvas(n, n); lit ? c.ball(n / 2, n / 2, n / 2, n / 2, col) : c.glowDot(n / 2, n / 2, n / 2, col); return c }
   const dots = [dot(8, 0xffd890, false), dot(8, 0x8a2418, true), dot(8, 0xffa040, false), dot(16, 0x5a5c62, true), dot(10, 0x9a2a20, true)]
-  return { mon, faces: buildFaces(), barrel: props.barrel, fireball: props.fireball, shotgun, pickups, bolt, rocket, explosion, exitPad, rifle, launcher, muzzle, dots }
+  return { mon, faces: buildFaces(), barrel: props.barrel, fireball: props.fireball, guns, pickups, bolt, rocket, explosion, exitPad, muzzle, dots }
 }

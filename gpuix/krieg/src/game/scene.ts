@@ -57,13 +57,14 @@ export function scene(w: World, s: SpriteSet, t: number) {
     const dx = Math.cos(p.angle), dy = Math.sin(p.angle)
     dyn.push({ x: p.x + dx * 0.4, y: p.y + dy * 0.4, r: 0.6 * p.flash, g: 0.42 * p.flash, b: 0.22 * p.flash, radius: p.weapon ? 2.2 : 3 })
   }
+  const set = s.guns[p.weapon]!, img = set[p.weapon === 0 ? (p.cool > 0.15 && p.cool < 0.55 ? 1 : 0) : p.weapon === 1 && p.cool > 0 ? Math.floor(t * 40) % 3 : 0]!
   const vm: Viewmodel = {
-    img: p.weapon === 0 ? s.shotgun[p.cool > 0.15 && p.cool < 0.55 ? 1 : 0]! : p.weapon === 1 ? s.rifle : s.launcher,
-    ox: (p.weapon ? 0.16 : 0.02) + Math.sin(p.bob * 0.5) * 0.02 + p.sway * 0.05, oy: Math.abs(Math.cos(p.bob * 0.5)) * 0.02 + p.kick * 0.035 + Math.max(0, p.cool - [0.8, 0.1, 0.5][p.weapon]!) * 0.2 + (p.z - 0.5) * 0.2 - 0.05,
-    scale: p.weapon ? 0.5 : 0.46, flash: p.flash, muzzle: s.muzzle[Math.floor(t * 30) % 3], tip: p.weapon === 2 ? [0.533, 0.16] : p.weapon ? [0.533, 0.03] : [0.542, 0.05],
+    img, ox: Math.sin(p.bob * 0.5) * 0.02 + p.sway * 0.05, oy: Math.abs(Math.cos(p.bob * 0.5)) * 0.02 + p.kick * 0.03 + Math.max(0, p.cool - [0.8, 0.1, 0.5][p.weapon]!) * 0.2 + (p.z - 0.5) * 0.2 + p.raise * p.raise * 0.4,
+    scale: 0.5, flash: p.flash, muzzle: s.muzzle[Math.floor(t * 30) % 3], tip: img.tip,
   }
   let tint: [number, number, number, number] | null = null
   if (w.state === 'dead') tint = [120, 10, 10, 0.45]
   else if (p.hurt > 0) tint = [255, 40, 40, p.hurt * 0.3]
+  else if (p.pick > 0) tint = [255, 205, 70, p.pick * 0.16]
   return { cam, sprites, dyn, vm, tint, tr }
 }

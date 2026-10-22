@@ -241,8 +241,8 @@ export class Renderer {
       blit(vm.img, ox, oy, w, h, 0)
       const mz = vm.muzzle, tip = vm.tip
       if (mz && tip && vm.flash > 0.05) {
-        const ms = Math.round(h * 0.6 * (0.55 + 0.45 * vm.flash))
-        blit(mz, Math.round(ox + tip[0]! * w - ms / 2), Math.round(oy + tip[1]! * h - ms * (40 / 48)), ms, ms, vm.flash)
+        const ms = Math.round(h * 0.42 * (0.55 + 0.45 * vm.flash))
+        blit(mz, Math.round(ox + tip[0]! * w - ms / 2), Math.round(oy + tip[1]! * h - ms / 2), ms, ms, vm.flash)
       }
     }
     if (this.bloom) this.applyBloom()
