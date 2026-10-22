@@ -115,7 +115,7 @@ export class Audio {
   }
 
   play(name: string, vol = 0.6) {
-    if (!this.wk || !SFX[name] || this.n > 8) return
+    if (!this.wk || !SFX[name] || this.n > 4) return
     const now = performance.now()
     if (now - (this.last[name] ?? 0) < (name === 'shoot' ? 60 : 40)) return
     this.last[name] = now

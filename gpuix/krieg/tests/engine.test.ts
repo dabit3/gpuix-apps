@@ -97,6 +97,20 @@ describe('gameplay', () => {
     const s = scene(w, boot(1337, 32).sprites, 0)
     expect(s.sprites.filter((d) => d.x === a.x && d.y === a.y).length).toBe(1)
   })
+  test('monster sheets: 16 frames, upright pain frame, corpse and gib pile lie on the floor', () => {
+    const { mon } = boot(1337, 32).sprites
+    const lowY = (img: { w: number; h: number; px: Uint32Array }) => {
+      let top = img.h
+      for (let i = 0; i < img.px.length; i++) if (img.px[i]! >>> 24) top = Math.min(top, Math.floor(i / img.w))
+      return top / img.h
+    }
+    for (const k of ['trooper', 'imp', 'brute'] as const) {
+      expect(mon[k].length).toBe(16)
+      expect(lowY(mon[k][6]!)).toBeLessThan(0.3)
+      expect(lowY(mon[k][11]!)).toBeGreaterThan(0.5)
+      expect(lowY(mon[k][15]!)).toBeGreaterThan(0.7)
+    }
+  })
   test('barrels explode, chain and hurt nearby monsters but do not count as kills', () => {
     const w = new World(1337)
     const [b1, b2] = w.enemies.filter((e) => e.kind === 'barrel')

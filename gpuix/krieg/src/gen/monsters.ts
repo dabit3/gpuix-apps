@@ -174,6 +174,7 @@ export function buildMonster(kind: MonsterKind, tex: Texture): Img[] {
   const out: Img[] = [0, 1, 2, 3].map((f) => frame(0, (f / 4) * Math.PI * 2))
   out.push(frame(1, 0), frame(2, 0))
   const pain = frame(3, 0)
+  out.push(pain)
   const seed = kind.length * 31
   for (let k = 0; k < 5; k++) out.push(fall(pain, k, seed))
   for (let k = 0; k < 4; k++) out.push(gib(kind, pain, k, seed))
