@@ -3,7 +3,7 @@ import { realpathSync, statfsSync, watch, type FSWatcher } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join, relative, sep } from 'node:path'
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { AnimatePresence, isTerminal, motion, useGpuix, useWindowSize } from '@gpuix/react'
+import { isTerminal, motion, useGpuix, useWindowSize } from '@gpuix/react'
 import {
   copyInto,
   kindOf,
@@ -514,14 +514,12 @@ export function Yard({ start, showHidden: initialHidden = false, home = homedir(
         <Hints width={width} />
       </div>
 
-      <AnimatePresence>
-        {mode.kind === 'look' && current && isPhoto(current) && (
+      {mode.kind === 'look' && current && isPhoto(current) && (
           <Viewer key="viewer" entry={current} index={photos.findIndex((p) => p.path === current.path)} count={photos.length} width={width} height={height - chromeTop} top={chromeTop} onClose={close} onStep={(d) => {
             const i = Math.max(0, photos.findIndex((p) => p.path === current.path))
             select(photos[(i + d + photos.length) % photos.length]!.name)
           }} />
         )}
-      </AnimatePresence>
       {mode.kind !== 'browse' && mode.kind !== 'look' && (
         <Overlay
           mode={mode}
@@ -658,7 +656,6 @@ function Viewer(props: { entry: Entry; index: number; count: number; width: numb
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
       style={{ position: 'absolute', top: props.top, left: 0, right: 0, bottom: 0, display: 'flex' }}
     >

@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import { createTestRoot, hasNativeTestRenderer } from '@gpuix/react/testing'
 import { copyInto, imageSize, listDir, moveInto, readClip, renameEntry, trash, uniqueDest, walk, writeClip } from '../src/fs'
 import { fuzzyMatch } from '../src/fuzzy'
+import { parseStatus } from '../src/git'
+import { dominant, readExif } from '../src/media'
 import { Yard } from '../src/Yard'
 
 const SAMPLE = join(import.meta.dir, '..', 'sample')
@@ -54,6 +56,36 @@ describe('filesystem model', () => {
 })
 
 const describeNative = hasNativeTestRenderer ? describe : describe.skip
+
+describe('photo and git metadata', () => {
+  it('reads EXIF camera, lens and exposure from the sample JPEGs', () => {
+    const x = readExif(join(root, 'Photos', 'coastline.jpg'))!
+    expect(x.camera).toBe('Fujifilm X-T5')
+    expect(x.lens).toBe('XF16-55mmF2.8 R LM WR')
+    expect([x.aperture, x.shutter, x.iso, x.focal]).toEqual(['ƒ/11', '1/125 s', 'ISO 160', '18 mm'])
+    expect(readExif(join(root, 'Photos', 'waterfall.jpg'))!.shutter).toBe('1/2 s')
+    expect(readExif(join(root, 'README.txt'))).toBeNull()
+  })
+
+  it('extracts distinct dominant colours', () => {
+    const px = [...Array(60).fill([250, 250, 250]), ...Array(30).fill([10, 20, 200]), ...Array(10).fill([200, 30, 30])]
+    const out = dominant(px, 3)
+    expect(out.length).toBe(3)
+    expect(out[0]).toBe('#fafafa')
+    expect(out).toContain('#0a14c8')
+  })
+
+  it('parses porcelain status and rolls changes up into folders', () => {
+    const g = parseStatus('/r', ['## main...origin/main [ahead 2]', ' M src/a.ts', '?? docs/new/x.md', 'D  old.txt', ''].join('\0'))
+    expect(g.branch).toBe('main')
+    expect(g.ahead).toBe(2)
+    expect(g.status.get('/r/src/a.ts')).toBe('M')
+    expect(g.status.get('/r/src')).toBe('M')
+    expect(g.status.get('/r/docs/new/x.md')).toBe('?')
+    expect(g.status.get('/r/docs')).toBe('?')
+    expect(g.status.get('/r/old.txt')).toBe('D')
+  })
+})
 
 describeNative('yard in the GPU test renderer', () => {
   let t: ReturnType<typeof createTestRoot>
@@ -152,6 +184,30 @@ describeNative('yard in the GPU test renderer', () => {
     await press('enter')
     expect(existsSync(join(root, 'walks.csv'))).toBe(false)
     expect(readdirSync(join(base, 'Trash'))).toEqual(['walks.csv'])
+  })
+
+  it('opens photos in the viewer, flips through them and shows EXIF', async () => {
+    const openedBefore = opened.length
+    await press('j j j l')
+    expect(text()).toContain('Sony ILCE-7M4')
+    expect(text()).toContain('ƒ/8')
+    expect(r().findByTestId('filmstrip')).toBeTruthy()
+    await press('enter')
+    expect(r().findByTestId('viewer')).toBeTruthy()
+    expect(text()).toContain('1 of 6')
+    await press('right right')
+    expect(text()).toContain('3 of 6')
+    expect(text()).toContain('harbor-evening.jpg')
+    await press('left')
+    expect(text()).toContain('2 of 6')
+    await press('escape')
+    expect(text()).toContain('2/6')
+    await press('j')
+    expect(text()).toContain('3/6')
+    expect(opened.length).toBe(openedBefore)
+    await click('thumb-winter-ridge.jpg')
+    expect(text()).toContain('6/6')
+    expect(text()).toContain('Fujifilm GFX100 II')
   })
 
   it('fuzzy-jumps to a nested file and previews highlighted code', async () => {
