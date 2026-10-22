@@ -80,9 +80,9 @@ function SecurityBadge({ t, tab }: { t: Theme; tab: Tab | undefined }) {
 
 function Favicon({ t, tab }: { t: Theme; tab: Tab }) {
   const host = hostOf(tab.url)
+  const icon = useFavicon(/^https?:/.test(tab.url) ? host : '')
   if (tab.loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: alpha(t.accent, 0.35), flexShrink: 0 }}><div style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: t.accent }} /></div>
   if (!host || !/^https?:/.test(tab.url)) return <div style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: t.raised, flexShrink: 0 }} />
-  const icon = useFavicon(host)
   if (!icon) return <div style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: t.raised, flexShrink: 0 }} />
   return <img src={icon} style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0 }} />
 }
@@ -105,7 +105,7 @@ function faviconFor(host: string) {
 }
 function useFavicon(host: string) {
   const [icon, setIcon] = useState<{ host: string; src: string | null } | null>(null)
-  useEffect(() => { let live = true; void faviconFor(host).then((src) => { if (live) setIcon({ host, src }) }); return () => { live = false } }, [host])
+  useEffect(() => { if (!host) return; let live = true; void faviconFor(host).then((src) => { if (live) setIcon({ host, src }) }); return () => { live = false } }, [host])
   return icon?.host === host ? icon.src : null
 }
 
