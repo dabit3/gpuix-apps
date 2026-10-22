@@ -54,7 +54,8 @@ Don't pipe anything into `devin-tui`: GPUIX 0.11.0 treats a stdin pipe as the au
 - `status` + `status_detail` map to the dots and the footer line: working (blue, pulsing), waiting for user / approval (orange, "Action required"), finished, suspended ("Devin went to sleep"), error.
 - The gap between messages becomes a "Worked for 46s" row, and a running session ends with a live "Working for …" timer. New Devin messages type in as they arrive.
 - The web app's inline markup is cleaned up: `<ref_file>` / `<ref_snippet>` become `file.ts:3-9`, `ATTACHMENT:{...}` payloads become links.
-- The right panel shows the session's details (status, mode, ACUs, link, child sessions) and one tab per PR with its state and an "Open on GitHub" button.
+- The right panel opens on **Computer**: Devin's screen, as far as the public API exposes it. The v3 API has no live screen, VNC or browser stream, but `GET /sessions/{id}/attachments` lists every screenshot and recording Devin posts. The panel shows the newest one large, polls while the session runs and jumps to new posts, has ←/→ and a recent list to step back, and "Open" opens the original on app.devin.ai. Images download through the presigned redirect from `GET /attachments/{uuid}/{name}`; recordings show a poster frame that `ffmpeg` grabs straight from the presigned URL (without ffmpeg they show a placeholder). Previews are cached in `~/.cache/devin-tui/attachments/`. The panel widens to 520 px on windows ≥ 1360 px.
+- The **Session** tab shows the session's details (status, mode, ACUs, link, child sessions), plus one tab per PR with its state and an "Open on GitHub" button.
 - The messages API returns the conversation, not Devin's shell/editor/browser steps, so live sessions show messages and work durations. The scripted demo data (`--demo`) still shows the shell, diff, browser, plan and PR cards.
 
 ## API key (Settings → Devin API)
