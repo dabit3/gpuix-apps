@@ -31,7 +31,7 @@ export interface ItemDef {
   value: number
   parts?: Record<string, number>
 }
-export interface QuestDef { title: string; main: boolean; stages: Record<string, string> }
+export interface QuestDef { title: string; main: boolean; stages: Record<string, string>; goals?: Record<string, string> }
 export interface EnemyDef { name: string; hp: number; armor: number; ap: number; dmg: [number, number]; hit: number; range: number; xp: number; aggro: number; sprite: string }
 
 export interface DialogueOption {

@@ -1,7 +1,7 @@
 import { MAP_H, MAP_W, tileAt, type TileKind } from '../engine/world'
 import { hash2, valueNoise } from '../engine/rng'
 import { drawText, textWidth } from './font'
-import { HUE_AMBER, HUE_CYAN, HUE_GREEN, HUE_RED } from './palette'
+import { HUE_AMBER, HUE_CYAN, HUE_GREEN, HUE_RED, HUE_RUST, HUE_TOXIC } from './palette'
 
 export const TW = 32, TH = 16
 const TOP = 130
@@ -18,18 +18,19 @@ export function artToTile(ax: number, ay: number): [number, number] {
   return [Math.floor((X / 16 + Y / 8) / 2), Math.floor((Y / 8 - X / 16) / 2)]
 }
 
-export interface StaticLayer { lum: Uint8Array; hue: Uint8Array; depth: Int16Array; rad: Uint8Array }
+export interface Light { x: number; y: number; r: number; i: number; hue: number; kind: 'fire' | 'rad' | 'neon' | 'lamp' | 'beacon' }
+export interface StaticLayer { lum: Uint8Array; hue: Uint8Array; depth: Int16Array; rad: Uint8Array; empty: Uint8Array; lights: Light[] }
 let cached: StaticLayer | null = null
 
 export function buildStatic(): StaticLayer {
   if (cached) return cached
   const n = SW * SH
-  const L: StaticLayer = { lum: new Uint8Array(n), hue: new Uint8Array(n), depth: new Int16Array(n).fill(-1), rad: new Uint8Array(n) }
+  const L: StaticLayer = { lum: new Uint8Array(n), hue: new Uint8Array(n), depth: new Int16Array(n).fill(-1), rad: new Uint8Array(n), empty: new Uint8Array(n).fill(1), lights: [] }
   const put = (x: number, y: number, l: number, h: number, d: number) => {
     x |= 0; y |= 0
     if (x < 0 || y < 0 || x >= SW || y >= SH) return
     const i = y * SW + x
-    L.lum[i] = l < 0 ? 0 : l > 255 ? 255 : l; L.hue[i] = h; L.depth[i] = d; L.rad[i] = 0
+    L.lum[i] = l < 0 ? 0 : l > 255 ? 255 : l; L.hue[i] = h; L.depth[i] = d; L.rad[i] = 0; L.empty[i] = 0
   }
   // ground pass
   for (let ty = 0; ty < MAP_H; ty++) for (let tx = 0; tx < MAP_W; tx++) {
@@ -69,6 +70,17 @@ export function buildStatic(): StaticLayer {
   sign('BLEECKER ST', 18, 14, 34, HUE_GREEN)
   sign('WKNY 88.1', 37, 15, 120, HUE_RED)
   sign('SHELTER 34', 5, 27, 22, HUE_CYAN)
+  const signs: [number, number, number, number][] = [[4, 15, 46, HUE_AMBER], [19, 3, 70, HUE_GREEN], [18, 14, 34, HUE_GREEN], [37, 15, 120, HUE_RED], [5, 27, 22, HUE_CYAN]]
+  for (const [tx, ty, up, hu] of signs) { const [cx, cy] = tileCenter(tx, ty); L.lights.push({ x: cx, y: cy - up, r: 46, i: 70, hue: hu, kind: 'neon' }) }
+  for (let ty = 0; ty < MAP_H; ty++) for (let tx = 0; tx < MAP_W; tx++) {
+    const k = tileAt(tx, ty)
+    const [cx, cy] = tileCenter(tx, ty)
+    if (k === 'barrel') L.lights.push({ x: cx, y: cy - 14, r: 56, i: 120, hue: HUE_RUST, kind: 'fire' })
+    else if (k === 'radpool' && hash2(tx, ty, 77) > 0.55) L.lights.push({ x: cx, y: cy, r: 54, i: 70, hue: HUE_TOXIC, kind: 'rad' })
+    else if (k === 'kiosk') L.lights.push({ x: cx, y: cy - 20, r: 40, i: 80, hue: HUE_GREEN, kind: 'lamp' })
+  }
+  { const [cx, cy] = tileCenter(5.5, 26.5); L.lights.push({ x: cx, y: cy - 4, r: 70, i: 70, hue: HUE_CYAN, kind: 'lamp' }) }
+  { const [bx, by] = tileCenter(38, 14); L.lights.push({ x: bx, y: by - 132, r: 50, i: 120, hue: HUE_RED, kind: 'beacon' }) }
   cached = L
   return L
 }

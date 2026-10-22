@@ -1,18 +1,19 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { ImgInstance } from '@gpuix/react'
 import type { GameState } from '../engine/game'
-import { snapToEntity, tickPath } from '../engine/game'
+import { objective, snapToEntity, tickPath } from '../engine/game'
 import { createBuffers, pickArt, renderFrame, type FrameBuffers, type View } from '../render/frame'
 import { artToTile, tileCenter } from '../render/iso'
 import { C } from './theme'
 
 export interface WorldHandle { zoom: number; cineUntil: number; cineTarget: [number, number] | null; fps: number }
 
-export function WorldView({ game, onChange, onTileClick, handle }: {
+export function WorldView({ game, onChange, onTileClick, handle, attract }: {
   game: { current: GameState }
   onChange: () => void
   onTileClick: (x: number, y: number) => void
   handle: { current: WorldHandle }
+  attract?: boolean
 }) {
   const img = useRef<ImgInstance>(null)
   const layout = useRef({ x: 0, y: 0, w: 0, h: 0 })
@@ -27,8 +28,8 @@ export function WorldView({ game, onChange, onTileClick, handle }: {
     const anim = new Map<string, { x: number; y: number; moving: number }>()
     const s0 = game.current
     let cam: [number, number] = tileCenter(s0.player.x, s0.player.y)
-    let lastStep = 0, frames = 0, fpsT = performance.now()
-    const view: View = { width: W, height: H, time: 0, cam, zoom: 2, hover: null, anim, shots: [] }
+    let lastStep = 0, frames = 0, fpsT = performance.now(), cine = 0
+    const view: View = { width: W, height: H, time: 0, cam, zoom: 3, hover: null, anim, shots: [] }
     const tick = () => {
       const s = game.current
       const now = performance.now()
@@ -46,12 +47,18 @@ export function WorldView({ game, onChange, onTileClick, handle }: {
       const h = handle.current
       const p = anim.get('player')!
       let target = tileCenter(p.x, p.y)
+      if (attract) target = [target[0] + Math.sin(now / 6000) * 220 + 120, target[1] + Math.cos(now / 8000) * 90 - 120]
       let zoom = h.zoom
-      if (now < h.cineUntil && h.cineTarget) {
-        const [tx, ty] = tileCenter(h.cineTarget[0], h.cineTarget[1])
+      const inCine = now < h.cineUntil && !!h.cineTarget
+      if (inCine) {
+        const [tx, ty] = tileCenter(h.cineTarget![0], h.cineTarget![1])
         target = [(target[0] + tx) / 2, (target[1] + ty) / 2 - 10]
-        zoom = 3
+        zoom = Math.min(4, h.zoom + 1)
       }
+      cine += ((inCine ? 1 : 0) - cine) * 0.2
+      view.cine = cine < 0.02 ? 0 : cine
+      const o = objective(s)
+      view.objective = o && o.x >= 0 && !attract ? [o.x, o.y] : null
       cam = [cam[0] + (target[0] - cam[0]) * 0.18, cam[1] + (target[1] - cam[1]) * 0.18]
       view.cam = cam; view.zoom = zoom; view.time = now
       if (mouse.current) {
@@ -84,12 +91,12 @@ export function WorldView({ game, onChange, onTileClick, handle }: {
       onClick={(e) => {
         mouse.current = local(e)
         const h = hover.current
-        if (h) onTileClick(h[0], h[1])
+        if (h && !attract) onTileClick(h[0], h[1])
       }}
       onScroll={(e) => {
         const dy = e.deltaY ?? 0
         if (Math.abs(dy) < 0.5) return
-        handle.current.zoom = dy > 0 ? 3 : 2
+        handle.current.zoom = Math.max(2, Math.min(4, handle.current.zoom + (dy > 0 ? 1 : -1)))
       }}
     >
       {size.w > 0 && <img ref={img} testId="world-img" objectFit="fill" style={{ width: size.w, height: size.h, pointerEvents: 'none' }} />}

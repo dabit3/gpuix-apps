@@ -4,7 +4,7 @@ import {
   BODY_PARTS, STAT_POOL, DEFAULT_STATS, buy, carryMax, carryWeight, chooseOption, closePanel, cycleTarget, endTurn, engagedEnemies, fire,
   geiger, hitChance, interactAt, liveActors, maxAp, maxHp, newGame, openTarget, questList, receiveBroadcast, regionName, repairItem,
   selectPart, sell, buyPrice, sellPrice, skills, spendPoint, startCombat, step, takeFromContainer, useItem, visibleOptions, weaponDef,
-  armorRating, xpForLevel, type GameState, type Stack,
+  armorRating, xpForLevel, objective, type GameState, type Stack,
 } from '../engine/game'
 import { ITEMS, NPCS, PERKS, RADIO_STATIONS, STATS, STAT_INFO, type Stat } from '../engine/content'
 import { districtMap, dogPortrait, mkArt, portrait, radioArt, weaponArt, type MapMarker } from '../render/art2d'
@@ -66,8 +66,13 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
   const [tab, setTab] = useState<Tab>('status')
   const [panelOpen, setPanelOpen] = useState(false)
   const [sel, setSel] = useState(0)
-  const [toast, setToast] = useState<string | null>(null)
-  const handle = useRef<WorldHandle>({ zoom: 2, cineUntil: 0, cineTarget: null, fps: 0 })
+  const [toasts, setToasts] = useState<{ id: number; text: string; c: string }[]>([])
+  const [banner, setBanner] = useState<{ text: string; sub: string; c: string; id: number } | null>(null)
+  const [help, setHelp] = useState(false)
+  const titleHandle = useRef<WorldHandle>({ zoom: 3, cineUntil: 0, cineTarget: null, fps: 0 })
+  const onFresh = useRef<(lines: GameState['log']) => void>(() => {})
+  const prevCombat = useRef<{ on: boolean; round: number }>({ on: !!game.current.combat, round: game.current.combat?.round ?? 0 })
+  const handle = useRef<WorldHandle>({ zoom: 3, cineUntil: 0, cineTarget: null, fps: 0 })
   const flushed = useRef<GameState["log"][number] | null>(game.current.log[game.current.log.length - 1] ?? null)
   const lastMove = useRef(0)
   const [create, setCreate] = useState({ stats: { ...DEFAULT_STATS } as Record<Stat, number>, perks: ['deadeye', 'tinkerer'], row: 0 })
@@ -76,11 +81,35 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
     const s = game.current
     const i = flushed.current ? s.log.lastIndexOf(flushed.current) : -1
     const fresh = s.log.slice(i + 1)
-    if (fresh.length) { io.log?.(fresh.map((l) => `[T${String(l.turn).padStart(4, '0')}] ${l.kind.toUpperCase().padEnd(6)} ${l.text}`)); flushed.current = s.log[s.log.length - 1] ?? null }
+    if (fresh.length) { onFresh.current(fresh); io.log?.(fresh.map((l) => `[T${String(l.turn).padStart(4, '0')}] ${l.kind.toUpperCase().padEnd(6)} ${l.text}`)); flushed.current = s.log[s.log.length - 1] ?? null }
     setV((v) => v + 1)
   }, [io])
   const act = useCallback((fn: (s: GameState) => void) => { fn(game.current); refresh() }, [refresh])
-  const flash = (t: string) => { setToast(t); setTimeout(() => setToast(null), 1800) }
+  const flash = (text: string, c: string = C.green) => {
+    const id = Math.random()
+    setToasts((ts) => [...ts.slice(-2), { id, text, c }])
+    setTimeout(() => setToasts((ts) => ts.filter((t) => t.id !== id)), 2600)
+  }
+  const showBanner = (text: string, sub: string, c: string, ms = 1400) => {
+    const id = Math.random()
+    setBanner({ text, sub, c, id })
+    setTimeout(() => setBanner((b) => (b?.id === id ? null : b)), ms)
+  }
+  onFresh.current = (lines) => {
+    for (const l of lines) {
+      if (l.kind === 'quest') flash(l.text, C.amber)
+      else if (l.text.startsWith('LEVEL UP')) showBanner('LEVEL UP', `LEVEL ${game.current.player.level}  -  +1 ATTRIBUTE POINT`, C.green, 2200)
+      else if (l.kind === 'loot' && /^(Took|Bought|Received|Got)/i.test(l.text)) flash(l.text, C.cyan)
+    }
+  }
+  useEffect(() => {
+    const c = game.current.combat
+    const p = prevCombat.current
+    if (c && !p.on) showBanner('COMBAT', `${engagedEnemies(game.current).length} HOSTILE${engagedEnemies(game.current).length === 1 ? '' : 'S'} ENGAGED  -  T TO TARGET`, C.red)
+    else if (c && c.round !== p.round) showBanner(`ROUND ${c.round}`, 'YOUR TURN', C.cyan, 1000)
+    else if (!c && p.on && game.current.mode !== 'dead') showBanner('ALL CLEAR', 'COMBAT OVER', C.green, 1300)
+    prevCombat.current = { on: !!c, round: c?.round ?? 0 }
+  })
 
   useEffect(() => {
     if (!io.pollBroadcasts) return
@@ -94,7 +123,12 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
 
   const doFire = () => act((s) => {
     const fx = fire(s, performance.now())
-    if (fx) { handle.current.cineUntil = performance.now() + 1300; handle.current.cineTarget = [fx.toX, fx.toY] }
+    if (fx) {
+      handle.current.cineUntil = performance.now() + 1300; handle.current.cineTarget = [fx.toX, fx.toY]
+      const victim = s.actors.find((a) => a.id === fx.target)
+      const msg: [string, string, string] | null = victim?.dead ? ['TARGET DOWN', `${victim.name.toUpperCase()}  -  ${fx.dmg} DMG`, C.amber] : fx.crit ? ['CRITICAL', `${fx.part.toUpperCase()}  -  ${fx.dmg} DMG`, C.red] : null
+      if (msg) setTimeout(() => showBanner(...msg, 1100), 640)
+    }
   })
   const doEndTurn = () => act((s) => { if (s.mode === 'target') closePanel(s); endTurn(s, performance.now()) })
   const doTarget = () => act((s) => {
@@ -118,6 +152,8 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
       else if (k === 'left' || k === 'right') adjustStat(STATS[row]!, k === 'right' ? 1 : -1)
       return
     }
+    if (help) { if (k === 'escape' || k === 'h' || k === '?' || k === 'enter') setHelp(false); return }
+    if (k === 'h' || k === '?' || k === 'f1') return setHelp(true)
     if (ctrl && k === 's') return doSave()
     if (ctrl && k === 'l') return doLoad()
     if (k === 'f5') return doSave()
@@ -162,7 +198,7 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
     else if (k === 'm') { setTab('map'); if (compact) setPanelOpen(true) }
     else if (k === 'q') { setTab('quests'); if (compact) setPanelOpen(true) }
     else if (k === 'r') { setTab('radio'); if (compact) setPanelOpen(true) }
-    else if (k === 'z') handle.current.zoom = handle.current.zoom === 2 ? 3 : 2
+    else if (k === 'z') handle.current.zoom = handle.current.zoom >= 4 ? 2 : handle.current.zoom + 1
   }
 
   const adjustStat = (st: Stat, d: number) => {
@@ -180,10 +216,12 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
     const used = STATS.reduce((a, k) => a + create.stats[k], 0)
     const narrow = (win?.width ?? 1400) < 760
     return root(
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexGrow: 1, gap: 18, padding: 24 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, position: 'relative' }}>
+      <WorldView game={game} onChange={() => {}} handle={titleHandle} onTileClick={() => {}} attract />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, gap: 16, padding: 24, backgroundColor: '#0a0c1066' }}>
         <ArtImg art={TITLE_ART} scale={narrow ? 3 : 5} width={(textWidth('WASTELAND: NEW YORK') + 8) * (narrow ? 3 : 5)} height={13 * (narrow ? 3 : 5)} testId="title" />
-        <T c={C.dim} s={13}>SHELTER 34 / MANHATTAN / YEAR 2097   -   WRIST-LINK v3.4 ONLINE</T>
-        <div testId="creator" style={{ display: 'flex', flexDirection: narrow ? 'column' : 'row', gap: 28, padding: 18, borderWidth: 1, borderColor: C.border, backgroundColor: C.panel, borderRadius: 6 }}>
+        <T c={C.text} s={13}>SHELTER 34  /  LOWER MANHATTAN  /  2097   -   WRIST-LINK v3.4 ONLINE</T>
+        <div testId="creator" style={{ display: 'flex', flexDirection: narrow ? 'column' : 'row', gap: 28, padding: 18, borderWidth: 1, borderColor: C.borderHi, backgroundColor: '#0b130eec', borderRadius: 8 }}>
           <Col gap={5}>
             <Row><T c={C.green} w={700}>ATTRIBUTES</T><T c={used >= STAT_POOL ? C.dim : C.amber}>{`${STAT_POOL - used} pts left`}</T></Row>
             {STATS.map((st, i) => (
@@ -197,6 +235,12 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
             ))}
           </Col>
           <Col gap={5}>
+            <Row gap={14}>
+              <T c={C.dim} s={11}>DERIVED</T>
+              <T c={C.green} s={12} testId="derived">{`HP ${50 + create.stats.stamina * 8}`}</T>
+              <T c={C.cyan} s={12}>{`AP ${6 + Math.floor(create.stats.reflex / 2)}`}</T>
+              <T c={C.amber} s={12}>{`CARRY ${80 + create.stats.grit * 12} lb`}</T>
+            </Row>
             <T c={C.green} w={700}>PERKS (pick 2)</T>
             {Object.entries(PERKS).map(([id, p]) => {
               const on = create.perks.includes(id)
@@ -212,7 +256,8 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
           <Btn label="ENTER  LEAVE THE SHELTER" onClick={startNew} testId="start" active />
           {io.load && <Btn label="C  CONTINUE SAVE" onClick={() => { doLoad(); if (io.load?.()) setScreen('game') }} testId="continue" />}
         </Row>
-        <T c={C.faint} s={11}>arrows: pick and adjust  -  click to toggle perks  -  ctrl-c quits</T>
+        <T c={C.dim} s={11}>arrows: pick and adjust  -  click to toggle perks  -  ctrl-c quits</T>
+      </div>
       </div>,
     )
   }
@@ -226,9 +271,10 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
       <Row gap={6}><T c={C.dim} s={11}>AP</T><Bar v={s.combat ? ap : map} max={map} c={C.cyan} w={compact ? 40 : 60} /></Row>
       <Row gap={6}><T c={C.dim} s={11}>RAD</T><T c={s.player.rads > 60 ? C.red : s.player.rads ? C.amber : C.dim} s={11} testId="rads">{String(s.player.rads)}</T>{g > 0 && <T c={C.amber} s={11}>{'|'.repeat(1 + Math.round(g * 6))}</T>}</Row>
       {!compact && <T c={C.amber} s={11}>{`${s.player.caps} caps`}</T>}
-      {!compact && <T c={C.dim} s={11}>{`LV ${s.player.level}`}</T>}
+      {!compact && <Row gap={6}><T c={C.text} s={11} w={700}>{`LV ${s.player.level}`}</T><Bar v={s.player.xp - xpForLevel(s.player.level)} max={xpForLevel(s.player.level + 1) - xpForLevel(s.player.level)} c={C.amber} w={50} /></Row>}
       <div style={{ display: 'flex', flexGrow: 1 }} />
       <T c={C.dim} s={11} testId="region">{regionName(s).toUpperCase()}</T>
+      {!compact && <T c={C.faint} s={11}>H help</T>}
       {compact && <Btn label={panelOpen ? 'TAB close' : 'TAB menu'} onClick={() => setPanelOpen(!panelOpen)} testId="toggle-panel" />}
     </div>
   )
@@ -246,7 +292,7 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
   )
   const logStrip = (
     <div testId="log" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: 74, flexShrink: 0, overflow: 'hidden', paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, gap: 1, borderTopWidth: 1, borderColor: C.border, backgroundColor: C.panel }}>
-      {logLines.map((l, i) => <T key={i} c={kindColor(l.kind)} s={12}>{`> ${l.text}`}</T>)}
+      {logLines.map((l, i) => <T key={i} c={i >= logLines.length - 2 ? kindColor(l.kind) : C.faint} s={12}>{`${i === logLines.length - 1 ? '>' : ' '} ${l.text}`}</T>)}
     </div>
   )
 
@@ -259,7 +305,23 @@ export function App({ initial, io = {}, startScreen }: { initial?: GameState | n
         {s.mode === 'barter' && <Barter s={s} act={act} />}
         {s.mode === 'target' && <Target s={s} act={act} onFire={doFire} />}
         {(s.mode === 'dead' || s.mode === 'ending') && <EndCard s={s} onLoad={doLoad} onContinue={() => act((g2) => { g2.mode = 'explore' })} onNew={() => setScreen('title')} />}
-        {toast && <div style={{ display: 'flex', position: 'absolute', top: 12, left: 12, paddingLeft: 10, paddingRight: 10, paddingTop: 4, paddingBottom: 4, backgroundColor: C.sel, borderWidth: 1, borderColor: C.green, borderRadius: 3, pointerEvents: 'none' }}><T c={C.green} testId="toast">{toast}</T></div>}
+        {s.mode !== 'dialogue' && s.mode !== 'dead' && s.mode !== 'ending' && <Tracker s={s} compact={compact} />}
+        {toasts.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, position: 'absolute', top: 14, left: 0, right: 0, pointerEvents: 'none' }}>
+            {toasts.map((t, i) => (
+              <div key={t.id} style={{ display: 'flex', flexDirection: 'row', gap: 8, paddingLeft: 12, paddingRight: 12, paddingTop: 5, paddingBottom: 5, backgroundColor: '#0b130ef0', borderWidth: 1, borderColor: t.c, borderRadius: 4 }}>
+                <T c={t.c} w={700}>{'+'}</T><T c={t.c} testId={i === toasts.length - 1 ? 'toast' : undefined}>{t.text}</T>
+              </div>
+            ))}
+          </div>
+        )}
+        {banner && (
+          <div testId="banner" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, position: 'absolute', top: Math.round((win?.height ?? 800) * 0.24), left: 0, right: 0, paddingTop: 12, paddingBottom: 12, backgroundColor: '#0a0c10cc', borderTopWidth: 1, borderBottomWidth: 1, borderColor: banner.c, pointerEvents: 'none' }}>
+            <T c={banner.c} s={compact ? 24 : 34} w={700}>{banner.text}</T>
+            {banner.sub ? <T c={C.text} s={13}>{banner.sub}</T> : null}
+          </div>
+        )}
+        {help && <Help />}
       </div>
       {combatBar}
       {logStrip}
@@ -285,18 +347,25 @@ function Dialogue({ s, act, compact }: { s: GameState; act: Act; compact: boolea
   const node = npc.dialogue.nodes[d.node]!
   const opts = visibleOptions(s)
   const art = useMemo(() => (npc.sprite === 'dog' ? dogPortrait() : portrait(npc.look, npc.id)), [npc.id])
+  const [shown, setShown] = useState(0)
+  useEffect(() => {
+    setShown(0)
+    const id = setInterval(() => setShown((n) => { if (n >= node.text.length) { clearInterval(id); return n } return n + 3 }), 16)
+    return () => clearInterval(id)
+  }, [node.text])
+  const stats = s.player.stats as Record<string, number>
   return (
     <div testId="dialogue" style={{ display: 'flex', flexDirection: 'row', gap: 14, position: 'absolute', left: 12, right: 12, bottom: 12, padding: 14, backgroundColor: '#0b130ef2', borderWidth: 1, borderColor: C.borderHi, borderRadius: 6 }}>
-      {!compact && <div style={{ display: 'flex', borderWidth: 1, borderColor: C.border }}><ArtImg art={art} scale={3} width={144} height={144} testId="portrait" /></div>}
+      {!compact && <div style={{ display: 'flex', borderWidth: 1, borderColor: C.border }}><ArtImg art={art} scale={4} width={192} height={192} testId="portrait" /></div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexGrow: 1, flexShrink: 1, minWidth: 0 }}>
         <Row><T c={C.green} w={700} testId="npc-name">{npc.name.toUpperCase()}</T><T c={C.dim} s={11}>{npc.faction}</T></Row>
-        <T c={C.text} testId="npc-line">{node.text}</T>
+        <T c={C.text} testId="npc-line">{node.text.slice(0, Math.max(shown, 1)) + (shown < node.text.length ? '_' : '')}</T>
         {d.result && <T c={d.result.endsWith('SUCCESS') ? C.green : C.red} s={12}>{`[${d.result}]`}</T>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
           {opts.map((o, i) => (
             <div key={i} testId={`opt-${i + 1}`} onClick={() => act((g) => chooseOption(g, i))} style={{ display: 'flex', flexDirection: 'row', gap: 8, paddingLeft: 6, paddingTop: 2, paddingBottom: 2, borderRadius: 3, cursor: 'pointer', hover: { backgroundColor: C.sel } }}>
               <T c={C.amber}>{`${i + 1}.`}</T>
-              {o.check && <T c={C.cyan}>{`[${o.check.stat.toUpperCase()} ${o.check.dc}]`}</T>}
+              {o.check && <T c={(stats[o.check.stat] ?? 0) >= o.check.dc ? C.green : C.red}>{`[${o.check.stat.toUpperCase()} ${stats[o.check.stat] ?? '?'}/${o.check.dc}]`}</T>}
               <T c={C.text}>{o.text}</T>
             </div>
           ))}
@@ -368,6 +437,7 @@ function Target({ s, act, onFire }: { s: GameState; act: Act; onFire: () => void
           </div>
         )
       })}
+      <Row gap={10}><T c={C.red} s={30} w={700} testId="target-chance">{`${hitChance(s, a, s.target!.part)}%`}</T><Col gap={1}><T c={C.text} s={11}>{`${s.target!.part.toUpperCase()} SHOT`}</T><T c={C.dim} s={11}>{s.target!.part === 'head' ? 'crit x2  -  hard to land' : s.target!.part === 'legs' ? 'cripple: slows' : s.target!.part === 'arms' ? 'cripple: weakens aim' : 'reliable damage'}</T></Col></Row>
       <T c={C.dim} s={11}>{`${w.name}  -  ${cost} AP per ${w.class === 'melee' ? 'swing' : 'shot'}  -  AP ${s.player.ap}`}</T>
       <Row><Btn label="ENTER  FIRE" onClick={onFire} c={C.red} testId="fire" active /><Btn label="ESC" onClick={() => act(closePanel)} c={C.dim} /></Row>
     </div>
@@ -525,5 +595,47 @@ function Radio({ s, act }: { s: GameState; act: Act }) {
       {s.broadcasts.length === 0 && <T c={C.faint} s={12}>static...</T>}
       {s.broadcasts.slice(-6).reverse().map((b, i) => <T key={i} c={i === 0 ? C.cyan : C.dim} s={12} testId={i === 0 ? 'broadcast-latest' : undefined}>{`» ${b}`}</T>)}
     </>
+  )
+}
+
+const DIRS = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE']
+function Tracker({ s, compact }: { s: GameState; compact: boolean }) {
+  if (s.combat) {
+    const foes = engagedEnemies(s)
+    return (
+      <div testId="tracker" style={{ display: 'flex', flexDirection: 'column', gap: 3, position: 'absolute', top: 12, left: 12, paddingLeft: 10, paddingRight: 12, paddingTop: 6, paddingBottom: 6, backgroundColor: '#140b0ad8', borderLeftWidth: 2, borderColor: C.red, pointerEvents: 'none' }}>
+        <T c={C.red} s={11} w={700}>{`COMBAT  -  ROUND ${s.combat.round}  -  YOUR TURN`}</T>
+        {foes.slice(0, compact ? 2 : 4).map((a) => <T key={a.id} c={C.text} s={11}>{`${a.name.padEnd(13)} ${'#'.repeat(Math.ceil((a.hp / a.maxHp) * 8)).padEnd(8, '.')} ${a.hp}`}</T>)}
+      </div>
+    )
+  }
+  const o = objective(s)
+  if (!o) return null
+  const dx = o.x - s.player.x, dy = o.y - s.player.y
+  const far = o.x >= 0 ? Math.max(Math.abs(dx), Math.abs(dy)) : -1
+  const dir = DIRS[(Math.round(Math.atan2(dx + dy, (dx - dy) * 2) / (Math.PI / 4)) + 8) % 8]
+  return (
+    <div testId="tracker" style={{ display: 'flex', flexDirection: 'column', gap: 3, position: 'absolute', top: 12, left: 12, width: compact ? 240 : 320, paddingLeft: 10, paddingRight: 12, paddingTop: 6, paddingBottom: 7, backgroundColor: '#0a0c10d0', borderLeftWidth: 2, borderColor: C.amber, pointerEvents: 'none' }}>
+      <T c={C.amber} s={10} w={700}>{o.main ? 'MAIN QUEST' : 'SIDE QUEST'}</T>
+      <T c={C.text} s={13} w={700} testId="tracker-title">{o.title.toUpperCase()}</T>
+      {!compact && <T c={C.dim} s={11}>{o.text}</T>}
+      {far >= 0 && <T c={C.amber} s={11}>{far <= 1 ? `> ${o.label}  -  here` : `> ${o.label}  -  ${far * 10} m ${dir}`}</T>}
+    </div>
+  )
+}
+
+const HELP: [string, string][] = [
+  ['click / WASD / arrows', 'walk, talk, loot, attack'], ['scroll  /  Z', 'zoom the city'], ['T', 'T.A.R.G.E.T. (pauses combat)'],
+  ['arrows in T.A.R.G.E.T.', 'body part / next target'], ['ENTER  /  F', 'fire'], ['E', 'end turn'],
+  ['1-5  /  I M Q R', 'WRIST-LINK tabs'], ['TAB', 'cycle tabs / open menu'], ['CTRL-S  /  CTRL-L', 'save / load'],
+  ['wasteland radio "..."', 'broadcast from another pane'], ['CTRL-C', 'quit to the shell'],
+]
+function Help() {
+  return (
+    <div testId="help" style={{ display: 'flex', flexDirection: 'column', gap: 5, position: 'absolute', top: 50, left: 50, right: 50, padding: 20, backgroundColor: '#0b130ef4', borderWidth: 1, borderColor: C.borderHi, borderRadius: 8, pointerEvents: 'none' }}>
+      <T c={C.green} s={15} w={700}>WRIST-LINK  /  FIELD MANUAL</T>
+      {HELP.map(([k, v]) => <Row key={k} gap={14}><div style={{ display: 'flex', width: 220 }}><T c={C.amber} s={12}>{k}</T></div><T c={C.text} s={12}>{v}</T></Row>)}
+      <T c={C.dim} s={11}>H or ESC to close</T>
+    </div>
   )
 }

@@ -612,6 +612,33 @@ export function questList(s: GameState) {
   return Object.entries(s.quests).map(([id, stage]) => ({ id, title: QUESTS[id]!.title, main: QUESTS[id]!.main, stage, text: QUESTS[id]!.stages[stage] ?? '', done: stage === 'done' }))
     .sort((a, b) => Number(a.done) - Number(b.done) || Number(b.main) - Number(a.main))
 }
+/** Current objective: first unfinished quest (main first) with a world location for its stage, if any. */
+export function objective(s: GameState): { id: string; title: string; text: string; main: boolean; x: number; y: number; label: string } | null {
+  if (!Object.keys(s.quests).length && !s.flags.talked_ada) {
+    const ada = s.npcs.find((n) => n.id === 'ada')
+    if (ada) return { id: 'wake', title: 'Report to the Overseer', text: 'The WRIST-LINK blinks: OVERSEER WANTS YOU. Ada is waiting by the Shelter 34 hatch.', main: true, x: ada.x, y: ada.y, label: NPCS.ada?.name ?? 'Ada' }
+  }
+  for (const q of questList(s)) {
+    if (q.done) continue
+    const g = QUESTS[q.id]!.goals?.[q.stage]
+    let pos: [number, number] | null = null, label = ''
+    if (g) {
+      const [kind, id] = g.split(':') as [string, string]
+      if (kind === 'npc') {
+        const n = s.npcs.find((n) => n.id === id && !n.removed) ?? s.actors.find((a) => a.npc === id && !a.removed && !a.dead)
+        if (n) { pos = [n.x, n.y]; label = NPCS[id]?.name ?? id }
+      } else if (kind === 'box') {
+        const c = s.containers.find((c) => c.id === id)
+        if (c) { pos = [c.x, c.y]; label = c.name }
+      } else if (kind === 'group') {
+        const a = liveActors(s).find((a) => a.group === id)
+        if (a) { pos = [a.x, a.y]; label = a.name }
+      }
+    }
+    return { id: q.id, title: q.title, text: q.text, main: q.main, x: pos?.[0] ?? -1, y: pos?.[1] ?? -1, label }
+  }
+  return null
+}
 export function receiveBroadcast(s: GameState, text: string) {
   const t = text.trim().slice(0, 140)
   if (!t) return
