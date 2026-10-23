@@ -1,7 +1,7 @@
 // App state: the files, per-kind settings, the conversion queue, and live previews. UI-free so tests can drive it.
-import { existsSync, readdirSync, readFileSync, rmSync, statSync, watch, type FSWatcher, openSync, readSync, closeSync } from 'node:fs'
+import { closeSync, constants, existsSync, fstatSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync, watch, writeSync, type FSWatcher } from 'node:fs'
 import { availableParallelism, tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { DEFAULTS, MAX_DIMS, PRESETS, isConverted, outputPath, parseProgress, plan, targetsFor, type Engines, type PresetId, type Settings, type Source } from './formats'
 import { excerpt, previewCrop, previewEncode, probe, run, thumbnail, type EngineInfo, type Preview } from './engines'
 import { sniff, type Kind } from './sniff'
@@ -85,13 +85,17 @@ export class Store {
   private async addFile(path: string, quiet: boolean): Promise<boolean> {
     if (this.files.some((f) => f.path === path)) return false
     if (isConverted(path)) return false
-    let st
-    try { st = statSync(path) } catch { return false }
-    if (!st.isFile()) return false
+    // Never follow links: a planted `a.md -> ~/.ssh/id_rsa` would be read and its copy written beside it.
+    if (lstatSync(path, { throwIfNoEntry: false })?.isSymbolicLink()) { if (!quiet) { this.rejected.push({ path, reason: 'symlink' }); this.emit() } return false }
+    let fd
+    try { fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW) } catch { return false }
     const head = new Uint8Array(4096)
-    const fd = openSync(path, 'r')
-    const len = readSync(fd, head, 0, 4096, 0)
-    closeSync(fd)
+    let st, len = 0
+    try {
+      st = fstatSync(fd)
+      if (st.isFile()) len = readSync(fd, head, 0, 4096, 0)
+    } finally { closeSync(fd) }
+    if (!st.isFile()) return false
     const s = sniff(head.subarray(0, len), path)
     if (!s) { if (!quiet) this.rejected.push({ path, reason: 'unknown format' }); this.emit(); return false }
     const name = path.split('/').pop()!
@@ -249,8 +253,7 @@ export class Store {
   private async runJob(f: FileItem) {
     const t = this.targetOf(f)!
     const s = { ...this.settings[f.src.kind], target: t.id }
-    const exists = (p: string) => existsSync(p) || this.reserved.has(p)
-    const out = outputPath(f.path, t.ext, exists)
+    let out = outputPath(f.path, t.ext, this.taken)
     this.reserved.add(out)
     const ac = new AbortController()
     this.controllers.set(f.id, ac)
@@ -262,8 +265,13 @@ export class Store {
     f.outputThumb = null
     this.emit()
     const t0 = performance.now()
+    if (!lstatSync(f.path, { throwIfNoEntry: false })?.isFile()) return this.finish(f, ac, 'failed', 'input is no longer a regular file')
+    // Engines write into a private staging dir; the result is placed beside the input without following links.
+    let stage: string
+    try { mkdirSync(this.cache, { recursive: true, mode: 0o700 }); stage = mkdtempSync(join(this.cache, 'job-')) } catch (e) { return this.finish(f, ac, 'failed', String((e as Error).message)) }
+    const staged = join(stage, basename(out))
     let p
-    try { p = plan(f.src, s, this.engines, out, this.cache) } catch (e) { return this.finish(f, ac, 'failed', String((e as Error).message)) }
+    try { p = plan(f.src, s, this.engines, staged, this.cache) } catch (e) { rmSync(stage, { recursive: true, force: true }); return this.finish(f, ac, 'failed', String((e as Error).message)) }
     const n = p.steps.length
     let err: string | null = null
     for (let i = 0; i < n && !ac.signal.aborted; i++) {
@@ -291,8 +299,17 @@ export class Store {
       this.emit()
     }
     for (const tmp of p.temps) rmSync(tmp, { force: true })
-    if (ac.signal.aborted) { rmSync(out, { force: true }); return this.finish(f, ac, 'canceled', null) }
-    if (err || !existsSync(out) || statSync(out).size === 0) { rmSync(out, { force: true }); return this.finish(f, ac, 'failed', err ?? 'no output written') }
+    const done = () => rmSync(stage, { recursive: true, force: true })
+    if (ac.signal.aborted) { done(); return this.finish(f, ac, 'canceled', null) }
+    if (!err && !(lstatSync(staged, { throwIfNoEntry: false })?.size)) err = 'no output written'
+    if (!err) {
+      try {
+        const placed = this.place(staged, out, f.path, t.ext)
+        if (placed !== out) { this.reserved.delete(out); this.reserved.add(placed); out = placed; f.output = out }
+      } catch (e) { err = `couldn't write output: ${(e as Error).message}` }
+    }
+    done()
+    if (err) return this.finish(f, ac, 'failed', err)
     f.outputSize = statSync(out).size
     f.ms = performance.now() - t0
     this.written.done++
@@ -305,6 +322,33 @@ export class Store {
       f.outputThumb = await thumbnail({ path: out, kind, format: fmt, duration: f.src.duration }, this.engines, this.cache, this.color(kind))
       this.emit()
     }
+  }
+
+  /** Any directory entry counts as taken, including a dangling symlink. */
+  private taken = (p: string) => this.reserved.has(p) || lstatSync(p, { throwIfNoEntry: false }) !== undefined
+
+  /** Moves a finished output to `out` (or the next free name) with exclusive, no-follow creates. */
+  private place(staged: string, out: string, input: string, ext: string): string {
+    for (let tries = 0; tries < 100; tries++) {
+      try {
+        // link(2) never follows the destination and fails if any entry exists there.
+        linkSync(staged, out)
+        return out
+      } catch (e) {
+        const code = (e as NodeJS.ErrnoException).code
+        if (code === 'EEXIST') { out = outputPath(input, ext, (p) => p === out || this.taken(p)); continue }
+        if (code !== 'EXDEV' && code !== 'EPERM' && code !== 'ENOTSUP' && code !== 'EMLINK') throw e
+      }
+      let fd
+      try { fd = openSync(out, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o644) } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'EEXIST') { out = outputPath(input, ext, (p) => p === out || this.taken(p)); continue }
+        throw e
+      }
+      try { copyInto(staged, fd) } catch (e) { closeSync(fd); rmSync(out, { force: true }); throw e }
+      closeSync(fd)
+      return out
+    }
+    throw new Error('no free output name')
   }
 
   private finish(f: FileItem, ac: AbortController, state: JobState, error: string | null) {
@@ -344,6 +388,19 @@ export class Store {
       after,
     }
   }
+}
+
+function copyInto(src: string, fd: number) {
+  const buf = new Uint8Array(1 << 20)
+  const sfd = openSync(src, 'r')
+  try {
+    for (let pos = 0; ; ) {
+      const n = readSync(sfd, buf, 0, buf.length, pos)
+      if (!n) break
+      for (let w = 0; w < n; ) w += writeSync(fd, buf, w, n - w)
+      pos += n
+    }
+  } finally { closeSync(sfd) }
 }
 
 export const readHead = (p: string) => new Uint8Array(readFileSync(p).subarray(0, 4096))
