@@ -1,6 +1,6 @@
 # surf
 
-A real web browser inside Ghostty. `surf https://news.ycombinator.com` starts **headless Google Chrome**, drives it over the Chrome DevTools Protocol (raw CDP over a WebSocket, no puppeteer/playwright), and paints the pages into a [GPUIX](https://github.com/remorses/gpuix) 0.11.0 app that renders in the terminal over the Kitty graphics protocol. The tab strip, toolbar, omnibox, find bar and status line are GPUIX; the pages are Chrome.
+A real web browser inside Ghostty. `surf https://news.ycombinator.com` starts **headless Google Chrome**, drives it over the Chrome DevTools Protocol (raw CDP over `--remote-debugging-pipe`, no puppeteer/playwright), and paints the pages into a [GPUIX](https://github.com/remorses/gpuix) 0.11.0 app that renders in the terminal over the Kitty graphics protocol. The tab strip, toolbar, omnibox, find bar and status line are GPUIX; the pages are Chrome.
 
 ![surf in Ghostty, split with a shell driving it](media/screenshot.png)
 
@@ -34,8 +34,8 @@ Ctrl-C closes Chrome (`Browser.close`, then SIGKILL of anything still holding th
 
 | piece | file |
 | --- | --- |
-| CDP client: request ids, events, flattened target sessions | `src/cdp.ts` |
-| Chrome launcher: `--headless`, random debugging port, throwaway profile, muted, no background throttling; orphan reaper | `src/chrome.ts` |
+| CDP client: request ids, events, flattened target sessions; NUL-delimited pipe transport on Chrome's fds 3/4 | `src/cdp.ts` |
+| Chrome launcher: `--headless`, `--remote-debugging-pipe` (no TCP debugging port, so other local users can't drive the browser), throwaway `0700` profile, muted, no background throttling; orphan reaper | `src/chrome.ts` |
 | Tabs (one CDP target + session per tab), navigation/history, `Page.startScreencast`, input dispatch, find, eval, screenshots | `src/browser.ts` |
 | Latest-frame slot (stale frames are acked and dropped), JPEG/PNG header parsing, fps meter | `src/frame.ts` |
 | Pointer mapping (pane px → CSS px), viewport/DPR sizing, wheel deltas, GPUIX key → `Input.dispatchKeyEvent` mapping | `src/input.ts` |
