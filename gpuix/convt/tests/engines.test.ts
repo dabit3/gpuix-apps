@@ -72,4 +72,30 @@ describe.skipIf(!engines.ffmpeg || !engines.ffprobe)('engines on fixtures', () =
       expect(s?.format).toBe(id)
     }
   }, 60000)
+
+  test.skipIf(!engines.pandoc || !engines.typst)('untrusted documents: no fetches, no local files or typst code in the output', async () => {
+    let hits = 0
+    const server = Bun.serve({ port: 0, fetch: () => { hits++; return new Response('x') } })
+    const secret = join(dir, 'secret.svg')
+    await Bun.write(secret, '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><text>CONVT-SECRET</text></svg>')
+    const md = join(dir, 'evil.md')
+    await Bun.write(md, [
+      '---', 'template: "@preview/cetz:0.3.4"', 'fontsize: "11pt, x: read(\\"/etc/hosts\\")"', '---',
+      `# Hi`, '', `![remote](${server.url}beacon.png) ![local](${secret}) <img src="${server.url}img.png">`, '',
+      '```{=typst}', '#import "@preview/cetz:0.3.4"', `#read("${secret}")`, '```', '',
+      `[x]{typst:text:fill="red, x: read(\\"${secret}\\")"}`, '',
+    ].join('\n'))
+    try {
+      for (const id of ['pdf', 'docx', 'rtf', 'html']) {
+        const out = await convert(md, 'doc', 'md', id)
+        expect(readFileSync(out).includes('CONVT-SECRET')).toBe(false)
+      }
+      const typ = readFileSync(join(dir, `evil.md.${Bun.hash(md).toString(36)}.typst`, 'doc.typ'), 'utf8')
+      for (const code of ['@preview', 'read(', secret]) expect(typ).not.toContain(code)
+      expect(typ).toContain('remote')
+    } finally {
+      server.stop(true)
+    }
+    expect(hits).toBe(0)
+  }, 60000)
 })

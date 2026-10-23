@@ -290,7 +290,7 @@ export class Store {
       f.progress = (i + 1) / n
       this.emit()
     }
-    for (const tmp of p.temps) rmSync(tmp, { force: true })
+    for (const tmp of p.temps) rmSync(tmp, { recursive: true, force: true })
     if (ac.signal.aborted) { rmSync(out, { force: true }); return this.finish(f, ac, 'canceled', null) }
     if (err || !existsSync(out) || statSync(out).size === 0) { rmSync(out, { force: true }); return this.finish(f, ac, 'failed', err ?? 'no output written') }
     f.outputSize = statSync(out).size

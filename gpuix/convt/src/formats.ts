@@ -92,6 +92,7 @@ const NEEDS_PNG: Record<string, string[]> = {
 }
 const TEXTUTIL_IN = ['docx', 'odt', 'rtf', 'html', 'txt']
 const PANDOC_IN = ['md', 'docx', 'odt', 'html', 'epub', 'rtf', 'txt']
+const TYPST_SAFE = join(import.meta.dir, 'typst-safe.lua')
 
 export interface Source {
   path: string
@@ -242,15 +243,23 @@ export function plan(src: Source, s: Settings, engines: Engines, output: string,
 
   // Documents.
   const textutilFmt = (id: string) => id
+  // Documents are untrusted: --sandbox stops pandoc from fetching URLs or reading files the document
+  // references. typst runs separately with --root on an empty dir and on filtered source (TYPST_SAFE).
+  const pandoc = [bin('pandoc'), '--sandbox', src.path]
   if (t.id === 'pdf') {
-    steps.push({ cmd: [bin('pandoc'), src.path, `--pdf-engine=${bin('typst')}`, '-V', 'mainfont=Helvetica Neue', '-o', output] })
+    const root = join(tmp, `${basename(src.path)}.${Bun.hash(src.path).toString(36)}.typst`)
+    const typ = join(root, 'doc.typ')
+    temps.push(root)
+    steps.push({ cmd: ['mkdir', '-p', root] })
+    steps.push({ cmd: [...pandoc, '-L', TYPST_SAFE, '-s', '-t', 'typst', '-V', 'mainfont=Helvetica Neue', '-o', typ] })
+    steps.push({ cmd: [bin('typst'), 'compile', '--root', root, typ, output] })
   } else if (t.id === 'md') {
-    steps.push({ cmd: [bin('pandoc'), src.path, '-t', 'gfm', '-o', output] })
+    steps.push({ cmd: [...pandoc, '-t', 'gfm', '-o', output] })
   } else if (TEXTUTIL_IN.includes(src.format)) {
     steps.push({ cmd: [bin('textutil'), '-convert', textutilFmt(t.id), src.path, '-output', output] })
   } else if (PANDOC_IN.includes(src.format)) {
     const to: Record<string, string[]> = { html: ['-s', '--metadata', `pagetitle=${basename(src.path)}`], docx: [], rtf: ['-s', '-t', 'rtf'], txt: ['-t', 'plain'] }
-    steps.push({ cmd: [bin('pandoc'), src.path, ...(to[t.id] ?? []), '-o', output] })
+    steps.push({ cmd: [...pandoc, ...(to[t.id] ?? []), '-o', output] })
   } else throw new Error(`can't convert ${src.format} documents`)
   return { steps, temps, output }
 }
