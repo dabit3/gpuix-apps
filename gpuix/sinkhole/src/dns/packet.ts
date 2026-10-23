@@ -117,7 +117,7 @@ export const getId = (buf: Uint8Array) => (buf[0]! << 8) | buf[1]!
 export const getRcode = (buf: Uint8Array) => buf[3]! & 0x0f
 
 export interface Record_ { name: string; type: number; ttl: number; ttlOffset: number; data: Uint8Array; section: 'an' | 'ns' | 'ar' }
-export interface Response { id: number; rcode: number; truncated: boolean; question?: { name: string; qtype: number }; records: Record_[] }
+export interface Response { id: number; rcode: number; truncated: boolean; qdcount: number; question?: { name: string; qtype: number; qclass: number }; records: Record_[] }
 
 export function parseResponse(buf: Uint8Array): Response {
   if (buf.length < 12) throw new DnsError('short header')
@@ -127,7 +127,8 @@ export function parseResponse(buf: Uint8Array): Response {
   let question: Response['question']
   for (let i = 0; i < counts[0]; i++) {
     const n = readName(buf, pos)
-    if (i === 0) question = { name: n.name, qtype: v.getUint16(n.next) }
+    if (n.next + 4 > buf.length) throw new DnsError('truncated question')
+    if (i === 0) question = { name: n.name, qtype: v.getUint16(n.next), qclass: v.getUint16(n.next + 2) }
     pos = n.next + 4
   }
   const records: Record_[] = []
@@ -146,7 +147,7 @@ export function parseResponse(buf: Uint8Array): Response {
       pos = start + len
     }
   }
-  return { id: v.getUint16(0), rcode: buf[3]! & 0x0f, truncated: (buf[2]! & 0x02) !== 0, question, records }
+  return { id: v.getUint16(0), rcode: buf[3]! & 0x0f, truncated: (buf[2]! & 0x02) !== 0, qdcount: counts[0], question, records }
 }
 
 /** Seconds a response may be cached: the smallest answer TTL, or the SOA minimum for negative answers. */
