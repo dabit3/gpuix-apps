@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, extname, join } from 'node:path'
-import { emptyLibrary, parseEpisode, parseTitle, slug, VIDEO_EXT, type Item, type Library, type Probe } from './model.ts'
+import { emptyLibrary, parseCrop, parseEpisode, parseSeconds, parseTitle, slug, VIDEO_EXT, type Item, type Library, type Probe } from './model.ts'
 
 export const cacheDir = () => process.env.COUCH_CACHE ?? join(homedir(), 'Library/Caches/couch')
 
@@ -54,7 +54,7 @@ export function buildLibrary(root: string, files: Found[]): Library {
           title: meta.title ?? parsed.title, year: meta.year ?? parsed.year,
           summary: meta.summary ?? '', genres: meta.genres ?? [], cast: meta.cast ?? [],
           director: meta.director, studio: meta.studio, rating: meta.rating, license: meta.license,
-          posterAt: meta.posterAt, backdropAt: meta.backdropAt,
+          posterAt: parseSeconds(meta.posterAt), backdropAt: parseSeconds(meta.backdropAt),
         }
         showDirs.set(showDir, show)
         lib.items[show.id] = show
@@ -66,7 +66,7 @@ export function buildLibrary(root: string, files: Found[]): Library {
         id, kind: 'episode', dir, path: f.path, size: f.size, addedAt: f.birth,
         title: meta.title ?? ep.title ?? `Episode ${ep.episode}`, year: meta.year ?? show.year,
         summary: meta.summary ?? '', genres: show.genres, cast: [], studio: show.studio, license: show.license,
-        showId: show.id, season: ep.season, episode: ep.episode, posterAt: meta.posterAt, backdropAt: meta.backdropAt,
+        showId: show.id, season: ep.season, episode: ep.episode, posterAt: parseSeconds(meta.posterAt), backdropAt: parseSeconds(meta.backdropAt),
       }
       show.episodes!.push(id)
       show.addedAt = Math.max(show.addedAt, f.birth)
@@ -81,7 +81,7 @@ export function buildLibrary(root: string, files: Found[]): Library {
       id, kind: 'movie', dir, path: f.path, size: f.size, addedAt: f.birth,
       title, year: meta.year ?? parsed.year, summary: meta.summary ?? '', genres: meta.genres ?? [], cast: meta.cast ?? [],
       director: meta.director, studio: meta.studio, rating: meta.rating, license: meta.license,
-      posterAt: meta.posterAt, backdropAt: meta.backdropAt, crop: meta.crop,
+      posterAt: parseSeconds(meta.posterAt), backdropAt: parseSeconds(meta.backdropAt), crop: parseCrop(meta.crop),
     }
     lib.movies.push(id)
   }

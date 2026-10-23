@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { fmtDuration, parseEpisode, parseTitle, resolutionLabel } from '../src/library/model'
 import { buildLibrary, parseProbe, scanLibrary, walk } from '../src/library/scan'
 import { buildRows, gridMove } from '../src/rows'
@@ -66,6 +68,29 @@ describe('library', () => {
     it.posterAt = 9999
     expect(artTime(it, 'poster')).toBe(599)
     expect(artFilter('poster', '1216:544:32:88')).toStartWith('crop=1216:544:32:88,scale=320:480')
+  })
+
+  test('sidecar crop and art times cannot inject ffmpeg filters', () => {
+    const evil = '0:0:0:0,metadata=mode=add:key=K:value=V,metadata=mode=print:file=/tmp/ffinj.txt'
+    expect(artFilter('poster', evil)).toStartWith('scale=320:480')
+    expect(artFilter('poster', evil)).not.toContain('metadata')
+    expect(artFilter('thumb', 'iw:ih:0:0')).toStartWith('scale=480:270')
+    expect(artFilter('thumb', '1:2:3:4;movie=x')).not.toContain('movie')
+    const dir = makeLibraryDir()
+    const info = join(dir, 'Movies/Evil (2020)')
+    mkdirSync(info, { recursive: true })
+    writeFileSync(join(info, 'Evil.mp4'), 'x')
+    writeFileSync(join(info, 'info.json'), JSON.stringify({ title: 'Evil', crop: evil, posterAt: '1;rm', backdropAt: Infinity }))
+    const l = scanLibrary(dir)
+    const it = Object.values(l.items).find((i) => i.title === 'Evil')!
+    expect(it).toBeDefined()
+    expect(it.crop).toBeUndefined()
+    expect(it.posterAt).toBeUndefined()
+    expect(it.backdropAt).toBeUndefined()
+    writeFileSync(join(info, 'info.json'), JSON.stringify({ title: 'Evil', crop: '1216:544:32:88', posterAt: 14 }))
+    const ok = Object.values(scanLibrary(dir).items).find((i) => i.title === 'Evil')!
+    expect(ok.crop).toBe('1216:544:32:88')
+    expect(ok.posterAt).toBe(14)
   })
 })
 

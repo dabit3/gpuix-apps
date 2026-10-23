@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Item } from './model.ts'
+import { parseCrop, parseSeconds, type Item } from './model.ts'
 import { cacheDir } from './scan.ts'
 
 export type ArtKind = 'poster' | 'backdrop' | 'thumb'
@@ -14,7 +14,7 @@ export const ART_SIZE: Record<ArtKind, [number, number]> = {
 /** Seconds into the file to grab a frame from. */
 export function artTime(item: Item, kind: ArtKind): number {
   const d = item.probe?.duration ?? item.artDur ?? 60
-  const want = kind === 'poster' ? item.posterAt : kind === 'backdrop' ? item.backdropAt : undefined
+  const want = parseSeconds(kind === 'poster' ? item.posterAt : kind === 'backdrop' ? item.backdropAt : undefined)
   const t = want ?? d * (kind === 'poster' ? 0.22 : kind === 'backdrop' ? 0.4 : 0.3)
   return Math.max(0, Math.min(t, Math.max(0, d - 1)))
 }
@@ -25,7 +25,8 @@ export function artPath(item: Item, kind: ArtKind): string {
 
 export function artFilter(kind: ArtKind, crop?: string): string {
   const [w, h] = ART_SIZE[kind]
-  return `${crop ? `crop=${crop},` : ''}scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${w}:${h},eq=saturation=1.08`
+  const box = parseCrop(crop)
+  return `${box ? `crop=${box},` : ''}scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${w}:${h},eq=saturation=1.08`
 }
 
 /** Generates poster/backdrop/thumb frames with ffmpeg, a few at a time, and reports each finished file. */
