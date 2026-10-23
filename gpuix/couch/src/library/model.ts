@@ -111,6 +111,18 @@ export function parseEpisode(name: string): { season: number; episode: number; t
   return { season: Number(m[1]), episode: Number(m[2]), title: m[3]?.trim() }
 }
 
+/** Sidecar `crop` as a strict w:h:x:y of plain integers; anything else is dropped so it can't reach an ffmpeg filtergraph. */
+export function parseCrop(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined
+  const m = /^(\d{1,5}):(\d{1,5}):(\d{1,5}):(\d{1,5})$/.exec(v)
+  return m ? m.slice(1, 5).map(Number).join(':') : undefined
+}
+
+/** Sidecar time in seconds: finite, non-negative numbers only. */
+export function parseSeconds(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined
+}
+
 export function slug(s: string): string {
   return s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
