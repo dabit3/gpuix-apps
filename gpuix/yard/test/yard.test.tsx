@@ -67,6 +67,30 @@ describe('photo and git metadata', () => {
     expect(readExif(join(root, 'README.txt'))).toBeNull()
   })
 
+  it('bounds EXIF parsing when IFDs point back at themselves', () => {
+    const n = 5400
+    const tiff = Buffer.alloc(8 + 2 + n * 12 + 4)
+    tiff.write('II', 0, 'ascii')
+    tiff.writeUInt16LE(42, 2)
+    tiff.writeUInt32LE(8, 4)
+    tiff.writeUInt16LE(n, 8)
+    for (let k = 0; k < n; k++) {
+      const e = 10 + k * 12
+      tiff.writeUInt16LE(0x8769, e)
+      tiff.writeUInt16LE(4, e + 2)
+      tiff.writeUInt32LE(1, e + 4)
+      tiff.writeUInt32LE(8, e + 8)
+    }
+    const app1 = Buffer.concat([Buffer.from('Exif\0\0', 'binary'), tiff])
+    const head = Buffer.from([0xff, 0xd8, 0xff, 0xe1, 0, 0])
+    head.writeUInt16BE(app1.length + 2, 4)
+    const evil = join(root, 'Photos', '0.jpg')
+    writeFileSync(evil, Buffer.concat([head, app1, Buffer.from([0xff, 0xd9])]))
+    const start = performance.now()
+    expect(readExif(evil)).toBeNull()
+    expect(performance.now() - start).toBeLessThan(500)
+  })
+
   it('extracts distinct dominant colours', () => {
     const px = [...Array(60).fill([250, 250, 250]), ...Array(30).fill([10, 20, 200]), ...Array(10).fill([200, 30, 30])]
     const out = dominant(px, 3)

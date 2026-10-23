@@ -40,16 +40,23 @@ export function readExif(path: string): Exif | null {
   }
 }
 
+const MAX_IFD_ENTRIES = 512
+const MAX_EXIF_ENTRIES = 1024
+
 function parseTiff(t: Buffer): Exif | null {
   const le = t.toString('ascii', 0, 2) === 'II'
   const u16 = (o: number) => (le ? t.readUInt16LE(o) : t.readUInt16BE(o))
   const u32 = (o: number) => (le ? t.readUInt32LE(o) : t.readUInt32BE(o))
   const tags: Record<number, string | number> = {}
   const sizes: Record<number, number> = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8 }
-  const readIfd = (off: number, depth = 0) => {
-    if (off <= 0 || off + 2 > t.length || depth > 2) return
-    const count = u16(off)
-    for (let k = 0; k < count; k++) {
+  const seen = new Set<number>()
+  let budget = MAX_EXIF_ENTRIES
+  const readIfd = (off: number, isIfd0: boolean) => {
+    if (off <= 0 || off + 2 > t.length || seen.has(off)) return
+    seen.add(off)
+    const count = Math.min(u16(off), MAX_IFD_ENTRIES)
+    let exifIfd = 0
+    for (let k = 0; k < count && budget > 0; k++, budget--) {
       const e = off + 2 + k * 12
       if (e + 12 > t.length) return
       const tag = u16(e)
@@ -58,8 +65,9 @@ function parseTiff(t: Buffer): Exif | null {
       const bytes = (sizes[type] ?? 1) * num
       const at = bytes > 4 ? u32(e + 8) : e + 8
       if (at + bytes > t.length) continue
-      if (tag === 0x8769) readIfd(u32(e + 8), depth + 1)
-      else if (type === 2) tags[tag] = t.toString('utf8', at, at + num).replace(/\0+$/, '').trim()
+      if (tag === 0x8769) {
+        if (isIfd0 && !exifIfd) exifIfd = u32(e + 8)
+      } else if (type === 2) tags[tag] = t.toString('utf8', at, at + num).replace(/\0+$/, '').trim()
       else if (type === 3) tags[tag] = u16(at)
       else if (type === 4) tags[tag] = u32(at)
       else if (type === 5 || type === 10) {
@@ -68,8 +76,9 @@ function parseTiff(t: Buffer): Exif | null {
         if (tag === 0x829a) tags[-1] = `${u32(at)}/${den}`
       }
     }
+    if (exifIfd) readIfd(exifIfd, false)
   }
-  readIfd(u32(4))
+  readIfd(u32(4), true)
   const s = (k: number) => (typeof tags[k] === 'string' ? (tags[k] as string) : undefined)
   const num = (k: number) => (typeof tags[k] === 'number' ? (tags[k] as number) : undefined)
   const make = s(0x010f)
