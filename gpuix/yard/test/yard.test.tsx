@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync, mkdirSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createTestRoot, hasNativeTestRenderer } from '@gpuix/react/testing'
 import { copyInto, imageSize, listDir, moveInto, readClip, renameEntry, trash, uniqueDest, walk, writeClip } from '../src/fs'
 import { fuzzyMatch } from '../src/fuzzy'
-import { parseStatus } from '../src/git'
+import { filterOverrides, gitInfo, parseStatus } from '../src/git'
 import { dominant, readExif } from '../src/media'
 import { Yard } from '../src/Yard'
 
@@ -84,6 +85,49 @@ describe('photo and git metadata', () => {
     expect(g.status.get('/r/docs/new/x.md')).toBe('?')
     expect(g.status.get('/r/docs')).toBe('?')
     expect(g.status.get('/r/old.txt')).toBe('D')
+  })
+})
+
+describe('git in untrusted folders', () => {
+  let repo: string
+  const git = (...args: string[]) => expect(spawnSync('git', args, { cwd: repo }).status).toBe(0)
+  beforeEach(() => {
+    repo = mkdtempSync(join(tmpdir(), 'yard-git-'))
+    git('init', '-q')
+    writeFileSync(join(repo, 'f.txt'), 'a\n')
+    writeFileSync(join(repo, '.gitattributes'), '* filter=evil\n')
+    git('add', 'f.txt', '.gitattributes')
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'i')
+    const mark = (name: string) => JSON.stringify(`touch '${join(repo, name)}'; cat`)
+    appendFileSync(
+      join(repo, '.git', 'config'),
+      `[core]\n\tfsmonitor = ${mark('FSMONITOR')}\n[filter "evil"]\n\tclean = ${mark('CLEAN')}\n\tprocess = ${mark('PROCESS')}\n`,
+    )
+    const later = new Date(Date.now() + 5000)
+    utimesSync(join(repo, 'f.txt'), later, later)
+  })
+  afterEach(() => rmSync(repo, { recursive: true, force: true }))
+
+  it('fixture really runs repo commands under plain git status', () => {
+    spawnSync('git', ['--no-optional-locks', 'status', '--porcelain'], { cwd: repo })
+    expect(existsSync(join(repo, 'FSMONITOR')) || existsSync(join(repo, 'CLEAN')) || existsSync(join(repo, 'PROCESS'))).toBe(true)
+  })
+
+  it('reads status without running core.fsmonitor or filter commands', async () => {
+    const g = await gitInfo(repo)
+    expect(g).not.toBeNull()
+    expect(g!.branch).not.toBe('')
+    expect(['FSMONITOR', 'CLEAN', 'PROCESS'].filter((f) => existsSync(join(repo, f)))).toEqual([])
+  })
+
+  it('neutralizes every filter driver, including dotted names, and refuses unsafe names', () => {
+    const o = filterOverrides('core.bare=false\nfilter.a.b.clean=x\nFilter.lfs.process=git-lfs filter-process\n')!
+    expect(o).toContain('filter.a.b.clean=')
+    expect(o).toContain('filter.a.b.process=')
+    expect(o).toContain('filter.lfs.process=')
+    expect(o).toContain('filter.lfs.required=false')
+    expect(filterOverrides('filter.x=y.clean=z\n')).toBeNull()
+    expect(filterOverrides('core.bare=false\n')).toEqual([])
   })
 })
 
