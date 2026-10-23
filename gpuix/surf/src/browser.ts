@@ -2,7 +2,7 @@ import { Cdp } from './cdp'
 import { decodeBase64, imageSize, LatestFrame, RateMeter } from './frame'
 import { findExpression } from './findpage'
 import { securityOf, type Security } from './omnibox'
-import { clampZoom, zoomedMetrics, type KeyEventParams } from './input'
+import { clampZoom, WheelGlide, zoomedMetrics, type KeyEventParams } from './input'
 
 /** `p`, or undefined once `ms` passes. */
 function within<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
@@ -35,6 +35,10 @@ export interface Viewport { width: number; height: number; deviceScaleFactor: nu
 
 const QUALITY = 82
 
+/** Remembers the element at `fy` of the viewport height and where on it, so the same spot can be put back after a zoom re-layout. At the very top there is nothing to keep. */
+export const saveAnchor = (fy: number) => `(()=>{window.__surfAnchor=null;if(scrollY<1)return;const y=innerHeight*${fy};const e=document.elementFromPoint(innerWidth/2,y);if(!e||e===document.documentElement||e===document.body)return;const r=e.getBoundingClientRect();window.__surfAnchor={e,f:r.height?(y-r.top)/r.height:0,fy:${fy}}})()`
+export const RESTORE_ANCHOR = `(()=>{const a=window.__surfAnchor;window.__surfAnchor=null;if(!a||!a.e.isConnected)return;const r=a.e.getBoundingClientRect();const d=r.top+a.f*r.height-innerHeight*a.fy;if(Math.abs(d)>1)scrollBy({top:d,behavior:'instant'})})()`
+
 /** Rewrites the HeadlessChrome UA token so sites serve the same pages they serve desktop Chrome. */
 export function desktopUserAgent(ua: string) { return ua.replace(/HeadlessChrome/g, 'Chrome').replace(/\s*Headless\b/g, '') }
 
@@ -61,13 +65,22 @@ export class Browser {
   private wantViewport: Viewport | null = null
   private viewportJob: Promise<void> | null = null
   private zoomPending = new Set<Tab>()
+  /** The --force-device-scale-factor Chrome was launched with: screencast frames come at CSS px × this, capped at the pane's pixel size. */
+  rasterScale = 1
+  private glide = new WheelGlide()
+  private wheelAt = { x: 0, y: 0, modifiers: 0 }
+  private wheelTimer: ReturnType<typeof setInterval> | null = null
+  private wheelInFlight = false
+  private wheelStepAt = 0
+  private settleTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(readonly cdp: Cdp) {}
 
-  static async connect(wsUrl: string, opts: { viewport?: Viewport } = {}) {
+  static async connect(wsUrl: string, opts: { viewport?: Viewport; rasterScale?: number } = {}) {
     const cdp = await Cdp.connect(wsUrl)
     const b = new Browser(cdp)
     if (opts.viewport) b.viewport = opts.viewport
+    if (opts.rasterScale) b.rasterScale = opts.rasterScale
     await b.init()
     return b
   }
@@ -103,7 +116,7 @@ export class Browser {
     c.on('Page.javascriptDialogOpening', (p, sid) => { this.cdp.post('Page.handleJavaScriptDialog', { accept: p.type !== 'beforeunload' ? false : true }, sid) })
     c.on('Page.frameStoppedLoading', (p, sid) => { const t = this.bySession(sid); if (t && this.isMain(p.frameId, t)) { t.loading = false; t.progress = 1; this.changed(); void this.refreshHistory(t); void this.refreshTitle(t) } })
     c.on('Page.domContentEventFired', (_p, sid) => { const t = this.bySession(sid); if (t && t.loading) { t.progress = Math.max(t.progress, 0.7); this.changed() } })
-    c.on('Page.frameNavigated', (p, sid) => { const t = this.bySession(sid); if (t && !p.frame.parentId) { t.url = p.frame.url; t.security = securityOf(t.url); void this.refreshHistory(t); this.changed(); if (t.zoom > 1) void this.resumeZoomed(t) } })
+    c.on('Page.frameNavigated', (p, sid) => { const t = this.bySession(sid); if (t && !p.frame.parentId) { t.url = p.frame.url; t.security = securityOf(t.url); void this.refreshHistory(t); this.changed(); if (this.needsCrisp(t)) void this.resumeZoomed(t) } })
     c.on('Page.navigatedWithinDocument', (p, sid) => { const t = this.bySession(sid); if (t) { t.url = p.url; void this.refreshHistory(t); void this.refreshTitle(t); this.changed() } })
     c.on('Page.domContentEventFired', (_p, sid) => { const t = this.bySession(sid); if (t) void this.refreshTitle(t) })
     c.on('Network.requestWillBeSent', (_p, sid) => { const t = this.bySession(sid); if (t?.loading) { t.requests++; this.bump(t) } })
@@ -179,6 +192,7 @@ export class Browser {
     const prev = this.active
     if (prev && prev.id !== id) this.cdp.post('Page.stopScreencast', {}, prev.sessionId)
     this.activeId = id
+    this.glide.clear()
     this.frames.take()
     this.changed()
     this.cdp.post('Target.activateTarget', { targetId: id })
@@ -215,17 +229,28 @@ export class Browser {
   }
 
   /** Sets a tab's page zoom: Chrome re-lays the page out at pane size / zoom, and the active tab's frames follow. */
-  async setZoom(zoom: number, id = this.activeId): Promise<number> {
+  /** The part of the page at `anchorY` (a fraction of the viewport height) stays put across the re-layout, like zooming in Chrome. */
+  async setZoom(zoom: number, id = this.activeId, anchorY = 0.5): Promise<number> {
     const t = this.tab(id)
     if (!t) return 1
     const z = clampZoom(zoom)
     if (z === t.zoom) return z
+    const live = t.id === this.activeId
+    if (live) await this.quietEval(t, saveAnchor(anchorY))
     t.zoom = z
     this.zoomPending.add(t)
     this.changed()
     await this.kick()
+    if (live && t.zoom === z) await this.quietEval(t, RESTORE_ANCHOR)
     return z
   }
+
+  private quietEval(t: Tab, expression: string) {
+    return within(this.cdp.send('Runtime.evaluate', { expression }, t.sessionId).catch(() => null), 400)
+  }
+
+  /** Zoom levels the screencast can't render at full resolution fall back to device-pixel screenshots once the page settles. */
+  needsCrisp(t: Tab) { return t.zoom * this.viewport.deviceScaleFactor > this.rasterScale + 1e-3 }
 
   /** Resizes every tab's viewport; the active tab's screencast restarts at the new frame size. */
   /** Latest wins: resizes arrive faster than Chrome applies them, so updates run one at a time and only the newest pending size is applied next. */
@@ -239,7 +264,7 @@ export class Browser {
     if (!this.viewportJob) this.viewportJob = this.drainViewport().finally(() => {
       this.viewportJob = null
       if (this.wantViewport || this.zoomPending.size) void this.kick()
-      else if (this.crispWanted) { this.crispWanted = false; const a = this.active; if (a && a.zoom > 1) void this.captureCrisp(a) }
+      else if (this.crispWanted) { this.crispWanted = false; const a = this.active; if (a && this.needsCrisp(a)) void this.captureCrisp(a) }
     })
     return this.viewportJob
   }
@@ -249,19 +274,21 @@ export class Browser {
     if (this.crispJob) await within(this.crispJob, 1500)
     while (this.wantViewport || this.zoomPending.size) {
       let tabs: Tab[] = []
+      let resized = false
       const v = this.wantViewport
       if (v) {
         this.wantViewport = null
         const same = v.width === this.viewport.width && v.height === this.viewport.height && v.deviceScaleFactor === this.viewport.deviceScaleFactor
         this.viewport = v
-        if (!same) { await this.fitWindow(); tabs = [...this.tabs] }
+        if (!same) { await this.fitWindow(); tabs = [...this.tabs]; resized = true }
       }
       for (const t of this.zoomPending) if (!tabs.includes(t) && this.tabs.includes(t)) tabs.push(t)
       this.zoomPending.clear()
       if (!tabs.length) continue
       await Promise.all(tabs.map((t) => this.applyViewport(t)))
       const a = this.active
-      if (a && tabs.includes(a)) { await this.cdp.send('Page.stopScreencast', {}, a.sessionId).catch(() => {}); await this.startScreencast(a) }
+      // a zoom change keeps the frame size, so the running screencast just follows the new layout
+      if (a && tabs.includes(a) && (resized || this.needsCrisp(a))) { await this.cdp.send('Page.stopScreencast', {}, a.sessionId).catch(() => {}); await this.startScreencast(a) }
       this.changed()
     }
   }
@@ -273,18 +300,16 @@ export class Browser {
     if (!tab || tab.id !== this.activeId) { ack(); return }
     const now = performance.now()
     if (this.inputAt) { const d = now - this.inputAt; if (d < 600) this.latency = this.latency ? this.latency * 0.7 + d * 0.3 : d; this.inputAt = 0 }
-    if (tab.zoom > 1) {
-      ack()
-      // each screenshot makes Chrome emit a screencast frame, so only a frame whose pixels changed triggers the next capture
-      if (p.data !== this.lastCast) { this.lastCast = p.data; void this.captureCrisp(tab) }
-    } else {
-      const bytes = decodeBase64(p.data)
-      // replaced (dropped) frames must still be acked or Chrome stops sending
-      const size = imageSize(bytes)
-      const stale = this.frames.push({ bytes, width: size?.width ?? this.viewport.frameWidth, height: size?.height ?? this.viewport.frameHeight, cssWidth: p.metadata?.deviceWidth || this.viewport.width, cssHeight: p.metadata?.deviceHeight || this.viewport.height, zoom: tab.zoom, tabId: tab.id, receivedAt: now, ack })
-      stale?.ack()
-      this.fps.tick(now)
-    }
+    // an identical frame changes nothing on screen (each crisp screenshot also echoes one), so skip the decode and the paint
+    if (p.data === this.lastCast) { ack(); return }
+    this.lastCast = p.data
+    const bytes = decodeBase64(p.data)
+    // replaced (dropped) frames must still be acked or Chrome stops sending
+    const size = imageSize(bytes)
+    const stale = this.frames.push({ bytes, width: size?.width ?? this.viewport.frameWidth, height: size?.height ?? this.viewport.frameHeight, cssWidth: p.metadata?.deviceWidth || this.viewport.width, cssHeight: p.metadata?.deviceHeight || this.viewport.height, zoom: tab.zoom, tabId: tab.id, receivedAt: now, ack })
+    stale?.ack()
+    this.fps.tick(now)
+    if (this.needsCrisp(tab)) this.settleCrisp(tab)
     // document.title set by script doesn't always produce targetInfoChanged; repaints are a cheap hint to re-read it
     if (!this.titleTimer) {
       const wait = Math.max(0, 1000 - (now - this.titleAt))
@@ -305,10 +330,13 @@ export class Browser {
   private crispAgain = false
   private crispWanted = false
 
-  /**
-   * Headless screencast frames come at CSS px whatever the device scale factor, so a zoomed-in page would arrive small and be upscaled (blurry).
-   * Above 100% a screencast frame only means "the page changed" and the frame shown is a device-pixel screenshot (~50 ms each here); latest wins.
-   */
+  /** Past the raster scale, screencast frames stream live (upscaled) and a device-pixel screenshot replaces them once the page is still. */
+  private settleCrisp(t: Tab) {
+    if (this.settleTimer) clearTimeout(this.settleTimer)
+    this.settleTimer = setTimeout(() => { this.settleTimer = null; if (t.id === this.activeId && this.needsCrisp(t)) this.captureCrisp(t) }, 140)
+  }
+
+  /** Screenshots under emulation are serialized with input; latest wins. */
   private captureCrisp(t: Tab) {
     if (this.viewportJob) { this.crispWanted = true; return }
     if (this.crispJob) { this.crispAgain = true; return }
@@ -414,11 +442,34 @@ export class Browser {
     })
   }
 
-  wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers = 0) {
+  /** Smooth wheel: deltas feed a glide that drains at most one CDP wheel event in flight, so bursts coalesce and line jumps become a scroll. */
+  wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers = 0, smooth = true) {
     const sid = this.session()
     if (!sid) return
     this.markInput()
-    void this.input('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX, deltaY, modifiers, button: 'none' }, sid)
+    this.wheelAt = { x, y, modifiers }
+    if (!smooth) { void this.input('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX, deltaY, modifiers, button: 'none' }, sid); return }
+    this.glide.add(deltaX, deltaY)
+    if (!this.wheelTimer) {
+      this.wheelStepAt = performance.now() - 16
+      this.wheelTimer = setInterval(() => this.wheelTick(), 12)
+      this.wheelTick()
+    }
+  }
+
+  /** True while a glide is still scrolling. */
+  get scrolling() { return !!this.wheelTimer }
+
+  private wheelTick() {
+    if (this.wheelInFlight) return
+    const sid = this.session()
+    if (!sid || this.glide.idle) { if (this.wheelTimer) clearInterval(this.wheelTimer); this.wheelTimer = null; this.glide.clear(); return }
+    const now = performance.now()
+    const d = this.glide.step(Math.min(now - this.wheelStepAt, 50))
+    this.wheelStepAt = now
+    if (!d.deltaX && !d.deltaY) return
+    this.wheelInFlight = true
+    void this.input('Input.dispatchMouseEvent', { type: 'mouseWheel', ...this.wheelAt, deltaX: d.deltaX, deltaY: d.deltaY, button: 'none' }, sid).finally(() => { this.wheelInFlight = false })
   }
 
   keys(events: KeyEventParams[]) {
@@ -463,6 +514,8 @@ export class Browser {
 
   async close() {
     if (this.titleTimer) { clearTimeout(this.titleTimer); this.titleTimer = null }
+    if (this.wheelTimer) { clearInterval(this.wheelTimer); this.wheelTimer = null }
+    if (this.settleTimer) { clearTimeout(this.settleTimer); this.settleTimer = null }
     this.closing = true
     try { await Promise.race([this.cdp.send('Browser.close'), Bun.sleep(800)]) } catch {}
     this.cdp.close()

@@ -102,7 +102,7 @@ if (!process.env.SURF_CHILD) {
 const scale = values.dpr ? Number(values.dpr) : terminal ? await (await import('./term')).detectScale() : 2
 if (!Number.isFinite(scale) || scale <= 0) fail(`bad --dpr "${values.dpr}"`)
 const { Session } = await import('./session')
-const s = new Session({ urls: positionals, dpr: scale, chrome: values.chrome ?? process.env.SURF_CHROME, profile: process.env.SURF_PROFILE })
+const s = new Session({ urls: positionals, dpr: scale, wheelScale: terminal ? 2 : 1, chrome: values.chrome ?? process.env.SURF_CHROME, profile: process.env.SURF_PROFILE })
 const out = console.log
 console.log = (...args: unknown[]) => { if (typeof args[0] === 'string' && args[0].startsWith('[gpuix]')) return; out(...args) }
 let quitting = false

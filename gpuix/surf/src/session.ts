@@ -4,11 +4,12 @@ import { Browser, type Tab } from './browser'
 import { launchChrome, removeProfile, type ChromeProcess } from './chrome'
 import { serve, type Handler } from './ipc'
 import { resolveInput } from './omnibox'
-import { parseZoom, viewportFor, zoomStep, type Box } from './input'
+import { parseZoom, rasterScale, viewportFor, zoomStep, type Box } from './input'
 
 export type Focus = 'page' | 'omnibox' | 'find'
 
-export interface SessionOptions { urls: string[]; dpr: number; chrome?: string; profile?: string; ipc?: boolean }
+/** wheelScale multiplies wheel deltas (terminal wheel reports are one text line each, smaller than a browser's notch). */
+export interface SessionOptions { urls: string[]; dpr: number; chrome?: string; profile?: string; ipc?: boolean; wheelScale?: number }
 
 /** Owns Chrome, the CDP browser, the UI focus state and the control socket for one surf window. */
 const RESIZE_MS = 50
@@ -43,8 +44,9 @@ export class Session {
   async start() {
     try {
       const v = this.box.width > 0 ? viewportFor(this.box, this.dpr) : undefined
-      this.chrome = await launchChrome({ executable: this.opts.chrome, profile: this.opts.profile, width: v?.width, height: v?.height })
-      this.browser = await Browser.connect(this.chrome.wsUrl, { viewport: v })
+      const scale = rasterScale(this.dpr)
+      this.chrome = await launchChrome({ executable: this.opts.chrome, profile: this.opts.profile, width: v?.width, height: v?.height, scale })
+      this.browser = await Browser.connect(this.chrome.wsUrl, { viewport: v, rasterScale: scale })
       this.browser.onChange(() => { this.touch(); this.ping() })
       this.fitViewport()
       const [first, ...rest] = this.opts.urls.length ? this.opts.urls : ['https://news.ycombinator.com']
@@ -93,26 +95,30 @@ export class Session {
   /** When the zoom last changed, so the UI can flash the level. */
   zoomedAt = 0
   private wheelZoom = 0
+  private wheelZoomAt = 0
 
   /** Zooms the active tab: `in`/`out` step through Chrome's levels, `reset` goes back to 100%, a number sets the factor. */
-  async zoom(to: 'in' | 'out' | 'reset' | number): Promise<number> {
+  async zoom(to: 'in' | 'out' | 'reset' | number, anchorY = 0.5): Promise<number> {
     const b = this.browser, t = b?.active
     if (!b || !t) return 1
     const z = to === 'in' ? zoomStep(t.zoom, 1) : to === 'out' ? zoomStep(t.zoom, -1) : to === 'reset' ? 1 : to
     this.zoomedAt = performance.now()
-    const r = await b.setZoom(z, t.id)
+    const r = await b.setZoom(z, t.id, anchorY)
     this.ping()
     return r
   }
 
   /** Ctrl-scroll: accumulate wheel px so one notch or a short trackpad swipe is one zoom step. `dy` > 0 is wheel up = zoom in. */
-  zoomWheel(dy: number) {
+  zoomWheel(dy: number, anchorY = 0.5) {
     if (Math.sign(dy) !== Math.sign(this.wheelZoom)) this.wheelZoom = 0
     this.wheelZoom += dy
-    if (Math.abs(this.wheelZoom) < 50) return
+    // one terminal wheel notch (a cell height, ~16-20 px) is one zoom step; fast flicks step at most every 60 ms
+    const now = performance.now()
+    if (Math.abs(this.wheelZoom) < 16 || now - this.wheelZoomAt < 60) return
     const dir = this.wheelZoom > 0 ? 'in' : 'out'
     this.wheelZoom = 0
-    void this.zoom(dir)
+    this.wheelZoomAt = now
+    void this.zoom(dir, anchorY)
   }
 
   info() {
@@ -128,6 +134,8 @@ export class Session {
       zoom: `${Math.round((t?.zoom ?? 1) * 100)}%`,
       latencyMs: b ? Math.round(b.latency) : 0,
       dropped: b?.frames.dropped ?? 0,
+      painted: this.painted,
+      paintMs: Math.round(this.paintMs * 10) / 10,
     }
   }
 

@@ -20,8 +20,10 @@ export function findChrome(env = process.env): string | null {
   return CANDIDATES.find((p) => existsSync(p)) ?? null
 }
 
-export function chromeArgs(profile: string, size: { width: number; height: number }) {
+/** `scale` is the browser's device scale factor: screencast frames are rendered at CSS px × scale, so zoomed-in pages stream crisp. */
+export function chromeArgs(profile: string, size: { width: number; height: number }, scale = 1) {
   return [
+    ...(scale !== 1 ? [`--force-device-scale-factor=${scale}`] : []),
     '--headless',
     '--remote-debugging-port=0',
     `--user-data-dir=${profile}`,
@@ -44,12 +46,12 @@ export interface ChromeProcess { proc: Subprocess; wsUrl: string; profile: strin
 export const defaultProfile = () => join(homedir(), '.surf', 'profiles', String(process.pid))
 
 /** Starts headless Chrome and resolves with its browser WebSocket endpoint. */
-export async function launchChrome(opts: { executable?: string; profile?: string; width?: number; height?: number; timeoutMs?: number } = {}): Promise<ChromeProcess> {
+export async function launchChrome(opts: { executable?: string; profile?: string; width?: number; height?: number; timeoutMs?: number; args?: string[]; scale?: number } = {}): Promise<ChromeProcess> {
   const exe = opts.executable ?? findChrome()
   if (!exe) throw new Error('Chrome not found. Install Google Chrome or set SURF_CHROME=/path/to/chrome')
   const profile = opts.profile ?? defaultProfile()
   mkdirSync(profile, { recursive: true })
-  const proc = Bun.spawn([exe, ...chromeArgs(profile, { width: opts.width ?? 1280, height: opts.height ?? 800 })], { stdin: 'ignore', stdout: 'ignore', stderr: 'pipe' })
+  const proc = Bun.spawn([exe, ...chromeArgs(profile, { width: opts.width ?? 1280, height: opts.height ?? 800 }, opts.scale), ...(opts.args ?? [])], { stdin: 'ignore', stdout: 'ignore', stderr: 'pipe' })
   const kill = () => { try { proc.kill('SIGKILL') } catch {} }
   const reader = proc.stderr.getReader()
   const dec = new TextDecoder()

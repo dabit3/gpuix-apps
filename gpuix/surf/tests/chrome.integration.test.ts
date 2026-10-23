@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { Browser } from '../src/browser'
 import { findChrome, launchChrome, reapProfile, type ChromeProcess } from '../src/chrome'
 import { imageSize } from '../src/frame'
-import { mapPoint, viewportFor } from '../src/input'
+import { mapPoint, rasterScale, viewportFor } from '../src/input'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -24,8 +24,8 @@ beforeAll(async () => {
   expect(findChrome()).not.toBeNull()
   server = Bun.serve({ port: 0, fetch: (req) => new Response(new URL(req.url).pathname === '/long' ? LONG : PAGE, { headers: { 'content-type': 'text/html' } }) })
   const vp = viewportFor({ width: 640, height: 400 }, 1)
-  chrome = await launchChrome({ profile, width: vp.width, height: vp.height })
-  browser = await Browser.connect(chrome.wsUrl, { viewport: vp })
+  chrome = await launchChrome({ profile, width: vp.width, height: vp.height, scale: rasterScale(1) })
+  browser = await Browser.connect(chrome.wsUrl, { viewport: vp, rasterScale: rasterScale(1) })
 }, 30000)
 
 afterAll(async () => {
@@ -69,7 +69,7 @@ test('typing reaches a focused input and the viewport follows a resize', async (
   expect(await until(async () => (await browser.evaluate("document.getElementById('field').value")) === 'Hi! pasted')).toBe(true)
 
   await browser.setViewport(viewportFor({ width: 320, height: 300 }, 2))
-  expect(await until(async () => (await browser.evaluate("innerWidth+'x'+innerHeight+'@'+devicePixelRatio")) === '320x300@2')).toBe(true)
+  expect(await until(async () => (await browser.evaluate("innerWidth+'x'+innerHeight+'@'+Math.round(devicePixelRatio*1e3)/1e3")) === '320x300@2')).toBe(true)
   // Frames follow the new viewport's shape. Headless screencast may deliver them at CSS (320x300) or device (640x600) resolution.
   let size: ReturnType<typeof imageSize> = null
   expect(await until(() => { const f = browser.frames.take(); size = f ? imageSize(f.bytes) : size; return !!size && size.width * 300 === size.height * 320 })).toBe(true)
@@ -137,7 +137,7 @@ test('page zoom re-lays the page out, frames keep the pane size, and clicks land
   expect(await until(async () => (await browser.evaluate('document.readyState')) === 'complete')).toBe(true)
   expect(await browser.setZoom(2)).toBe(2)
   expect(browser.active?.zoom).toBe(2)
-  expect(await browser.evaluate('innerWidth + "x" + innerHeight + "@" + devicePixelRatio')).toBe('320x200@2')
+  expect(await browser.evaluate('innerWidth + "x" + innerHeight + "@" + Math.round(devicePixelRatio * 1e3) / 1e3')).toBe('320x200@2')
   await browser.evaluate("setInterval(() => document.body.style.background = document.body.style.background === 'white' ? 'ivory' : 'white', 50)")
   let f: ReturnType<typeof browser.frames.take> = null
   expect(await until(async () => {
@@ -146,7 +146,7 @@ test('page zoom re-lays the page out, frames keep the pane size, and clicks land
     f = browser.frames.take()
     return !!f && f.cssWidth === 320
   })).toBe(true)
-  // a device-pixel frame (crisp), not the 320 px CSS-size screencast frame
+  // a device-pixel frame (crisp, rendered at the raster scale), not a 320 px CSS-size frame
   expect(f!.width).toBe(640)
   expect(f!.zoom).toBe(2)
   // #go is at CSS (100,80) 200x60, so on screen at 2x it spans (200,160)-(600,280) of the pane
@@ -175,11 +175,33 @@ test('page zoom re-lays the page out, frames keep the pane size, and clicks land
   await browser.activate(zoomed)
   expect(await browser.evaluate('innerWidth')).toBe(320)
   expect(await browser.setZoom(0.5)).toBe(0.5)
-  expect(await until(async () => (await browser.evaluate('innerWidth + "@" + devicePixelRatio')) === '1280@0.5')).toBe(true)
+  expect(await until(async () => (await browser.evaluate('innerWidth + "@" + Math.round(devicePixelRatio * 1e3) / 1e3')) === '1280@0.5')).toBe(true)
   // rapid steps while zoomed-in captures are running: the last one wins
   await Promise.all([1.1, 1.25, 1.5, 1.75].map((z) => browser.setZoom(z)))
   await Bun.sleep(300)
-  expect(await browser.evaluate('innerWidth + "@" + devicePixelRatio')).toBe('366@1.75')
+  expect(await browser.evaluate('innerWidth + "@" + Math.round(devicePixelRatio * 1e3) / 1e3')).toBe('366@1.75')
   expect(await browser.setZoom(1)).toBe(1)
-  expect(await until(async () => (await browser.evaluate('innerWidth + "@" + devicePixelRatio')) === '640@1')).toBe(true)
+  expect(await until(async () => (await browser.evaluate('innerWidth + "@" + Math.round(devicePixelRatio * 1e3) / 1e3')) === '640@1')).toBe(true)
+}, 30000)
+
+test('wheel bursts coalesce into a smooth scroll that lands on the full distance', async () => {
+  await browser.setZoom(1)
+  await browser.navigate(`http://127.0.0.1:${server.port}/long`)
+  expect(await until(async () => (await browser.evaluate('document.readyState+location.pathname')) === 'complete/long')).toBe(true)
+  await browser.evaluate("window.ticks = 0; addEventListener('wheel', () => window.ticks++)")
+  for (let i = 0; i < 10; i++) browser.wheel(200, 200, 0, 40)
+  expect(browser.scrolling).toBe(true)
+  expect(await until(async () => !browser.scrolling && (await browser.evaluate('scrollY')) === 400)).toBe(true)
+  // ten line jumps become a glide of several smaller wheel events
+  expect(Number(await browser.evaluate('window.ticks'))).toBeGreaterThan(3)
+}, 30000)
+
+test('zooming keeps the content at the middle of the viewport in place', async () => {
+  await browser.evaluate("scrollTo(0, 0); document.getElementById('hit').scrollIntoView({ block: 'center' })")
+  const mid = async () => Number(await browser.evaluate("(() => { const r = document.getElementById('hit').getBoundingClientRect(); return (r.top + r.height / 2) / innerHeight })()"))
+  expect(Math.abs((await mid()) - 0.5)).toBeLessThan(0.05)
+  await browser.setZoom(2)
+  expect(Math.abs((await mid()) - 0.5)).toBeLessThan(0.08)
+  await browser.setZoom(1)
+  expect(Math.abs((await mid()) - 0.5)).toBeLessThan(0.08)
 }, 30000)
