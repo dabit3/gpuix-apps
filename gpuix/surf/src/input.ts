@@ -174,3 +174,34 @@ function editCommand(name: string, key: string, m?: Mods): string | undefined {
   const k = key.length === 1 ? key.toLowerCase() : name
   return ({ a: 'selectAll', z: m.shift ? 'redo' : 'undo', y: 'redo', backspace: 'deleteWordBackward', delete: 'deleteWordForward' } as Record<string, string>)[k]
 }
+
+/** Chrome's raster scale for a terminal pixel ratio: 3× covers page zoom up to 300% at 1× with full-resolution screencast frames. */
+export function rasterScale(dpr: number) {
+  return Math.min(4, Math.max(1, Math.ceil((Number.isFinite(dpr) && dpr > 0 ? dpr : 1) * 3)))
+}
+
+/**
+ * Turns bursty wheel input (terminal wheel reports are whole lines) into a glide: deltas pile up and drain exponentially,
+ * so each step scrolls a fraction of what is left. Reversing direction drops the rest, so a flick back stops at once.
+ */
+export class WheelGlide {
+  x = 0
+  y = 0
+  constructor(readonly tauMs = 50) {}
+  add(dx: number, dy: number) {
+    if (dx && Math.sign(dx) !== Math.sign(this.x)) this.x = 0
+    if (dy && Math.sign(dy) !== Math.sign(this.y)) this.y = 0
+    this.x += dx
+    this.y += dy
+  }
+  step(dtMs: number): { deltaX: number; deltaY: number } {
+    const k = 1 - Math.exp(-Math.max(0, dtMs) / this.tauMs)
+    const take = (r: number) => { const d = Math.abs(r) <= 2 ? r : Math.round(r * k) || Math.sign(r); return d }
+    const deltaX = take(this.x), deltaY = take(this.y)
+    this.x -= deltaX
+    this.y -= deltaY
+    return { deltaX, deltaY }
+  }
+  get idle() { return this.x === 0 && this.y === 0 }
+  clear() { this.x = 0; this.y = 0 }
+}

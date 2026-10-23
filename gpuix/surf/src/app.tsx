@@ -170,9 +170,10 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
   const [hasFrame, setHasFrame] = useState(false)
   // The frame on screen: drawn at its own pixel size (width/height, logical px) and clicks map onto the CSS viewport it was rendered at,
   // so a frame from before a resize or zoom change is never stretched and clicks land where they look
-  const [shown, setShown] = useState<{ width: number; height: number; cssWidth: number; cssHeight: number } | null>(null)
+  const [shown, setShown] = useState<{ width: number; height: number; cssWidth: number; cssHeight: number; zoom: number } | null>(null)
   const shownRef = useRef(shown)
   const lastCursor = useRef({ at: 0, x: -1, y: -1 })
+  const cursorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const meter = useRef(paint ?? new RateMeter())
 
   const b = s.browser
@@ -203,7 +204,7 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
       img.current.setImage(f.bytes)
       const cur = shownRef.current
       const w = f.cssWidth * f.zoom, h = f.cssHeight * f.zoom
-      if (!cur || cur.width !== w || cur.height !== h || cur.cssWidth !== f.cssWidth || cur.cssHeight !== f.cssHeight) { shownRef.current = { width: w, height: h, cssWidth: f.cssWidth, cssHeight: f.cssHeight }; setShown(shownRef.current) }
+      if (!cur || cur.width !== w || cur.height !== h || cur.cssWidth !== f.cssWidth || cur.cssHeight !== f.cssHeight || cur.zoom !== f.zoom) { shownRef.current = { width: w, height: h, cssWidth: f.cssWidth, cssHeight: f.cssHeight, zoom: f.zoom }; setShown(shownRef.current) }
       s.paintMs = performance.now() - t0
       s.painted++
       meter.current.tick()
@@ -241,19 +242,27 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
     const p = pageX(e)
     const held = e.pressedButton
     b.mouse({ type: 'mouseMoved', x: p.x, y: p.y, button: held == null ? 'none' : cdpButton(held), buttons: cdpButtons(held), modifiers: cdpModifiers(e.modifiers) })
-    const now = performance.now(), lc = lastCursor.current
-    if (now - lc.at > 120 && (Math.abs(p.x - lc.x) > 2 || Math.abs(p.y - lc.y) > 2)) {
-      lastCursor.current = { at: now, x: p.x, y: p.y }
+    // the cursor lookup is a page evaluation, so it runs when the pointer rests (or every 250 ms while it moves), not on every move
+    const probe = () => {
+      cursorTimer.current = null
+      const lc = lastCursor.current
+      if (Math.abs(p.x - lc.x) <= 2 && Math.abs(p.y - lc.y) <= 2) return
+      lastCursor.current = { at: performance.now(), x: p.x, y: p.y }
       void b.cursorAt(p.x, p.y).then((c) => setCursor(cursorFor(c))).catch(() => {})
     }
+    if (cursorTimer.current) clearTimeout(cursorTimer.current)
+    if (performance.now() - lastCursor.current.at > 250) probe()
+    else cursorTimer.current = setTimeout(probe, 45)
   }
+  useEffect(() => () => { if (cursorTimer.current) clearTimeout(cursorTimer.current) }, [])
   const onScroll = (e: EventPayload) => {
     if (!b) return
-    if (e.modifiers?.ctrl || e.modifiers?.cmd) { s.zoomWheel((e.deltaY ?? 0) * (e.precise ? 1 : 40)); return }
+    if (e.modifiers?.ctrl || e.modifiers?.cmd) { s.zoomWheel((e.deltaY ?? 0) * (e.precise ? 1 : 40), s.box.height > 0 ? Math.min(1, Math.max(0, ((e.y ?? 0) - s.box.y) / s.box.height)) : 0.5); return }
     const p = pageX(e)
     // wheel px are screen px; at 200% one screen px is half a CSS px
     const z = b.active?.zoom ?? 1
-    const d = wheelDelta(e.deltaX ?? 0, e.deltaY ?? 0, e.precise)
+    const k = s.opts.wheelScale ?? 1
+    const d = wheelDelta((e.deltaX ?? 0) * k, (e.deltaY ?? 0) * k, e.precise)
     b.wheel(p.x, p.y, d.deltaX / z, d.deltaY / z, cdpModifiers(e.modifiers))
   }
 
@@ -269,6 +278,8 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
 
   const progress = tab?.loading ? Math.max(0.08, tab.progress) : 0
   const vp = b?.viewport
+  // until Chrome sends a frame at a new zoom level, the last one is scaled to it, so the zoom shows at once
+  const preview = shown && tab ? tab.zoom / shown.zoom : 1
   const fps = b ? b.fps.rate() : 0
   const narrow = size.width < 640
   const omniFocused = s.focus === 'omnibox'
@@ -308,7 +319,7 @@ export function Surf({ s, t, size, paint }: { s: Session; t: Theme; size: { widt
         onLayout={(e: EventPayload) => s.layout({ x: e.x ?? 0, y: e.y ?? 0, width: e.width ?? 0, height: e.height ?? 0 })}
         style={{ position: 'relative', display: 'flex', flexGrow: 1, minHeight: 0, backgroundColor: '#ffffff', overflow: 'hidden' }}
       >
-        <img ref={img} testId="page-img" style={{ position: 'absolute', left: 0, top: 0, width: shown ? shown.width : vp ? vp.width : '100%', height: shown ? shown.height : vp ? vp.height : '100%' }} />
+        <img ref={img} testId="page-img" style={{ position: 'absolute', left: 0, top: 0, width: shown ? shown.width * preview : vp ? vp.width : '100%', height: shown ? shown.height * preview : vp ? vp.height : '100%' }} />
         <div testId="page-input" onMouseDown={onMouseDown} onMouseUp={onMouseUp} onMouseMove={onMouseMove} onScroll={onScroll} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, cursor }} />
         {zoomFlash ? (
           <div style={{ position: 'absolute', top: 12, left: 0, right: 0, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>

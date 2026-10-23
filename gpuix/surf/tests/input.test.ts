@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { cdpButton, cdpButtons, cdpModifiers, clampZoom, keyEvents, mapPoint, parseZoom, printable, viewportFor, wheelDelta, zoomedMetrics, zoomStep } from '../src/input'
+import { cdpButton, cdpButtons, cdpModifiers, clampZoom, keyEvents, mapPoint, parseZoom, printable, rasterScale, viewportFor, WheelGlide, wheelDelta, zoomedMetrics, zoomStep } from '../src/input'
 
 describe('mapPoint', () => {
   const box = { x: 12, y: 120, width: 700, height: 400 }
@@ -120,5 +120,30 @@ describe('zoom', () => {
     // pane 700x400 at 200%: Chrome renders a 350x200 CSS viewport into a 700x400 frame
     const box = { x: 12, y: 120, width: 700, height: 400 }
     expect(mapPoint(12 + 300, 120 + 100, box, { width: 350, height: 200 })).toEqual({ x: 150, y: 50 })
+  })
+})
+
+describe('smooth scrolling and raster scale', () => {
+  test('a wheel burst glides out in shrinking steps and adds up exactly', () => {
+    const g = new WheelGlide(50)
+    g.add(0, 80)
+    const steps: number[] = []
+    while (!g.idle && steps.length < 100) steps.push(g.step(16).deltaY)
+    expect(steps.reduce((a, b) => a + b, 0)).toBe(80)
+    expect(steps.length).toBeGreaterThan(4)
+    expect(steps.length).toBeLessThan(20)
+    expect(steps[0]!).toBeGreaterThan(steps[3]!)
+  })
+  test('reversing direction drops what was left', () => {
+    const g = new WheelGlide(50)
+    g.add(0, 200)
+    g.step(16)
+    g.add(0, -40)
+    expect(g.y).toBe(-40)
+  })
+  test('raster scale covers zoom up to 300% at 1x and caps at 4', () => {
+    expect(rasterScale(1)).toBe(3)
+    expect(rasterScale(2)).toBe(4)
+    expect(rasterScale(NaN)).toBe(3)
   })
 })
