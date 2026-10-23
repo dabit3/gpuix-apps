@@ -98,16 +98,27 @@ describe('command plans', () => {
     expect(gif).toContain('palettegen')
   })
   test('documents: pandoc + typst for PDF, textutil for Word', () => {
-    expect(cmds(plan({ path: '/p/n.md', kind: 'doc', format: 'md' }, DEFAULTS.doc, ALL, '/p/n.converted.pdf', '/tmp'))[0]).toStartWith('pandoc /p/n.md --pdf-engine=typst')
+    const pdf = plan({ path: '/p/n.md', kind: 'doc', format: 'md' }, DEFAULTS.doc, ALL, '/p/n.converted.pdf', '/tmp')
+    const [mkdir, pandoc, typst] = pdf.steps.map((s) => s.cmd)
+    const root = mkdir![2]!
+    expect(mkdir).toEqual(['mkdir', '-p', root])
+    expect(root).toStartWith('/tmp/n.md.')
+    expect(pdf.temps).toEqual([root])
+    expect(pandoc!.join(' ')).toStartWith('pandoc --sandbox /p/n.md -L ')
+    expect(pandoc!.join(' ')).toEndWith(`-s -t typst -V mainfont=Helvetica Neue -o ${root}/doc.typ`)
+    expect(typst).toEqual(['typst', 'compile', '--root', root, `${root}/doc.typ`, '/p/n.converted.pdf'])
     expect(cmds(plan({ path: '/p/l.docx', kind: 'doc', format: 'docx' }, { ...DEFAULTS.doc, target: 'html' }, ALL, '/p/l.converted.html', '/tmp'))[0]).toBe('textutil -convert html /p/l.docx -output /p/l.converted.html')
   })
-  test('no plan can reach the network: ffmpeg is pinned to file/pipe and no argument is a URL', () => {
-    for (const [kind, format] of [['video', 'mp4'], ['audio', 'wav'], ['image', 'png']] as const) {
+  test('no plan can reach the network: ffmpeg is pinned to file/pipe, pandoc is sandboxed, typst is rooted, no argument is a URL', () => {
+    for (const [kind, format] of [['video', 'mp4'], ['audio', 'wav'], ['image', 'png'], ['doc', 'md'], ['doc', 'html'], ['doc', 'epub'], ['doc', 'docx']] as const) {
       for (const t of targetsFor({ kind, format }, ALL)) {
         const p = plan({ path: '/p/x', kind, format, width: 10, height: 10, duration: 1, hasAudio: true }, { ...DEFAULTS[kind], target: t.id }, ALL, '/p/out', '/tmp')
         for (const s of p.steps) {
           expect(s.cmd.some((a) => /^[a-z]+:\/\//i.test(a))).toBe(false)
           if (s.cmd[0] === 'ffmpeg') expect(s.cmd.join(' ')).toContain('-protocol_whitelist file,pipe')
+          if (s.cmd[0] === 'pandoc') expect(s.cmd[1]).toBe('--sandbox')
+          if (s.cmd[0] === 'typst') expect(s.cmd.slice(1, 3)).toEqual(['compile', '--root'])
+          if (s.cmd.includes('--pdf-engine') || s.cmd.some((a) => a.startsWith('--pdf-engine='))) throw new Error(`pandoc must not run typst itself: ${s.cmd.join(' ')}`)
         }
       }
     }

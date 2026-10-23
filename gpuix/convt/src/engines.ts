@@ -107,7 +107,7 @@ export async function excerpt(src: Source, engines: Engines): Promise<string> {
   let text = ''
   if (src.format === 'md' || src.format === 'txt') text = await Bun.file(src.path).slice(0, 4000).text()
   else if (engines.textutil && ['docx', 'odt', 'rtf', 'html'].includes(src.format)) text = (await run([engines.textutil, '-convert', 'txt', '-stdout', src.path])).stdout
-  else if (engines.pandoc) text = (await run([engines.pandoc, src.path, '-t', 'plain'])).stdout
+  else if (engines.pandoc) text = (await run([engines.pandoc, '--sandbox', src.path, '-t', 'plain'])).stdout
   return text.split('\n').slice(0, 24).join('\n').slice(0, 1400)
 }
 
