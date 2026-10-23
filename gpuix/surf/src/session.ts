@@ -46,7 +46,7 @@ export class Session {
       const v = this.box.width > 0 ? viewportFor(this.box, this.dpr) : undefined
       const scale = rasterScale(this.dpr)
       this.chrome = await launchChrome({ executable: this.opts.chrome, profile: this.opts.profile, width: v?.width, height: v?.height, scale })
-      this.browser = await Browser.connect(this.chrome.wsUrl, { viewport: v, rasterScale: scale })
+      this.browser = await Browser.connect(this.chrome.cdp, { viewport: v, rasterScale: scale })
       this.browser.onChange(() => { this.touch(); this.ping() })
       this.fitViewport()
       const [first, ...rest] = this.opts.urls.length ? this.opts.urls : ['https://news.ycombinator.com']

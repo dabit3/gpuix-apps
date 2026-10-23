@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { Browser } from '../src/browser'
-import { findChrome, launchChrome, reapProfile, type ChromeProcess } from '../src/chrome'
+import { chromeArgs, findChrome, launchChrome, reapProfile, type ChromeProcess } from '../src/chrome'
 import { imageSize } from '../src/frame'
 import { mapPoint, rasterScale, viewportFor } from '../src/input'
-import { mkdtempSync } from 'node:fs'
+import { existsSync, mkdtempSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -25,7 +25,7 @@ beforeAll(async () => {
   server = Bun.serve({ port: 0, fetch: (req) => new Response(new URL(req.url).pathname === '/long' ? LONG : PAGE, { headers: { 'content-type': 'text/html' } }) })
   const vp = viewportFor({ width: 640, height: 400 }, 1)
   chrome = await launchChrome({ profile, width: vp.width, height: vp.height, scale: rasterScale(1) })
-  browser = await Browser.connect(chrome.wsUrl, { viewport: vp, rasterScale: rasterScale(1) })
+  browser = await Browser.connect(chrome.cdp, { viewport: vp, rasterScale: rasterScale(1) })
 }, 30000)
 
 afterAll(async () => {
@@ -40,6 +40,15 @@ const until = async (fn: () => Promise<boolean> | boolean, ms = 8000) => {
   while (Date.now() < end) { if (await fn()) return true; await Bun.sleep(50) }
   return false
 }
+
+test('CDP runs over --remote-debugging-pipe: no debugging port, profile readable only by us', async () => {
+  const args = chromeArgs(profile, { width: 640, height: 400 })
+  expect(args).toContain('--remote-debugging-pipe')
+  expect(args.some((a) => a.startsWith('--remote-debugging-port') || a.startsWith('--remote-debugging-address'))).toBe(false)
+  expect(existsSync(join(profile, 'DevToolsActivePort'))).toBe(false)
+  expect(statSync(profile).mode & 0o777).toBe(0o700)
+  expect(chrome.version).toContain('Chrome')
+})
 
 test('loads a local page, streams frames, and a click through the input path changes the page', async () => {
   await browser.navigate(`http://127.0.0.1:${server.port}/`)

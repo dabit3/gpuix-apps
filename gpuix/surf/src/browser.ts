@@ -76,8 +76,7 @@ export class Browser {
 
   constructor(readonly cdp: Cdp) {}
 
-  static async connect(wsUrl: string, opts: { viewport?: Viewport; rasterScale?: number } = {}) {
-    const cdp = await Cdp.connect(wsUrl)
+  static async connect(cdp: Cdp, opts: { viewport?: Viewport; rasterScale?: number } = {}) {
     const b = new Browser(cdp)
     if (opts.viewport) b.viewport = opts.viewport
     if (opts.rasterScale) b.rasterScale = opts.rasterScale

@@ -1,4 +1,6 @@
-/** Minimal Chrome DevTools Protocol client over one browser-level WebSocket, with flattened target sessions. */
+import { closeSync } from 'node:fs'
+
+/** Minimal Chrome DevTools Protocol client over one browser-level connection, with flattened target sessions. */
 export type CdpParams = Record<string, unknown>
 type Listener = (params: any, sessionId?: string) => void
 
@@ -6,30 +8,73 @@ export class CdpError extends Error {
   constructor(public method: string, message: string, public code?: number) { super(`${method}: ${message}`) }
 }
 
+/** One message stream to Chrome's browser target. */
+export interface CdpTransport {
+  send(msg: string): void
+  onMessage(fn: (msg: string) => void): void
+  onClose(fn: () => void): void
+  close(): void
+}
+
+/**
+ * The `--remote-debugging-pipe` transport: Chrome reads NUL-terminated JSON messages on its fd 3 and writes them on its fd 4.
+ * `writeFd`/`readFd` are our ends of those pipes. No TCP listener exists, so no other local process can reach the browser.
+ */
+export function pipeTransport(writeFd: number, readFd: number): CdpTransport {
+  const out = Bun.file(writeFd).writer()
+  const messages = new Set<(msg: string) => void>()
+  const closes = new Set<() => void>()
+  let closed = false
+  const finish = () => {
+    if (closed) return
+    closed = true
+    try { out.end() } catch {}
+    try { closeSync(writeFd) } catch {}
+    for (const fn of closes) fn()
+  }
+  void (async () => {
+    const dec = new TextDecoder()
+    let buf = ''
+    try {
+      for await (const chunk of Bun.file(readFd).stream()) {
+        buf += dec.decode(chunk, { stream: true })
+        let end: number
+        while ((end = buf.indexOf('\0')) >= 0) {
+          const msg = buf.slice(0, end)
+          buf = buf.slice(end + 1)
+          for (const fn of messages) fn(msg)
+        }
+      }
+    } catch {}
+    finish()
+  })()
+  return {
+    send(msg) {
+      if (closed) throw new Error('connection closed')
+      out.write(msg + '\0')
+      out.flush()
+    },
+    onMessage: (fn) => void messages.add(fn),
+    onClose: (fn) => void closes.add(fn),
+    close: finish,
+  }
+}
+
 export class Cdp {
-  private ws: WebSocket
   private nextId = 1
   private pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void; method: string }>()
   private listeners = new Map<string, Set<Listener>>()
   closed = false
-  readonly ready: Promise<void>
 
-  constructor(url: string) {
-    this.ws = new WebSocket(url)
-    this.ready = new Promise((resolve, reject) => {
-      this.ws.addEventListener('open', () => resolve(), { once: true })
-      this.ws.addEventListener('error', () => reject(new Error(`could not connect to ${url}`)), { once: true })
-    })
-    this.ws.addEventListener('message', (ev) => this.onMessage(String(ev.data)))
-    this.ws.addEventListener('close', () => {
+  constructor(private transport: CdpTransport) {
+    transport.onMessage((raw) => this.onMessage(raw))
+    transport.onClose(() => {
       this.closed = true
       for (const p of this.pending.values()) p.reject(new CdpError(p.method, 'connection closed'))
       this.pending.clear()
       this.emit('close', {})
     })
   }
-
-  static async connect(url: string) { const c = new Cdp(url); await c.ready; return c }
 
   send<T = any>(method: string, params: CdpParams = {}, sessionId?: string): Promise<T> {
     if (this.closed) return Promise.reject(new CdpError(method, 'connection closed'))
@@ -38,7 +83,7 @@ export class Cdp {
     if (sessionId) msg.sessionId = sessionId
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve, reject, method })
-      this.ws.send(JSON.stringify(msg))
+      try { this.transport.send(JSON.stringify(msg)) } catch (e) { this.pending.delete(id); reject(new CdpError(method, (e as Error).message)) }
     })
   }
 
@@ -71,5 +116,5 @@ export class Cdp {
     }
   }
 
-  close() { try { this.ws.close() } catch {} }
+  close() { try { this.transport.close() } catch {} }
 }
