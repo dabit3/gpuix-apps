@@ -48,7 +48,7 @@ Keys: `↑↓` select · `b` block · `a` allow · `space` blocking on/off · `p
 | UDP :53 listener, header + QNAME parse, compression pointers | `src/dns/packet.ts` (UDP 5300 by default) |
 | Exact name then each parent against the list | `candidates()` + `Matcher` in `src/dns/blocklist.ts` |
 | Blocked → `0.0.0.0` / `::` or NXDOMAIN, TTL 60 | `buildBlocked()`; `--nxdomain` or `m` |
-| Forward to 1.1.1.1, fallback 9.9.9.9, pending-ID table, 2 s timeout | `src/dns/server.ts`: random upstream IDs, re-send to the next upstream after 800 ms, SERVFAIL at 2 s |
+| Forward to 1.1.1.1, fallback 9.9.9.9, pending-ID table, 2 s timeout | `src/dns/server.ts`: CSPRNG upstream IDs and a fresh source port per lookup, replies must echo the exact question, identical in-flight queries share one lookup, re-send to the next upstream after 800 ms, SERVFAIL at 2 s |
 | 256-entry LRU honoring TTL | `src/dns/cache.ts` (TTLs are aged on hits) |
 | 40-bit hashes, sorted array, binary search, 64 KB bloom in front | `HashedBlocklist`: FNV-1a 64 truncated to 40 bits; the sorted 5-byte table is `~/.sinkhole/blocklist.bin` (the "flash partition") |
 | Allowlist overriding hash false positives | allow beats deny beats list |

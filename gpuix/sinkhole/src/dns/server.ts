@@ -1,7 +1,7 @@
 import type { udp } from 'bun'
 import { DnsCache } from './cache'
 import type { Matcher } from './blocklist'
-import { buildBlocked, buildError, DnsError, getId, parseQuery, parseResponse, RCODE, setId, summarize, type BlockMode, type Query } from './packet'
+import { buildBlocked, buildError, DnsError, getId, parseQuery, parseResponse, RCODE, readName, setId, summarize, type BlockMode, type Query } from './packet'
 import { Stats, type QueryEvent, type Status } from './stats'
 
 type Sock = udp.Socket<'buffer'>
@@ -29,17 +29,31 @@ export interface SinkholeOptions {
   now?: () => number
 }
 
+interface Waiter {
+  query: Query
+  req: Uint8Array
+  host: string
+  port: number
+  t0: number
+  allowRule?: string
+}
+
+/** One upstream lookup, shared by every client asking the same name/type/class while it is in flight. */
 interface Pending {
+  key: string
   query: Query
   raw: Uint8Array
-  clientHost: string
-  clientPort: number
+  id: number
+  waiters: Waiter[]
   t0: number
   sentAt: number
   upstream: number
-  key: string
-  allowRule?: string
+  sentTo: Upstream[]
+  sock: Sock | null
+  done: boolean
 }
+
+const randomId = () => crypto.getRandomValues(new Uint16Array(1))[0]!
 
 /** The ESP32 DNS sinkhole loop: parse, match, answer blocked names locally, forward the rest, cache answers. */
 export class Sinkhole {
@@ -56,10 +70,14 @@ export class Sinkhole {
   timeoutMs: number
   fallbackAfterMs: number
   dropped = 0
+  /** Distinct upstream lookups allowed at once; more answer SERVFAIL. */
+  maxInFlight = 512
+  /** Clients that may wait on one in-flight lookup; more answer SERVFAIL. */
+  maxWaiters = 64
   private now: () => number
   private server: Sock | null = null
-  private client: Sock | null = null
-  private pending = new Map<number, Pending>()
+  private running = false
+  private pending = new Map<string, Pending>()
   private sweeper: ReturnType<typeof setInterval> | null = null
   private listeners = new Set<(e: QueryEvent) => void>()
   private seq = 0
@@ -97,15 +115,17 @@ export class Sinkhole {
       throw new Error(/in use|EADDRINUSE/i.test(msg) ? `port ${this.port} on ${this.host} is already in use` : msg)
     }
     this.port = this.server!.port
-    this.client = await Bun.udpSocket<'buffer'>({ socket: { data: (_s, buf, port, addr) => this.onUpstream(new Uint8Array(buf), addr, port) } })
+    this.running = true
     this.sweeper = setInterval(() => this.sweep(), 100)
   }
 
   stop() {
     if (this.sweeper) clearInterval(this.sweeper)
+    this.running = false
     this.server?.close()
-    this.client?.close()
-    this.server = this.client = null
+    this.server = null
+    for (const p of this.pending.values()) this.finish(p)
+    this.pending.clear()
   }
 
   private emit(p: { query: Query; clientHost: string; t0: number }, status: Status, answer: string, extra: Partial<QueryEvent> = {}) {
@@ -145,56 +165,99 @@ export class Sinkhole {
         return
       }
     }
-    if (!this.upstreams.length || !this.client) {
+    if (!this.upstreams.length || !this.running) {
       this.reply(buildError(buf, q), host, port)
       this.emit(ctx, 'failed', 'no upstream')
       return
     }
-    let id = 0
-    for (let tries = 0; tries < 64; tries++) {
-      id = (Math.random() * 0x10000) | 0
-      if (!this.pending.has(id)) break
+    const w: Waiter = { query: q, req: Uint8Array.from(buf), host, port, t0, allowRule: verdict.action === 'pass' && verdict.source === 'allow' ? verdict.rule : undefined }
+    const inflight = this.pending.get(key)
+    if (inflight) {
+      if (inflight.waiters.length >= this.maxWaiters) return this.busy(w)
+      inflight.waiters.push(w)
+      return
     }
+    if (this.pending.size >= this.maxInFlight) return this.busy(w)
+    const id = randomId()
     const raw = Uint8Array.from(buf)
     setId(raw, id)
-    const p: Pending = { query: q, raw, clientHost: host, clientPort: port, t0, sentAt: t0, upstream: 0, key, allowRule: verdict.action === 'pass' && verdict.source === 'allow' ? verdict.rule : undefined }
-    this.pending.set(id, p)
+    const p: Pending = { key, query: q, raw, id, waiters: [w], t0, sentAt: t0, upstream: 0, sentTo: [], sock: null, done: false }
+    this.pending.set(key, p)
+    void this.open(p)
+  }
+
+  private busy(w: Waiter) {
+    this.reply(buildError(w.req, w.query), w.host, w.port)
+    this.emit({ query: w.query, clientHost: w.host, t0: w.t0 }, 'failed', 'busy')
+  }
+
+  /** Each lookup gets its own socket, so its source port is a fresh OS-chosen ephemeral port. */
+  private async open(p: Pending) {
+    let sock: Sock
+    try {
+      sock = await Bun.udpSocket<'buffer'>({ socket: { data: (_s, buf, port, addr) => this.onUpstream(p, new Uint8Array(buf), addr, port) } })
+    } catch {
+      if (!p.done) this.fail(p, 'socket error')
+      return
+    }
+    if (p.done || !this.running) { sock.close(); return }
+    p.sock = sock
     this.send(p)
   }
 
-  private send(p: Pending) {
-    const u = this.upstreams[p.upstream % this.upstreams.length]!
-    p.sentAt = this.now()
-    this.client?.send(p.raw, u.port, u.host)
+  private finish(p: Pending) {
+    p.done = true
+    if (this.pending.get(p.key) === p) this.pending.delete(p.key)
+    p.sock?.close()
+    p.sock = null
   }
 
-  private onUpstream(buf: Uint8Array, host: string, port: number) {
-    if (buf.length < 12) return
-    const id = getId(buf)
-    const p = this.pending.get(id)
-    if (!p) return
-    if (!this.upstreams.some((u) => u.port === port && u.host === host)) return
+  private fail(p: Pending, why: string) {
+    this.finish(p)
+    for (const w of p.waiters) {
+      this.reply(buildError(w.req, w.query), w.host, w.port)
+      this.emit({ query: w.query, clientHost: w.host, t0: w.t0 }, 'failed', why)
+    }
+  }
+
+  private send(p: Pending) {
+    if (!p.sock || !this.upstreams.length) return
+    const u = this.upstreams[p.upstream % this.upstreams.length]!
+    if (!p.sentTo.includes(u)) p.sentTo.push(u)
+    p.sentAt = this.now()
+    p.sock.send(p.raw, u.port, u.host)
+  }
+
+  /** Accepts only a response to this lookup: our ID, from an upstream we asked, echoing exactly our one question. */
+  private onUpstream(p: Pending, buf: Uint8Array, host: string, port: number) {
+    if (p.done || buf.length < 12) return
+    if (getId(buf) !== p.id || !(buf[2]! & 0x80)) return
+    const u = p.sentTo.find((x) => x.port === port && x.host === host)
+    if (!u) return
+    let questionEnd: number
     try {
       const res = parseResponse(buf)
-      if (res.question && res.question.name !== p.query.name) return
+      const q = res.question
+      if (res.qdcount !== 1 || !q || q.name !== p.query.name || q.qtype !== p.query.qtype || q.qclass !== p.query.qclass) return
+      questionEnd = readName(buf, 12).next + 4
     } catch { return }
-    this.pending.delete(id)
-    const out = Uint8Array.from(buf)
-    setId(out, p.query.id)
-    this.reply(out, p.clientHost, p.clientPort)
-    if (this.cacheEnabled) this.cache.put(p.key, out)
-    const u = this.upstreams[p.upstream % this.upstreams.length]!
-    this.emit(p, p.allowRule ? 'allowed' : 'forwarded', summarize(out), { upstream: u.label, ...(p.allowRule ? { rule: `allow: ${p.allowRule}` } : {}) })
+    this.finish(p)
+    if (this.cacheEnabled) this.cache.put(p.key, buf)
+    for (const w of p.waiters) {
+      const out = Uint8Array.from(buf)
+      setId(out, w.query.id)
+      if (w.query.questionEnd === questionEnd) out.set(w.req.subarray(12, questionEnd), 12)
+      this.reply(out, w.host, w.port)
+      this.emit({ query: w.query, clientHost: w.host, t0: w.t0 }, w.allowRule ? 'allowed' : 'forwarded', summarize(out), { upstream: u.label, ...(w.allowRule ? { rule: `allow: ${w.allowRule}` } : {}) })
+    }
   }
 
   private sweep() {
     const t = this.now()
-    for (const [id, p] of this.pending) {
+    for (const p of [...this.pending.values()]) {
       if (t - p.t0 >= this.timeoutMs) {
-        this.pending.delete(id)
-        this.reply(buildError(p.raw, { ...p.query }), p.clientHost, p.clientPort)
-        this.emit(p, 'failed', 'timeout')
-      } else if (this.upstreams.length > 1 && t - p.sentAt >= this.fallbackAfterMs && p.upstream < this.upstreams.length - 1) {
+        this.fail(p, 'timeout')
+      } else if (p.sock && this.upstreams.length > 1 && t - p.sentAt >= this.fallbackAfterMs && p.upstream < this.upstreams.length - 1) {
         p.upstream++
         this.send(p)
       }

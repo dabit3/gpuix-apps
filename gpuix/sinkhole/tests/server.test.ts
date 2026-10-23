@@ -4,7 +4,7 @@ import { HashedBlocklist, Matcher } from '../src/dns/blocklist'
 import { getRcode, parseResponse, RCODE, summarize } from '../src/dns/packet'
 import { Sinkhole } from '../src/dns/server'
 import { AD_DOMAINS } from '../src/corpus'
-import { ask, fakeUpstream } from './helpers'
+import { answer, ask, fakeUpstream, forged } from './helpers'
 
 let up: Awaited<ReturnType<typeof fakeUpstream>>
 let dead: Awaited<ReturnType<typeof fakeUpstream>>
@@ -68,4 +68,67 @@ describe('sinkhole over real UDP', () => {
     expect(s.dropped).toBe(0)
     expect(parseResponse(await ask(s.port, 'github.com')).rcode).toBe(0)
   }, 20_000)
+})
+
+describe('upstream reply validation', () => {
+  const mk = async (up: { addr: string }) => {
+    const sh = new Sinkhole({ port: 0, upstreams: [up.addr], matcher: new Matcher(HashedBlocklist.fromDomains([])) })
+    await sh.start()
+    return sh
+  }
+
+  test('ignores forged replies with no question, another qtype, a wrong ID, or a non-upstream source', async () => {
+    const evil = await Bun.udpSocket<'buffer'>({ hostname: '127.0.0.1', port: 0 })
+    const up = await fakeUpstream({
+      before: (req, port) => {
+        evil.send(answer(req), port, '127.0.0.1')
+        const id = (req[0]! << 8) | req[1]!
+        return [forged(req, { qdcount0: true }), forged(req, { qtype: 28 }), forged(req, { id: id ^ 1 })]
+      },
+    })
+    const sh = await mk(up)
+    try {
+      expect(summarize(await ask(sh.port, 'bank.example'))).toBe('93.184.216.34')
+      expect(summarize(await ask(sh.port, 'bank.example'))).toBe('93.184.216.34')
+      expect(sh.stats.recent.map((e) => e.status).reverse()).toEqual(['forwarded', 'cached'])
+      expect(up.hits).toBe(1)
+    } finally { sh.stop(); up.close(); evil.close() }
+  })
+
+  test('forged replies alone never resolve the lookup or reach the cache', async () => {
+    const up = await fakeUpstream({ silent: true, before: (req) => [forged(req, { qdcount0: true }), forged(req, { qtype: 28 })] })
+    const sh = await mk(up)
+    sh.timeoutMs = 300
+    try {
+      const pending = ask(sh.port, 'victim.example')
+      await Bun.sleep(50)
+      expect(sh.inFlight).toBe(1)
+      expect(getRcode(await pending)).toBe(RCODE.SERVFAIL)
+      expect(sh.stats.recent[0]!.status).toBe('failed')
+      expect(sh.cache.size).toBe(0)
+    } finally { sh.stop(); up.close() }
+  })
+
+  test('coalesces identical in-flight queries into one upstream lookup and answers each client with its own ID', async () => {
+    const up = await fakeUpstream({ delayMs: 100 })
+    const sh = await mk(up)
+    sh.cacheEnabled = false
+    try {
+      const answers = await Promise.all(Array.from({ length: 20 }, () => ask(sh.port, 'same.example')))
+      expect(up.hits).toBe(1)
+      for (const a of answers) expect(summarize(a)).toBe('93.184.216.34')
+      expect(new Set(answers.map((a) => parseResponse(a).id)).size).toBeGreaterThan(1)
+      expect(sh.inFlight).toBe(0)
+    } finally { sh.stop(); up.close() }
+  })
+
+  test('each lookup is sent from its own source port', async () => {
+    const up = await fakeUpstream()
+    const sh = await mk(up)
+    try {
+      for (let i = 0; i < 8; i++) await ask(sh.port, `p${i}.example`)
+      expect(up.ports.length).toBe(8)
+      expect(new Set(up.ports).size).toBeGreaterThan(1)
+    } finally { sh.stop(); up.close() }
+  })
 })
