@@ -1,10 +1,6 @@
-# private-app-demos-2
+# gpuix-apps
 
-Native desktop app demos.
-
-## gpuix/
-
-Twelve experiments built with [GPUIX](https://github.com/remorses/gpuix) (React on Zed's GPUI, painted with Metal). One folder per app under `gpuix/<slug>/`. See `gpuix/README.md` for full per-app details.
+This repository contains twelve apps built with [GPUIX](https://github.com/remorses/gpuix) (React on Zed's GPUI, painted with Metal). Each app has its own folder at `gpuix/<slug>/`. See [`gpuix/README.md`](gpuix/README.md) for the full details of each app.
 
 Each app is wired to a one-word shell shortcut in `~/.zshrc` (also `bun link`ed into `~/.bun/bin`). Run them in Ghostty or kitty:
 

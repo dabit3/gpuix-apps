@@ -27,7 +27,7 @@ alias wasteland="$GPUIX_DEMO_HOME/wasteland/bin/wasteland"
 alias yard="$GPUIX_DEMO_HOME/yard/bin/yard.ts"
 ```
 
-where `GPUIX_DEMO_HOME="$HOME/opensource/private-app-demos-2/gpuix"`.
+where `GPUIX_DEMO_HOME` is the absolute path of this `gpuix/` folder.
 
 | Command | App | Try it |
 | --- | --- | --- |
