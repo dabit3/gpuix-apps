@@ -1,13 +1,14 @@
 /** @jsxImportSource #zoom */
 // Full-page views behind the sidebar nav, Settings and the bell. Everything here talks to the real Devin v3 API when one is configured.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, type StyleDesc } from '@gpuix/react'
+import { Button } from '@gpuix/react'
 import { Icon, type IconName } from './icons'
 import { C, nativeTheme } from './theme'
 import { DevinClient, describeTrigger, SCHEDULE_PRESETS, timeAgo, type ApiAutomation, type ApiNote, type ApiPlaybook, type ApiSecret, type ApiTemplate, type DevinApi } from './api'
 import type { Session } from './data'
 import { FindingsList } from './more'
 import { stepZoom } from './zoom/scale'
+import { Badge, Btn, Card, CLEAR, col, Empty, EmptyState, Field, IconButton, IconTile, Kbd, ListRow, Notice, openUrl, Pills, row, SANS, SecretField, SectionTitle, Segmented, T, Tabs, Toggle, WEB } from './ui'
 
 // View-local UI state that survives the theme toggle (which remounts the tree so memoized rows repaint).
 const sticky = new Map<string, unknown>()
@@ -25,20 +26,6 @@ export function useSticky<S>(key: string, initial: S): [S, (v: S | ((s: S) => S)
 
 export type View = 'home' | 'automations' | 'security' | 'review' | 'customize' | 'settings' | 'notifications' | 'sessions' | 'usage' | 'repos' | 'environment'
 
-export const SANS = 'Inter'
-const MONO = 'Menlo'
-const CLEAR = '#00000000'
-export const WEB = 'https://app.devin.ai'
-export const row = (extra: StyleDesc = {}): StyleDesc => ({ display: 'flex', flexDirection: 'row', alignItems: 'center', ...extra })
-export const col = (extra: StyleDesc = {}): StyleDesc => ({ display: 'flex', flexDirection: 'column', ...extra })
-
-export function openUrl(url: string) {
-  if (!url || typeof Bun === 'undefined' || process.env.NODE_ENV === 'test') return
-  try {
-    Bun.spawn(['open', url], { stdout: 'ignore', stderr: 'ignore' })
-  } catch {}
-}
-
 /** Copies over OSC 52 (works over SSH in Ghostty/kitty) and, locally on macOS, via pbcopy. */
 export function copyText(text: string) {
   if (typeof Bun === 'undefined' || process.env.NODE_ENV === 'test') return
@@ -54,125 +41,21 @@ export function copyText(text: string) {
   }
 }
 
-export function T({ children, size = 13.5, color, weight, mono, testId, style }: { children: React.ReactNode; size?: number; color?: string; weight?: number; mono?: boolean; testId?: string; style?: StyleDesc }) {
-  return (
-    <text testId={testId} style={{ fontFamily: mono ? MONO : SANS, fontSize: size, color: color ?? C.text, fontWeight: weight, lineHeight: Math.round(size * 1.45), ...style }}>
-      {children}
-    </text>
-  )
-}
-
-export function Btn({ label, onClick, testId, primary, icon, disabled, small, danger }: { label: string; onClick?: () => void; testId?: string; primary?: boolean; icon?: IconName; disabled?: boolean; small?: boolean; danger?: boolean }) {
-  const bg = primary ? C.sendBg : CLEAR
-  const fg = primary ? C.sendFg : danger ? C.del : C.text
-  return (
-    <Button
-      testId={testId}
-      onClick={disabled ? undefined : onClick}
-      style={{ ...row({ gap: 6, justifyContent: 'center' }), height: small ? 26 : 32, paddingLeft: small ? 9 : 12, paddingRight: small ? 9 : 12, borderRadius: 8, borderWidth: primary ? 0 : 1, borderColor: C.border, backgroundColor: bg, opacity: disabled ? 0.45 : 1, cursor: disabled ? 'default' : 'pointer', flexShrink: 0, hover: { backgroundColor: primary ? bg : C.hover } }}
-    >
-      {icon && <Icon name={icon} size={13} color={fg} />}
-      <text style={{ fontFamily: SANS, fontSize: small ? 12.5 : 13, color: fg, fontWeight: 500, whiteSpace: 'nowrap' }}>{label}</text>
-    </Button>
-  )
-}
-
-export function Pills<V extends string>({ items, value, onChange, testId }: { items: { value: V; label: string; count?: number }[]; value: V; onChange: (v: V) => void; testId: string }) {
-  return (
-    <div style={row({ gap: 4, flexWrap: 'wrap' })}>
-      {items.map((it) => (
-        <div
-          key={it.value}
-          testId={`${testId}-${it.value}`}
-          onClick={() => onChange(it.value)}
-          style={{ ...row({ gap: 6 }), height: 28, paddingLeft: 11, paddingRight: 11, borderRadius: 14, cursor: 'pointer', backgroundColor: value === it.value ? C.selected : CLEAR, hover: { backgroundColor: C.hover } }}
-        >
-          <text style={{ fontFamily: SANS, fontSize: 13, color: value === it.value ? C.text : C.tertiary, fontWeight: 500, whiteSpace: 'nowrap' }}>{it.label}</text>
-          {it.count !== undefined && <text style={{ fontFamily: SANS, fontSize: 12, color: C.ghost }}>{String(it.count)}</text>}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-export function Field({ value, onChange, placeholder, testId, multiline, mono }: { value: string; onChange: (v: string) => void; placeholder: string; testId: string; multiline?: boolean; mono?: boolean }) {
-  const style: StyleDesc = { width: '100%', fontSize: 13.5, color: C.text, backgroundColor: C.card, fontFamily: mono ? MONO : SANS, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingLeft: 10, paddingRight: 10 }
-  const theme = { caret: C.text, textMuted: C.ghost }
-  return multiline ? (
-    <textarea testId={testId} value={value} placeholder={placeholder} minRows={3} maxRows={8} onChange={(e) => onChange(e.value ?? '')} style={{ ...style, paddingTop: 8, paddingBottom: 8 }} theme={theme} />
-  ) : (
-    <input testId={testId} value={value} placeholder={placeholder} onChange={(e) => onChange(e.value ?? '')} style={{ ...style, height: 32 }} theme={theme} />
-  )
-}
-
-export function SecretField({ value, onChange, placeholder, testId, reveal }: { value: string; onChange: (v: string) => void; placeholder: string; testId: string; reveal: boolean }) {
-  const masked = !reveal && value.length > 0
-  return (
-    <div style={{ position: 'relative', width: '100%' }}>
-      <input
-        testId={testId}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.value ?? '')}
-        style={{ width: '100%', height: 32, fontSize: 13.5, color: masked ? C.card : C.text, backgroundColor: C.card, fontFamily: MONO, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingLeft: 10, paddingRight: 10 }}
-        theme={{ caret: C.text, textMuted: C.ghost }}
-      />
-      {masked && (
-        <div style={{ position: 'absolute', left: 11, top: 0, bottom: 0, ...row(), pointerEvents: 'none' }}>
-          <T testId={`${testId}-mask`} mono size={13} color={C.text}>{'•'.repeat(Math.min(value.length, 40))}</T>
-        </div>
-      )}
-    </div>
-  )
-}
-
-export function Toggle({ on, onChange, testId }: { on: boolean; onChange: (v: boolean) => void; testId: string }) {
-  return (
-    <Button testId={testId} onClick={() => onChange(!on)} style={{ ...row({ justifyContent: on ? 'flex-end' : 'flex-start' }), width: 32, height: 18, borderRadius: 9, padding: 2, cursor: 'pointer', backgroundColor: on ? C.add : C.borderStrong, flexShrink: 0 }}>
-      <div style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#ffffff', pointerEvents: 'none' }} />
-    </Button>
-  )
-}
-
-export function Card({ children, testId, onClick, style }: { children: React.ReactNode; testId?: string; onClick?: () => void; style?: StyleDesc }) {
-  return (
-    <div testId={testId} onClick={onClick} style={{ ...col({ gap: 6 }), padding: 14, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, cursor: onClick ? 'pointer' : 'default', hover: onClick ? { borderColor: C.borderStrong } : {}, ...style }}>
-      {children}
-    </div>
-  )
-}
-
-export function Divider() {
-  return <div style={{ height: 1, backgroundColor: C.border, flexShrink: 0 }} />
-}
-
 export function Page({ title, subtitle, actions, children, testId, narrow }: { title: string; subtitle?: string; actions?: React.ReactNode; children: React.ReactNode; testId: string; narrow?: boolean }) {
   return (
-    <div testId={testId} style={{ ...col(), flexGrow: 1, minHeight: 0, overflowY: 'scroll' }}>
-      <div style={{ ...col({ gap: 18 }), width: '100%', maxWidth: 900, alignSelf: 'center', paddingLeft: narrow ? 16 : 36, paddingRight: narrow ? 16 : 36, paddingTop: 28, paddingBottom: 40 }}>
-        <div style={row({ gap: 12, alignItems: 'flex-start' })}>
-          <div style={col({ gap: 3, flexGrow: 1, minWidth: 0 })}>
-            <T size={22} weight={600}>{title}</T>
-            {subtitle && <T size={13.5} color={C.tertiary}>{subtitle}</T>}
+    <div testId={testId} style={{ ...col(), flexGrow: 1, minHeight: 0, overflowY: 'scroll', scrollbarColor: C.borderStrong }}>
+      <div style={{ ...col({ gap: 20 }), width: '100%', maxWidth: 880, alignSelf: 'center', paddingLeft: narrow ? 18 : 40, paddingRight: narrow ? 18 : 40, paddingTop: narrow ? 20 : 34, paddingBottom: 48 }}>
+        <div style={row({ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' })}>
+          <div style={col({ gap: 4, flexGrow: 1, flexBasis: 0, minWidth: 220 })}>
+            <T size={20} weight={600} style={{ lineHeight: 28 }}>{title}</T>
+            {subtitle && <T size={13} color={C.tertiary}>{subtitle}</T>}
           </div>
-          {actions}
+          {actions && <div style={{ ...row({ gap: 8 }), paddingTop: 2 }}>{actions}</div>}
         </div>
         {children}
       </div>
     </div>
   )
-}
-
-export function Empty({ text }: { text: string }) {
-  return (
-    <div style={{ ...row({ justifyContent: 'center' }), paddingTop: 28, paddingBottom: 28 }}>
-      <T color={C.ghost}>{text}</T>
-    </div>
-  )
-}
-
-export function Notice({ text, tone }: { text: string; tone?: 'error' | 'ok' }) {
-  return <T testId="notice" size={12.5} color={tone === 'error' ? C.del : tone === 'ok' ? C.add : C.tertiary}>{text}</T>
 }
 
 /** Loads a list from an optional API method; `null` api → [] with a hint. */
@@ -196,59 +79,19 @@ export function useApiList<T>(load: (() => Promise<T[]>) | undefined, deps: unkn
   return { items, error, reload, setItems }
 }
 
-/* ───────────── Action menu (headless Select used as a popup menu) ───────────── */
-
-export function menuStyle(): StyleDesc {
-  return {
-    minWidth: 220,
-    padding: 4,
-    backgroundColor: C.menu,
-    borderWidth: 1,
-    borderColor: C.borderStrong,
-    borderRadius: 12,
-    boxShadow: { offsetX: 0, offsetY: 8, blurRadius: 24, spreadRadius: 0, color: C.name === 'light' ? '#0000001f' : '#00000080' },
-  }
+function Label({ children }: { children: string }) {
+  return <T size={12.5} weight={500} color={C.secondary}>{children}</T>
 }
 
-export type MenuAction = { id: string; label: string; icon?: IconName; hint?: string; danger?: boolean; header?: boolean; run?: () => void }
-
-export function ActionMenu({ items, testId, side = 'bottom', children, triggerStyle }: { items: MenuAction[]; testId: string; side?: 'top' | 'bottom' | 'left' | 'right'; children: React.ReactNode; triggerStyle?: StyleDesc }) {
-  const actionable = items.filter((i) => !i.header)
+function FormCard({ testId, title, children, footer }: { testId: string; title: string; children: React.ReactNode; footer: React.ReactNode }) {
   return (
-    <Select items={actionable.map((i) => ({ value: i.id, label: i.label }))} value="" onValueChange={(v) => actionable.find((i) => i.id === v)?.run?.()} style={{ flexShrink: 0 }}>
-      <div style={{ position: 'relative', display: 'flex' }}>
-        <SelectTrigger
-          testId={testId}
-          style={(s) => ({ ...row({ gap: 6, justifyContent: 'center' }), minWidth: 28, height: 28, paddingLeft: 6, paddingRight: 6, borderRadius: 8, cursor: 'pointer', backgroundColor: s.open ? C.hover : CLEAR, hover: { backgroundColor: C.hover }, ...triggerStyle })}
-        >
-          {children}
-        </SelectTrigger>
-        <SelectContent side={side} sideOffset={6} style={menuStyle()}>
-          {items.map((it) =>
-            it.header ? (
-              <div key={it.id} style={{ paddingLeft: 9, paddingTop: 6, paddingBottom: 3 }}>
-                <text style={{ fontFamily: SANS, fontSize: 11.5, color: C.ghost, fontWeight: 500 }}>{it.label}</text>
-              </div>
-            ) : (
-              <SelectItem
-                key={it.id}
-                value={it.id}
-                testId={`${testId}-${it.id}`}
-                style={(s) => ({ ...row({ gap: 10 }), width: '100%', paddingLeft: 9, paddingRight: 9, paddingTop: 6, paddingBottom: 6, borderRadius: 8, cursor: 'pointer', backgroundColor: s.highlighted ? C.hover : C.menu, hover: { backgroundColor: C.hover } })}
-              >
-                {() => (
-                  <>
-                    {it.icon && <Icon name={it.icon} size={14} color={it.danger ? C.del : C.tertiary} />}
-                    <text style={{ fontFamily: SANS, color: it.danger ? C.del : C.text, fontSize: 13.5, flexGrow: 1, whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0 }}>{it.label}</text>
-                    {it.hint && <text style={{ fontFamily: SANS, color: C.ghost, fontSize: 12, whiteSpace: 'nowrap' }}>{it.hint}</text>}
-                  </>
-                )}
-              </SelectItem>
-            ),
-          )}
-        </SelectContent>
+    <div testId={testId} style={{ ...col(), borderRadius: 12, borderWidth: 1, borderColor: C.borderStrong, backgroundColor: C.card, overflow: 'hidden' }}>
+      <div style={{ ...col({ gap: 12 }), padding: 16 }}>
+        <T size={14} weight={600}>{title}</T>
+        {children}
       </div>
-    </Select>
+      <div style={{ ...row({ gap: 8, justifyContent: 'flex-end' }), paddingLeft: 16, paddingRight: 16, paddingTop: 10, paddingBottom: 10, borderTopWidth: 1, borderColor: C.border, backgroundColor: C.cardHead }}>{footer}</div>
+    </div>
   )
 }
 
@@ -311,23 +154,36 @@ export function AutomationsView({ api, narrow }: { api: DevinApi | null; narrow?
       narrow={narrow}
       title="Automations"
       subtitle="Run Devin on a schedule or when something happens in your tools."
-      actions={<Btn testId="automation-new" primary icon="plus" label="Create automation" onClick={() => setCreating((v) => !v)} />}
+      actions={<Btn testId="automation-new" primary icon="plus" label="New automation" onClick={() => setCreating((v) => !v)} />}
     >
-      {!api && <Notice text="Automations need a Devin API key (see README). Showing nothing in demo mode." />}
+      {!api && <Notice text="Automations need a Devin API key. Add one in Settings → Devin API." />}
       {creating && (
-        <Card testId="automation-form">
-          <T weight={600}>New scheduled automation</T>
-          <Field testId="automation-name" value={name} onChange={setName} placeholder="Name, e.g. Weekday test run" />
-          <Field testId="automation-prompt" value={prompt} onChange={setPrompt} placeholder="What should Devin do each run?" multiline />
-          <Pills testId="automation-schedule" items={SCHEDULE_PRESETS.map((p) => ({ value: p.id, label: p.label }))} value={preset} onChange={setPreset} />
-          <div style={row({ gap: 8, justifyContent: 'flex-end' })}>
-            <Btn label="Cancel" onClick={() => setCreating(false)} />
-            <Btn testId="automation-create" primary label="Create" disabled={!name.trim() || !prompt.trim()} onClick={create} />
+        <FormCard
+          testId="automation-form"
+          title="New scheduled automation"
+          footer={
+            <>
+              <Btn label="Cancel" ghost onClick={() => setCreating(false)} />
+              <Btn testId="automation-create" primary label="Create automation" disabled={!name.trim() || !prompt.trim()} onClick={create} />
+            </>
+          }
+        >
+          <div style={col({ gap: 6 })}>
+            <Label>Name</Label>
+            <Field testId="automation-name" value={name} onChange={setName} placeholder="Weekday test run" />
           </div>
-        </Card>
+          <div style={col({ gap: 6 })}>
+            <Label>Prompt</Label>
+            <Field testId="automation-prompt" value={prompt} onChange={setPrompt} placeholder="What should Devin do each run?" multiline />
+          </div>
+          <div style={col({ gap: 6 })}>
+            <Label>Schedule</Label>
+            <Pills testId="automation-schedule" items={SCHEDULE_PRESETS.map((p) => ({ value: p.id, label: p.label }))} value={preset} onChange={setPreset} />
+          </div>
+        </FormCard>
       )}
       {notice && <Notice text={notice.text} tone={notice.tone} />}
-      <Pills
+      <Tabs
         testId="automations-tab"
         value={tab}
         onChange={setTab}
@@ -342,39 +198,49 @@ export function AutomationsView({ api, narrow }: { api: DevinApi | null; narrow?
           {autos.items === null ? (
             <Empty text="Loading automations…" />
           ) : autos.items.length === 0 ? (
-            <Empty text="No automations yet" />
+            <EmptyState icon="clock" title="No automations yet" body="Schedule a recurring session, or start from a template." action={<Btn small label="Browse templates" onClick={() => setTab('templates')} />} />
           ) : (
             autos.items.map((a) => (
-              <Card key={a.automation_id} testId={`automation-${a.automation_id}`}>
-                <div style={row({ gap: 10 })}>
-                  <Icon name="clock" size={15} color={a.enabled ? C.add : C.ghost} />
-                  <T weight={500} style={{ flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{a.name}</T>
-                  <T size={12} color={C.tertiary}>{a.enabled ? 'On' : 'Paused'}</T>
-                  <Toggle testId={`automation-toggle-${a.automation_id}`} on={a.enabled} onChange={(v) => toggle(a, v)} />
-                  <Btn small danger testId={`automation-delete-${a.automation_id}`} label={confirmDelete === a.automation_id ? 'Confirm delete' : 'Delete'} onClick={() => remove(a)} />
+              <Card key={a.automation_id} testId={`automation-${a.automation_id}`} style={{ ...row({ gap: 12, alignItems: 'flex-start' }), paddingTop: 12, paddingBottom: 12 }}>
+                <IconTile icon="clock" color={a.enabled ? C.add : C.ghost} bg={a.enabled ? C.greenSoft : undefined} size={32} />
+                <div style={col({ gap: 2, flexGrow: 1, flexShrink: 1, minWidth: 0 })}>
+                  <div style={row({ gap: 8 })}>
+                    <T weight={500} style={{ flexShrink: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{a.name}</T>
+                    {!a.enabled && <Badge label="Paused" />}
+                  </div>
+                  <T size={12.5} color={C.tertiary}>{`${a.triggers.map(describeTrigger).join(' · ') || 'No trigger'} · updated ${timeAgo(a.updated_at)}`}</T>
+                  {a.actions[0]?.prompt && (
+                    <T size={12.5} color={C.secondary} style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0 }}>
+                      {a.actions[0].prompt.replace(/\s+/g, ' ').slice(0, 220)}
+                    </T>
+                  )}
                 </div>
-                <T size={12.5} color={C.tertiary}>{`${a.triggers.map(describeTrigger).join(' · ') || 'No trigger'}  ·  updated ${timeAgo(a.updated_at)}`}</T>
-                {a.actions[0]?.prompt && (
-                  <T size={12.5} color={C.secondary} style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                    {a.actions[0].prompt.replace(/\s+/g, ' ').slice(0, 220)}
-                  </T>
-                )}
+                <div style={{ ...row({ gap: 6 }), height: 32 }}>
+                  <Toggle testId={`automation-toggle-${a.automation_id}`} on={a.enabled} onChange={(v) => toggle(a, v)} />
+                  {confirmDelete === a.automation_id ? (
+                    <Btn small danger testId={`automation-delete-${a.automation_id}`} label="Delete" icon="trash" onClick={() => remove(a)} />
+                  ) : (
+                    <IconButton icon="trash" size={15} box={28} tip="Delete automation" testId={`automation-delete-${a.automation_id}`} onClick={() => remove(a)} />
+                  )}
+                </div>
               </Card>
             ))
           )}
         </div>
       ) : (
-        <div style={col({ gap: 10 })}>
+        <div style={col({ gap: 12 })}>
           <Pills testId="template-cat" value={category} onChange={setCategory} items={categories.map((c) => ({ value: c, label: c === 'all' ? 'All' : c.replace(/_/g, ' ').replace(/^./, (m) => m.toUpperCase()) }))} />
           {templates.items === null ? (
             <Empty text="Loading templates…" />
+          ) : shownTemplates.length === 0 ? (
+            <EmptyState icon="shapes" title="No templates" body={api ? 'Nothing in this category yet.' : 'Connect a Devin API key to browse templates.'} />
           ) : (
             <div style={row({ gap: 10, flexWrap: 'wrap', alignItems: 'stretch' })}>
               {shownTemplates.map((t) => (
                 <Card
                   key={t.template_id}
                   testId={`template-${t.template_id}`}
-                  style={{ width: narrow ? '100%' : 260, flexGrow: 1 }}
+                  style={{ width: narrow ? '100%' : 260, flexGrow: 1, gap: 8 }}
                   onClick={() => {
                     setName(t.name)
                     setPrompt(t.description)
@@ -383,8 +249,11 @@ export function AutomationsView({ api, narrow }: { api: DevinApi | null; narrow?
                   }}
                 >
                   <T weight={500}>{t.name}</T>
-                  <T size={12.5} color={C.tertiary}>{t.description}</T>
-                  <T size={11.5} color={C.ghost}>{[t.triggers.map(describeTrigger).join(', '), ...t.required_integrations].filter(Boolean).join(' · ')}</T>
+                  <T size={12.5} color={C.tertiary} style={{ lineClamp: 2 }}>{t.description}</T>
+                  <div style={{ ...row({ gap: 6, flexWrap: 'wrap' }), paddingTop: 2 }}>
+                    {t.triggers.map(describeTrigger).filter(Boolean).map((x) => <Badge key={x} icon="clock" label={x} />)}
+                    {t.required_integrations.map((x) => <Badge key={x} label={x} />)}
+                  </div>
                 </Card>
               ))}
             </div>
@@ -397,11 +266,12 @@ export function AutomationsView({ api, narrow }: { api: DevinApi | null; narrow?
 
 /* ───────────────────────────── Security ───────────────────────────── */
 
-export function Stat({ label, value, testId }: { label: string; value: number | string; testId: string }) {
+export function Stat({ label, value, testId, hint }: { label: string; value: number | string; testId: string; hint?: string }) {
   return (
-    <Card style={{ flexGrow: 1, flexBasis: 0, minWidth: 120 }}>
+    <Card style={{ flexGrow: 1, flexBasis: 0, minWidth: 128, gap: 4, paddingTop: 12, paddingBottom: 12 }}>
       <T size={12.5} color={C.tertiary}>{label}</T>
-      <T testId={testId} size={24} weight={400}>{String(value)}</T>
+      <T testId={testId} size={24} weight={600} style={{ lineHeight: 30 }}>{String(value)}</T>
+      {hint && <T size={12} color={C.ghost}>{hint}</T>}
     </Card>
   )
 }
@@ -412,33 +282,55 @@ export function prStats(sessions: Session[]) {
   return { total: prs.length, open: by('open'), merged: by('merged'), closed: by('closed') }
 }
 
+export function Table({ children, testId }: { children: React.ReactNode; testId?: string }) {
+  return (
+    <div testId={testId} style={{ ...col(), borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
+      {children}
+    </div>
+  )
+}
+
+export function TableRow({ children, onClick, testId, last }: { children: React.ReactNode; onClick?: () => void; testId?: string; last?: boolean }) {
+  return (
+    <div testId={testId} onClick={onClick} style={{ ...row({ gap: 10 }), minHeight: 42, paddingLeft: 14, paddingRight: 14, borderBottomWidth: last ? 0 : 1, borderColor: C.border, cursor: onClick ? 'pointer' : 'default', hover: onClick ? { backgroundColor: C.hover } : {} }}>
+      {children}
+    </div>
+  )
+}
+
 export function SecurityView({ api, sessions, narrow }: { api: DevinApi | null; sessions: Session[]; narrow?: boolean }) {
   const secrets = useApiList<ApiSecret>(api?.listSecrets?.bind(api), [api])
   const s = prStats(sessions)
+  const list = secrets.items ?? []
   return (
-    <Page testId="view-security" narrow={narrow} title="Security" subtitle="Pull requests Devin opened, code scan findings, and the secrets it can use." actions={<Btn icon="share" label="Open scans on web" onClick={() => openUrl(`${WEB}/security`)} />}>
-      <div style={row({ gap: 10, flexWrap: 'wrap' })}>
-        <Stat testId="stat-total" label="Pull requests" value={s.total} />
-        <Stat testId="stat-open" label="Open" value={s.open} />
-        <Stat testId="stat-merged" label="Merged" value={s.merged} />
-        <Stat testId="stat-closed" label="Closed" value={s.closed} />
+    <Page testId="view-security" narrow={narrow} title="Security" subtitle="Pull requests Devin opened, code scan findings, and the secrets it can use." actions={<Btn icon="external" label="Scans on web" onClick={() => openUrl(`${WEB}/security`)} />}>
+      <div style={col({ gap: 8 })}>
+        <div style={row({ gap: 10, flexWrap: 'wrap' })}>
+          <Stat testId="stat-total" label="Pull requests" value={s.total} />
+          <Stat testId="stat-open" label="Open" value={s.open} />
+          <Stat testId="stat-merged" label="Merged" value={s.merged} />
+          <Stat testId="stat-closed" label="Closed" value={s.closed} />
+        </div>
+        <T size={12} color={C.ghost}>{`Counted from the ${sessions.length} sessions loaded in the sidebar.`}</T>
       </div>
-      <T size={12} color={C.ghost}>{`Counted from the ${sessions.length} sessions loaded in the sidebar. Click a finding to open its fix PR or session.`}</T>
       <FindingsList api={api} />
-      <Divider />
-      <T weight={600}>{`Secrets${secrets.items ? ` · ${secrets.items.length}` : ''}`}</T>
-      <T size={12.5} color={C.tertiary}>Names and notes only. Values never leave Devin.</T>
-      {secrets.error && <Notice text={secrets.error} tone="error" />}
-      <div style={col({ gap: 6 })} testId="secret-list">
-        {(secrets.items ?? []).map((x) => (
-          <div key={x.secret_id} style={{ ...row({ gap: 10 }), height: 34, paddingLeft: 12, paddingRight: 12, borderRadius: 8, backgroundColor: C.hover }}>
-            <Icon name="shield" size={13} color={C.tertiary} />
-            <T mono size={12.5} style={{ flexShrink: 0 }}>{x.key}</T>
-            <T size={12} color={C.ghost} style={{ flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{x.note ?? ''}</T>
-            <T size={11.5} color={C.ghost}>{x.secret_type ?? 'secret'}</T>
-          </div>
-        ))}
-        {secrets.items?.length === 0 && <Empty text={api ? 'No secrets' : 'Connect a Devin API key to list secrets'} />}
+      <div style={col({ gap: 10 })}>
+        <SectionTitle title="Secrets" count={secrets.items?.length} hint="Names and notes only. Values never leave Devin." />
+        {secrets.error && <Notice text={secrets.error} tone="error" />}
+        {list.length > 0 ? (
+          <Table testId="secret-list">
+            {list.map((x, i) => (
+              <TableRow key={x.secret_id} last={i === list.length - 1}>
+                <Icon name="key" size={14} color={C.ghost} />
+                <T mono size={12.5} style={{ flexShrink: 0 }}>{x.key}</T>
+                <T size={12.5} color={C.tertiary} style={{ flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{x.note ?? ''}</T>
+                <Badge label={x.secret_type ?? 'secret'} />
+              </TableRow>
+            ))}
+          </Table>
+        ) : (
+          <div testId="secret-list">{secrets.items && <EmptyState compact icon="key" title={api ? 'No secrets' : 'No API key'} body={api ? 'Secrets you add on app.devin.ai show up here.' : 'Connect a Devin API key to list secrets.'} />}</div>
+        )}
       </div>
     </Page>
   )
@@ -465,27 +357,39 @@ export function ReviewView({ sessions, onReview, onOpenSession, narrow }: { sess
   const valid = /github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(url)
   return (
     <Page testId="view-review" narrow={narrow} title="Review" subtitle="Pull requests from your Devin sessions. Paste any PR to have Devin review it.">
-      <div style={row({ gap: 8 })}>
-        <div style={{ flexGrow: 1 }}>
-          <Field testId="review-url" value={url} onChange={setUrl} placeholder="https://github.com/owner/repo/pull/123" />
-        </div>
-        <Btn testId="review-start" primary label="Review with Devin" disabled={!valid} onClick={() => valid && onReview(url.trim())} />
-      </div>
-      <Pills testId="review-state" value={state} onChange={setState} items={[{ value: 'open', label: 'Open' }, { value: 'merged', label: 'Merged' }, { value: 'all', label: 'All' }]} />
-      {repos.length > 1 && <Pills testId="review-repo" value={repo} onChange={setRepo} items={[{ value: 'all', label: 'All repos' }, ...repos.map((r) => ({ value: r, label: r.split('/')[1] ?? r }))]} />}
-      <div testId="review-list" style={col({ gap: 2 })}>
-        {shown.length === 0 && <Empty text="No pull requests match" />}
-        {shown.map((p) => (
-          <div key={`${p.session.id}-${p.url}`} style={{ ...row({ gap: 10 }), minHeight: 44, paddingLeft: 10, paddingRight: 8, borderRadius: 8, hover: { backgroundColor: C.hover } }}>
-            <Icon name={(p.state ?? '').toLowerCase() === 'merged' ? 'merge' : 'pr'} size={15} color={(p.state ?? '').toLowerCase() === 'merged' ? C.blue : C.add} />
-            <div style={col({ flexGrow: 1, minWidth: 0 })} onClick={() => onOpenSession(p.session.id)}>
-              <T size={13.5} style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{p.session.title}</T>
-              <T size={12} color={C.tertiary}>{`${p.repo} #${p.number} · ${p.state ?? 'open'} · ${p.session.updated}`}</T>
-            </div>
-            <Btn small label="GitHub" icon="share" onClick={() => openUrl(p.url)} />
-            {!narrow && <Btn small label="Review" onClick={() => onReview(p.url)} />}
+      <div style={{ ...col({ gap: 10 }), padding: 14, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card }}>
+        <div style={row({ gap: 8 })}>
+          <IconTile icon="pr" size={32} />
+          <div style={{ flexGrow: 1 }}>
+            <Field testId="review-url" value={url} onChange={setUrl} placeholder="https://github.com/owner/repo/pull/123" />
           </div>
-        ))}
+          <Btn testId="review-start" primary label="Review with Devin" disabled={!valid} onClick={() => valid && onReview(url.trim())} />
+        </div>
+      </div>
+      <div style={col({ gap: 10 })}>
+        <div style={row({ gap: 12, flexWrap: 'wrap' })}>
+          <Pills testId="review-state" value={state} onChange={setState} items={[{ value: 'open', label: 'Open' }, { value: 'merged', label: 'Merged' }, { value: 'all', label: 'All' }]} />
+          {repos.length > 1 && <div style={{ width: 1, height: 18, backgroundColor: C.border }} />}
+          {repos.length > 1 && <Pills testId="review-repo" value={repo} onChange={setRepo} items={[{ value: 'all', label: 'All repos' }, ...repos.map((r) => ({ value: r, label: r.split('/')[1] ?? r }))]} />}
+        </div>
+        <div testId="review-list" style={col({ gap: 2 })}>
+          {shown.length === 0 && <EmptyState compact icon="pr" title="No pull requests match" body="Pull requests Devin opens in your sessions show up here." />}
+          {shown.map((p) => {
+            const merged = (p.state ?? '').toLowerCase() === 'merged'
+            return (
+              <ListRow key={`${p.session.id}-${p.url}`} style={{ minHeight: 48 }}>
+                <Icon name={merged ? 'merge' : 'pr'} size={15} color={merged ? C.purple : C.add} />
+                <div style={{ ...col({ gap: 1, flexGrow: 1, minWidth: 0 }), cursor: 'pointer' }} onClick={() => onOpenSession(p.session.id)}>
+                  <T size={13.5} weight={500} style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{p.session.title}</T>
+                  <T size={12} color={C.tertiary} style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{`${p.repo} #${p.number} · ${p.session.updated}`}</T>
+                </div>
+                <Badge label={merged ? 'Merged' : (p.state ?? 'open').replace(/^./, (m) => m.toUpperCase())} tone={merged ? 'purple' : (p.state ?? 'open') === 'open' ? 'green' : 'neutral'} />
+                <IconButton icon="external" size={14} box={28} tip="Open on GitHub" onClick={() => openUrl(p.url)} />
+                {!narrow && <Btn small label="Review" onClick={() => onReview(p.url)} />}
+              </ListRow>
+            )
+          })}
+        </div>
       </div>
     </Page>
   )
@@ -537,6 +441,7 @@ export function CustomizeView({ api, tab, onTab, onUsePlaybook, narrow }: { api:
 
   const pbs = (playbooks.items ?? []).filter((p) => !needle || `${p.title} ${p.macro ?? ''}`.toLowerCase().includes(needle))
   const ns = (notes.items ?? []).filter((n) => !needle || `${n.name} ${n.trigger} ${n.folder_path}`.toLowerCase().includes(needle))
+  const md = { width: '100%', minWidth: 0, fontFamily: SANS, fontSize: 13, lineHeight: 20, color: C.secondary } as const
 
   return (
     <Page
@@ -546,8 +451,8 @@ export function CustomizeView({ api, tab, onTab, onUsePlaybook, narrow }: { api:
       subtitle="Playbooks and knowledge Devin uses in every session."
       actions={<Btn testId="customize-new" primary icon="plus" label={tab === 'playbooks' ? 'New playbook' : 'New knowledge'} disabled={!api} onClick={() => setCreating((v) => !v)} />}
     >
-      <div style={row({ gap: 12, flexWrap: 'wrap' })}>
-        <Pills
+      <div style={col({ gap: 12 })}>
+        <Tabs
           testId="customize-tab"
           value={tab}
           onChange={(t) => {
@@ -560,66 +465,89 @@ export function CustomizeView({ api, tab, onTab, onUsePlaybook, narrow }: { api:
             { value: 'knowledge', label: 'Knowledge', count: notes.items?.length },
           ]}
         />
-        <div style={{ flexGrow: 1, minWidth: 180 }}>
-          <Field testId="customize-search" value={q} onChange={setQ} placeholder={`Search ${tab}`} />
-        </div>
+        <Field testId="customize-search" value={q} onChange={setQ} placeholder={`Search ${tab}`} />
       </div>
       {creating && (
-        <Card testId="customize-form">
-          <T weight={600}>{tab === 'playbooks' ? 'New playbook' : 'New knowledge'}</T>
-          <Field testId="customize-title" value={title} onChange={setTitle} placeholder={tab === 'playbooks' ? 'Title' : 'Name'} />
-          <Field testId="customize-macro" value={macro} onChange={setMacro} placeholder={tab === 'playbooks' ? 'Macro, e.g. !release (optional)' : 'When should Devin use this? (trigger)'} />
-          <Field testId="customize-body" value={body} onChange={setBody} placeholder={tab === 'playbooks' ? 'Steps, in Markdown' : 'What Devin should know'} multiline />
-          <div style={row({ gap: 8, justifyContent: 'flex-end' })}>
-            <Btn label="Cancel" onClick={() => setCreating(false)} />
-            <Btn testId="customize-create" primary label="Create" disabled={!title.trim() || !body.trim()} onClick={create} />
+        <FormCard
+          testId="customize-form"
+          title={tab === 'playbooks' ? 'New playbook' : 'New knowledge'}
+          footer={
+            <>
+              <Btn label="Cancel" ghost onClick={() => setCreating(false)} />
+              <Btn testId="customize-create" primary label="Create" disabled={!title.trim() || !body.trim()} onClick={create} />
+            </>
+          }
+        >
+          <div style={col({ gap: 6 })}>
+            <Label>{tab === 'playbooks' ? 'Title' : 'Name'}</Label>
+            <Field testId="customize-title" value={title} onChange={setTitle} placeholder={tab === 'playbooks' ? 'Release checklist' : 'Use pnpm, never npm'} />
           </div>
-        </Card>
+          <div style={col({ gap: 6 })}>
+            <Label>{tab === 'playbooks' ? 'Macro (optional)' : 'Trigger'}</Label>
+            <Field testId="customize-macro" value={macro} onChange={setMacro} placeholder={tab === 'playbooks' ? '!release' : 'When should Devin use this?'} />
+          </div>
+          <div style={col({ gap: 6 })}>
+            <Label>{tab === 'playbooks' ? 'Steps' : 'Knowledge'}</Label>
+            <Field testId="customize-body" value={body} onChange={setBody} placeholder={tab === 'playbooks' ? 'Steps, in Markdown' : 'What Devin should know'} multiline />
+          </div>
+        </FormCard>
       )}
       {notice && <Notice text={notice.text} tone={notice.tone} />}
-      <div testId="customize-list" style={col({ gap: 6 })}>
+      <div testId="customize-list" style={col({ gap: 8 })}>
         {tab === 'playbooks'
           ? playbooks.items === null
             ? <Empty text="Loading playbooks…" />
             : pbs.length === 0
-              ? <Empty text={api ? 'No playbooks match' : 'Connect a Devin API key to list playbooks'} />
-              : pbs.map((p) => (
-                  <Card key={p.playbook_id} testId={`playbook-${p.playbook_id}`}>
-                    <div style={row({ gap: 10 })} onClick={() => setOpenId(openId === p.playbook_id ? null : p.playbook_id)}>
-                      <Icon name="library" size={14} color={C.tertiary} />
-                      <T weight={500} style={{ flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{p.title}</T>
-                      {p.macro && <T mono size={12} color={C.accent}>{p.macro}</T>}
-                      <Icon name={openId === p.playbook_id ? 'chevronDown' : 'chevronRight'} size={13} color={C.ghost} />
-                    </div>
-                    {openId === p.playbook_id && (
-                      <>
-                        <markdown testId={`playbook-body-${p.playbook_id}`} source={p.body.slice(0, 4000)} theme={nativeTheme()} style={{ width: '100%', minWidth: 0, fontFamily: SANS, fontSize: 13, lineHeight: 20, color: C.secondary }} />
-                        <div style={row({ gap: 8 })}>
-                          <Btn testId={`playbook-use-${p.playbook_id}`} small primary label="Use in new session" onClick={() => onUsePlaybook(p)} />
-                          <Btn small label="Open on web" icon="share" onClick={() => openUrl(`${WEB}/playbooks/${p.playbook_id}`)} />
+              ? <EmptyState icon="library" title={api ? 'No playbooks match' : 'No API key'} body={api ? 'Try another search, or create a playbook.' : 'Connect a Devin API key to list playbooks.'} />
+              : pbs.map((p) => {
+                  const open = openId === p.playbook_id
+                  return (
+                    <Card key={p.playbook_id} testId={`playbook-${p.playbook_id}`} style={{ padding: 0, gap: 0, overflow: 'hidden', borderColor: open ? C.borderStrong : C.border }}>
+                      <div style={{ ...row({ gap: 12 }), minHeight: 50, paddingLeft: 12, paddingRight: 14, cursor: 'pointer', hover: { backgroundColor: C.hover } }} onClick={() => setOpenId(open ? null : p.playbook_id)}>
+                        <IconTile icon="library" />
+                        <T weight={500} style={{ flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{p.title}</T>
+                        {p.macro && <Badge mono label={p.macro} tone="blue" />}
+                        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={14} color={C.ghost} />
+                      </div>
+                      {open && (
+                        <div style={{ ...col({ gap: 12 }), paddingLeft: 52, paddingRight: 16, paddingTop: 4, paddingBottom: 14 }}>
+                          <markdown testId={`playbook-body-${p.playbook_id}`} source={p.body.slice(0, 4000)} theme={nativeTheme()} style={md} />
+                          <div style={row({ gap: 8 })}>
+                            <Btn testId={`playbook-use-${p.playbook_id}`} small primary icon="plus" label="Use in new session" onClick={() => onUsePlaybook(p)} />
+                            <Btn small ghost label="Open on web" icon="external" onClick={() => openUrl(`${WEB}/playbooks/${p.playbook_id}`)} />
+                          </div>
                         </div>
-                      </>
-                    )}
-                  </Card>
-                ))
+                      )}
+                    </Card>
+                  )
+                })
           : notes.items === null
             ? <Empty text="Loading knowledge…" />
             : ns.length === 0
-              ? <Empty text={api ? 'No knowledge matches' : 'Connect a Devin API key to list knowledge'} />
-              : ns.slice(0, 200).map((n) => (
-                  <Card key={n.note_id} testId={`note-${n.note_id}`}>
-                    <div style={row({ gap: 10 })}>
-                      <div style={row({ gap: 10, flexGrow: 1, minWidth: 0 })} onClick={() => setOpenId(openId === n.note_id ? null : n.note_id)}>
-                        <Icon name="folder" size={14} color={C.tertiary} />
-                        <T weight={500} style={{ flexGrow: 1, minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{n.name}</T>
+              ? <EmptyState icon="book" title={api ? 'No knowledge matches' : 'No API key'} body={api ? 'Try another search, or add knowledge.' : 'Connect a Devin API key to list knowledge.'} />
+              : ns.slice(0, 200).map((n) => {
+                  const open = openId === n.note_id
+                  return (
+                    <Card key={n.note_id} testId={`note-${n.note_id}`} style={{ padding: 0, gap: 0, overflow: 'hidden', borderColor: open ? C.borderStrong : C.border }}>
+                      <div style={{ ...row({ gap: 12 }), minHeight: 56, paddingLeft: 12, paddingRight: 14 }}>
+                        <div style={{ ...row({ gap: 12, flexGrow: 1, minWidth: 0 }), cursor: 'pointer' }} onClick={() => setOpenId(open ? null : n.note_id)}>
+                          <IconTile icon="book" color={n.is_enabled ? C.tertiary : C.ghost} />
+                          <div style={col({ gap: 1, flexGrow: 1, minWidth: 0 })}>
+                            <T weight={500} color={n.is_enabled ? C.text : C.tertiary} style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{n.name}</T>
+                            <T size={12} color={C.tertiary} style={{ whiteSpace: open ? 'normal' : 'nowrap', textOverflow: 'ellipsis' }}>{`${n.folder_path ? `${n.folder_path} · ` : ''}Trigger: ${n.trigger}`}</T>
+                          </div>
+                        </div>
+                        {n.pinned_repo && !narrow && <Badge icon="folder" label={n.pinned_repo} />}
+                        <Toggle testId={`note-toggle-${n.note_id}`} on={n.is_enabled} onChange={(v) => toggleNote(n, v)} />
                       </div>
-                      {n.pinned_repo && !narrow && <T size={11.5} color={C.ghost}>{n.pinned_repo}</T>}
-                      <Toggle testId={`note-toggle-${n.note_id}`} on={n.is_enabled} onChange={(v) => toggleNote(n, v)} />
-                    </div>
-                    <T size={12} color={C.tertiary} style={{ whiteSpace: openId === n.note_id ? 'normal' : 'nowrap', textOverflow: 'ellipsis' }}>{`${n.folder_path ? `${n.folder_path} · ` : ''}Trigger: ${n.trigger}`}</T>
-                    {openId === n.note_id && <markdown testId={`note-body-${n.note_id}`} source={n.body.slice(0, 4000)} theme={nativeTheme()} style={{ width: '100%', minWidth: 0, fontFamily: SANS, fontSize: 13, lineHeight: 20, color: C.secondary }} />}
-                  </Card>
-                ))}
+                      {open && (
+                        <div style={{ paddingLeft: 52, paddingRight: 16, paddingBottom: 14 }}>
+                          <markdown testId={`note-body-${n.note_id}`} source={n.body.slice(0, 4000)} theme={nativeTheme()} style={md} />
+                        </div>
+                      )}
+                    </Card>
+                  )
+                })}
       </div>
     </Page>
   )
@@ -653,21 +581,24 @@ export function NotificationsView({ items, onOpen, onMarkAll, narrow }: { items:
   const unread = items.filter((n) => n.unread).length
   const shown = tab === 'unread' ? items.filter((n) => n.unread) : items
   return (
-    <Page testId="view-notifications" narrow={narrow} title="Notifications" subtitle="Sessions that need you or just finished." actions={<Btn testId="notifications-read" label="Mark all read" disabled={unread === 0} onClick={onMarkAll} />}>
-      <Pills testId="notifications-tab" value={tab} onChange={setTab} items={[{ value: 'all', label: 'All' }, { value: 'unread', label: 'Unread', count: unread }]} />
+    <Page testId="view-notifications" narrow={narrow} title="Notifications" subtitle="Sessions that need you or just finished." actions={<Btn testId="notifications-read" icon="check" label="Mark all read" disabled={unread === 0} onClick={onMarkAll} />}>
+      <Tabs testId="notifications-tab" value={tab} onChange={setTab} items={[{ value: 'all', label: 'All' }, { value: 'unread', label: 'Unread', count: unread }]} />
       <div testId="notification-list" style={col({ gap: 2 })}>
-        {shown.length === 0 && <Empty text={tab === 'unread' ? 'You’re all caught up' : 'Nothing yet'} />}
-        {shown.map((n) => (
-          <div key={n.id} testId={`notification-${n.id}`} onClick={() => onOpen(n.id)} style={{ ...row({ gap: 12, alignItems: 'flex-start' }), paddingTop: 9, paddingBottom: 9, paddingLeft: 10, paddingRight: 10, borderRadius: 8, cursor: 'pointer', hover: { backgroundColor: C.hover } }}>
-            <Icon name={n.alert ? 'help' : 'compose'} size={15} color={n.alert ? C.orange : C.tertiary} />
-            <div style={col({ flexGrow: 1, minWidth: 0, gap: 1 })}>
-              <T size={13.5} weight={n.unread ? 600 : 400} color={n.unread ? C.text : C.secondary} style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{n.title}</T>
-              <T size={12.5} color={n.alert ? C.orange : C.tertiary}>{n.detail}</T>
-            </div>
-            <T size={12} color={C.ghost}>{n.session.updated}</T>
-            <div style={{ width: 7, height: 7, borderRadius: 4, marginTop: 6, backgroundColor: n.unread ? C.blue : CLEAR }} />
-          </div>
-        ))}
+        {shown.length === 0 && <EmptyState icon="inbox" title={tab === 'unread' ? 'You’re all caught up' : 'Nothing yet'} body="Sessions that wait for you, open a PR or finish show up here." />}
+        {shown.map((n) => {
+          const review = n.detail === 'Review PR'
+          return (
+            <ListRow key={n.id} testId={`notification-${n.id}`} onClick={() => onOpen(n.id)} style={{ minHeight: 54, gap: 12 }}>
+              <IconTile icon={n.alert ? 'circleAlert' : review ? 'pr' : 'circleCheck'} color={n.alert ? C.orange : review ? C.add : C.tertiary} bg={n.alert ? C.orangeSoft : review ? C.greenSoft : undefined} size={30} />
+              <div style={col({ flexGrow: 1, minWidth: 0, gap: 1 })}>
+                <T size={13.5} weight={n.unread ? 600 : 400} color={n.unread ? C.text : C.secondary} style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{n.title}</T>
+                <T size={12.5} color={n.alert ? C.orange : C.tertiary}>{n.detail}</T>
+              </div>
+              <T size={12} color={C.ghost} style={{ flexShrink: 0 }}>{n.session.updated}</T>
+              <div style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: n.unread ? C.blue : CLEAR, flexShrink: 0 }} />
+            </ListRow>
+          )
+        })}
       </div>
     </Page>
   )
@@ -691,9 +622,9 @@ const SETTINGS_NAV: { section: string; items: NavItem[] }[] = [
   {
     section: 'Organization',
     items: [
-      { id: 'api', label: 'Devin API', icon: 'zap', page: 'api' },
+      { id: 'api', label: 'Devin API', icon: 'key', page: 'api' },
       { id: 'schedules', label: 'Schedules', icon: 'clock', go: ['automations'] },
-      { id: 'knowledge', label: 'Knowledge', icon: 'folder', go: ['customize', 'knowledge'] },
+      { id: 'knowledge', label: 'Knowledge', icon: 'book', go: ['customize', 'knowledge'] },
       { id: 'playbooks', label: 'Playbooks', icon: 'library', go: ['customize', 'playbooks'] },
       { id: 'secrets', label: 'Secrets', icon: 'shield', go: ['security'] },
       { id: 'review', label: 'Review', icon: 'pr', go: ['review'] },
@@ -721,14 +652,56 @@ export const SHORTCUTS: [string, string][] = [
   ['Ctrl-C', 'Quit and restore the terminal'],
 ]
 
-function SettingRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Group({ children, testId }: { children: React.ReactNode; testId?: string }) {
   return (
-    <div style={{ ...row({ gap: 16 }), minHeight: 52, paddingTop: 8, paddingBottom: 8, borderBottomWidth: 1, borderColor: C.border, flexWrap: 'wrap' }}>
-      <div style={col({ flexGrow: 1, minWidth: 180, gap: 2 })}>
+    <div testId={testId} style={{ ...col(), borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, overflow: 'hidden' }}>
+      {children}
+    </div>
+  )
+}
+
+function SettingRow({ label, hint, children, last }: { label: string; hint?: string; children: React.ReactNode; last?: boolean }) {
+  return (
+    <div style={{ ...row({ gap: 16 }), minHeight: 56, paddingLeft: 16, paddingRight: 14, paddingTop: 10, paddingBottom: 10, borderBottomWidth: last ? 0 : 1, borderColor: C.border, flexWrap: 'wrap' }}>
+      <div style={col({ flexGrow: 1, flexBasis: 0, minWidth: 200, gap: 2 })}>
         <T weight={500}>{label}</T>
         {hint && <T size={12.5} color={C.tertiary}>{hint}</T>}
       </div>
       {children}
+    </div>
+  )
+}
+
+function ZoomStepper({ zoom, onZoom }: { zoom: number; onZoom?: (z: number) => void }) {
+  const seg = (testId: string, label: string, onClick: () => void, disabled: boolean, wide?: boolean) => (
+    <Button
+      testId={testId}
+      disabled={disabled}
+      onClick={disabled ? undefined : onClick}
+      style={{ ...row({ justifyContent: 'center' }), width: wide ? 60 : 30, height: 28, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.4 : 1, borderLeftWidth: wide ? 1 : 0, borderRightWidth: wide ? 1 : 0, borderColor: C.border, hover: disabled ? {} : { backgroundColor: C.hover }, active: disabled ? {} : { backgroundColor: C.selected } }}
+    >
+      <text style={{ fontFamily: SANS, fontSize: wide ? 12.5 : 15, fontWeight: 500, color: C.text, pointerEvents: 'none' }}>{label}</text>
+    </Button>
+  )
+  return (
+    <div style={{ ...row(), borderRadius: 8, borderWidth: 1, borderColor: C.borderStrong, backgroundColor: C.raised, overflow: 'hidden', flexShrink: 0 }}>
+      {seg('zoom-out', '−', () => onZoom?.(stepZoom(zoom, -1)), zoom <= 0.75)}
+      {seg('zoom-reset', `${Math.round(zoom * 100)}%`, () => onZoom?.(1), false, true)}
+      {seg('zoom-in', '+', () => onZoom?.(stepZoom(zoom, 1)), zoom >= 2)}
+    </div>
+  )
+}
+
+function Keys({ combo }: { combo: string }) {
+  const parts = combo.split(' / ')
+  return (
+    <div style={row({ gap: 4 })}>
+      {parts.map((k, i) => (
+        <React.Fragment key={k}>
+          {i > 0 && <T size={12} color={C.ghost}>/</T>}
+          <Kbd keys={k} />
+        </React.Fragment>
+      ))}
     </div>
   )
 }
@@ -791,8 +764,8 @@ export function SettingsView(p: SettingsProps) {
   }
 
   const nav = (
-    <div style={{ ...col({ gap: 1 }), width: p.narrow ? '100%' : 230, flexShrink: 0, paddingTop: 20, paddingLeft: 10, paddingRight: 10, borderRightWidth: p.narrow ? 0 : 1, borderColor: C.border, overflowY: 'scroll' }}>
-      <div style={{ paddingLeft: 4, paddingRight: 4, paddingBottom: 10 }}>
+    <div style={{ ...col({ gap: 1 }), width: p.narrow ? '100%' : 232, flexShrink: 0, paddingTop: 16, paddingLeft: 10, paddingRight: 10, paddingBottom: 16, borderRightWidth: p.narrow ? 0 : 1, borderColor: C.border, overflowY: 'scroll' }}>
+      <div style={{ paddingLeft: 2, paddingRight: 2, paddingBottom: 8 }}>
         <Field testId="settings-search" value={q} onChange={setQ} placeholder="Search settings" />
       </div>
       {SETTINGS_NAV.map((s) => {
@@ -800,16 +773,19 @@ export function SettingsView(p: SettingsProps) {
         if (!items.length) return null
         return (
           <React.Fragment key={s.section}>
-            <div style={{ paddingLeft: 10, paddingTop: 10, paddingBottom: 4 }}>
-              <T size={12} color={C.ghost} weight={500}>{s.section}</T>
+            <div style={{ paddingLeft: 10, paddingTop: 12, paddingBottom: 4 }}>
+              <T size={11.5} color={C.ghost} weight={500}>{s.section}</T>
             </div>
-            {items.map((it) => (
-              <div key={it.id} testId={`settings-nav-${it.id}`} onClick={() => click(it)} style={{ ...row({ gap: 10 }), height: 32, paddingLeft: 10, paddingRight: 8, borderRadius: 8, cursor: 'pointer', backgroundColor: page === it.id ? C.selected : CLEAR, hover: { backgroundColor: C.hover } }}>
-                <Icon name={it.icon} size={14} color={page === it.id ? C.text : C.tertiary} />
-                <text style={{ fontFamily: SANS, fontSize: 13.5, color: page === it.id ? C.text : C.secondary, flexGrow: 1 }}>{it.label}</text>
-                {(it.web || it.go) && <Icon name={it.web ? 'share' : 'chevronRight'} size={12} color={C.ghost} />}
-              </div>
-            ))}
+            {items.map((it) => {
+              const active = page === it.id
+              return (
+                <div key={it.id} testId={`settings-nav-${it.id}`} onClick={() => click(it)} style={{ ...row({ gap: 10 }), height: 30, paddingLeft: 10, paddingRight: 8, borderRadius: 7, cursor: 'pointer', backgroundColor: active ? C.selected : CLEAR, hover: { backgroundColor: active ? C.selected : C.hover } }}>
+                  <Icon name={it.icon} size={15} color={active ? C.text : C.tertiary} />
+                  <text style={{ fontFamily: SANS, fontSize: 13.5, color: active ? C.text : C.secondary, fontWeight: active ? 500 : 400, flexGrow: 1, pointerEvents: 'none' }}>{it.label}</text>
+                  {(it.web || it.go) && <Icon name={it.web ? 'external' : 'chevronRight'} size={13} color={C.ghost} />}
+                </div>
+              )
+            })}
           </React.Fragment>
         )
       })}
@@ -820,42 +796,40 @@ export function SettingsView(p: SettingsProps) {
   if (page === 'preferences') {
     body = (
       <Page testId="settings-preferences" narrow={p.narrow} title="Preferences" subtitle="Saved to ~/.config/devin-tui/prefs.json on this machine.">
-        <div style={col()}>
-          <SettingRow label="Appearance" hint="Also ⇧⌘L. Defaults to your Ghostty theme.">
-            <Pills testId="pref-theme" value={p.themeName} onChange={p.onTheme} items={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]} />
+        <Group>
+          <SettingRow label="Appearance" hint="Defaults to your Ghostty theme. Also ⇧⌘L.">
+            <Segmented testId="pref-theme" value={p.themeName} onChange={p.onTheme} items={[{ value: 'dark', label: 'Dark', icon: 'moon' }, { value: 'light', label: 'Light', icon: 'sun' }]} />
           </SettingRow>
-          <SettingRow label="Zoom" hint="Also ⌘+ / ⌘− / ⌘0 (in Ghostty the app follows its font size) or ⌃+ / ⌃− / ⌃0. Scales the whole app.">
-            <div style={row({ gap: 6 })}>
-              <Btn small label="−" testId="zoom-out" disabled={(p.zoom ?? 1) <= 0.75} onClick={() => p.onZoom?.(stepZoom(p.zoom ?? 1, -1))} />
-              <Btn small label={`${Math.round((p.zoom ?? 1) * 100)}%`} testId="zoom-reset" onClick={() => p.onZoom?.(1)} />
-              <Btn small label="+" testId="zoom-in" disabled={(p.zoom ?? 1) >= 2} onClick={() => p.onZoom?.(stepZoom(p.zoom ?? 1, 1))} />
-            </div>
+          <SettingRow label="Zoom" hint="Scales the whole app. ⌘+ / ⌘− / ⌘0 or ⌃+ / ⌃− / ⌃0; in Ghostty the app follows the terminal's font size." last>
+            <ZoomStepper zoom={p.zoom ?? 1} onZoom={p.onZoom} />
           </SettingRow>
+        </Group>
+        <Group>
           <SettingRow label="Default agent" hint="Sent as devin_mode when you start a session.">
-            <Pills testId="pref-mode" value={p.mode} onChange={p.onMode} items={p.modes} />
+            <Segmented small testId="pref-mode" value={p.mode} onChange={p.onMode} items={p.modes} />
           </SettingRow>
-          <SettingRow label="Default repository" hint="Attached to new sessions as repos.">
+          <SettingRow label="Default repository" hint="Attached to new sessions as repos." last>
             <Pills testId="pref-repo" value={p.repo} onChange={p.onRepo} items={p.repos.slice(0, 6).map((r) => ({ value: r, label: r.split('/')[1] ?? r }))} />
           </SettingRow>
-          <SettingRow label="Renamed sessions" hint={`${p.renamedCount} local title override${p.renamedCount === 1 ? '' : 's'}. The Devin API has no rename, so names stay on this machine.`}>
+        </Group>
+        <Group>
+          <SettingRow label="Renamed sessions" hint={`${p.renamedCount} local title override${p.renamedCount === 1 ? '' : 's'}. The Devin API has no rename, so names stay on this machine.`} last>
             <Btn testId="pref-reset-titles" small label="Reset names" disabled={p.renamedCount === 0} onClick={p.onResetTitles} />
           </SettingRow>
-        </div>
+        </Group>
       </Page>
     )
   } else if (page === 'shortcuts') {
     body = (
-      <Page testId="settings-shortcuts" narrow={p.narrow} title="Keyboard shortcuts">
-        <div style={col()}>
-          {SHORTCUTS.map(([k, label]) => (
-            <div key={k} style={{ ...row({ gap: 12 }), height: 40, borderBottomWidth: 1, borderColor: C.border }}>
-              <T style={{ flexGrow: 1 }}>{label}</T>
-              <div style={{ paddingLeft: 8, paddingRight: 8, height: 24, ...row(), borderRadius: 6, backgroundColor: C.hover }}>
-                <T mono size={12} color={C.secondary}>{k}</T>
-              </div>
+      <Page testId="settings-shortcuts" narrow={p.narrow} title="Keyboard shortcuts" subtitle="Ghostty keeps some keys for itself; unbind ⌘K and ⌘N there to let the app have them.">
+        <Group>
+          {SHORTCUTS.map(([k, label], i) => (
+            <div key={k} style={{ ...row({ gap: 12 }), minHeight: 42, paddingLeft: 16, paddingRight: 14, borderBottomWidth: i === SHORTCUTS.length - 1 ? 0 : 1, borderColor: C.border }}>
+              <T style={{ flexGrow: 1, flexShrink: 1, minWidth: 0 }}>{label}</T>
+              <Keys combo={k} />
             </div>
           ))}
-        </div>
+        </Group>
       </Page>
     )
   } else if (page === 'api') {
@@ -879,70 +853,81 @@ export function SettingsView(p: SettingsProps) {
         setKeyBusy(false)
       }
     }
+    const info = (label: string, value: React.ReactNode, last?: boolean) => (
+      <div style={{ ...row({ gap: 16 }), minHeight: 42, paddingLeft: 16, paddingRight: 16, borderBottomWidth: last ? 0 : 1, borderColor: C.border }}>
+        <T size={13} color={C.tertiary} style={{ width: 110, flexShrink: 0 }}>{label}</T>
+        <div style={{ ...row({ gap: 8 }), flexGrow: 1, minWidth: 0 }}>{value}</div>
+      </div>
+    )
     body = (
       <Page testId="settings-api" narrow={p.narrow} title="Devin API" subtitle="devin-tui talks to the Devin v3 API with a personal access token. Save one here instead of exporting environment variables.">
-        <div style={col()}>
-          <SettingRow label="Status">
-            <T testId="api-status" size={13} color={p.api ? C.add : C.orange}>{p.api ? 'Live' : 'Demo data (no key)'}</T>
-          </SettingRow>
-          <SettingRow label="Organization">
-            <T mono size={12.5} color={C.secondary}>{p.orgId ?? '—'}</T>
-          </SettingRow>
-          <SettingRow label="Endpoint">
-            <T mono size={12.5} color={C.secondary}>{`${p.baseUrl}/v3`}</T>
-          </SettingRow>
-          <SettingRow label="Token" hint="Never shown in full.">
-            <T testId="api-key-hint" mono size={12.5} color={C.secondary}>{p.keyHint ?? '—'}</T>
-          </SettingRow>
-          <SettingRow label="Stored in">
-            <T testId="api-key-source" size={13} color={C.secondary}>{sourceLabel}</T>
-          </SettingRow>
-        </div>
-        <div style={row({ gap: 8 })}>
-          <Btn testId="api-test" label="Test connection" onClick={testConnection} />
-          <Btn label="Create a token on web" icon="share" onClick={() => openUrl(`${WEB}/settings/api-keys`)} />
-          <Btn label="API docs" icon="share" onClick={() => openUrl('https://docs.devin.ai/api-reference/overview')} />
+        <Group>
+          <div style={{ ...row({ gap: 12 }), minHeight: 56, paddingLeft: 14, paddingRight: 14, borderBottomWidth: 1, borderColor: C.border, backgroundColor: C.cardHead }}>
+            <IconTile icon="key" size={30} color={p.api ? C.add : C.orange} bg={p.api ? C.greenSoft : C.orangeSoft} />
+            <div style={col({ gap: 1, flexGrow: 1, minWidth: 0 })}>
+              <T weight={600}>Connection</T>
+              <T size={12.5} color={C.tertiary}>{p.api ? 'Sessions, automations and settings come from your organization.' : 'Running on scripted demo data.'}</T>
+            </div>
+            <Badge big tone={p.api ? 'green' : 'orange'} status={p.api ? 'finished' : 'blocked'} label={p.api ? 'Live' : 'Demo data (no key)'} testId="api-status" />
+          </div>
+          {info('Organization', <T mono size={12.5} color={C.secondary}>{p.orgId ?? '—'}</T>)}
+          {info('Endpoint', <T mono size={12.5} color={C.secondary}>{`${p.baseUrl}/v3`}</T>)}
+          {info('Token', <T testId="api-key-hint" mono size={12.5} color={C.secondary}>{p.keyHint ?? '—'}</T>)}
+          {info('Stored in', <T testId="api-key-source" size={13} color={C.secondary}>{sourceLabel}</T>, true)}
+        </Group>
+        <div style={row({ gap: 8, flexWrap: 'wrap' })}>
+          <Btn testId="api-test" icon="zap" label="Test connection" onClick={testConnection} />
+          <Btn ghost label="Create a token on web" icon="external" onClick={() => openUrl(`${WEB}/settings/api-keys`)} />
+          <Btn ghost label="API docs" icon="external" onClick={() => openUrl('https://docs.devin.ai/api-reference/overview')} />
         </div>
         {check && <Notice text={check.text} tone={check.tone} />}
-        <div style={{ ...col({ gap: 10 }), padding: 16, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card }}>
-          <T size={14} weight={600}>{source ? 'Replace API key' : 'Add an API key'}</T>
+        <FormCard
+          testId="api-key-form"
+          title={source ? 'Replace API key' : 'Add an API key'}
+          footer={
+            <>
+              {p.onRemoveKey && (source === 'keychain' || source === 'file') && (
+                <Btn
+                  testId="api-key-remove"
+                  danger
+                  ghost={!confirmRemove}
+                  label={confirmRemove ? 'Click again to remove' : 'Remove saved key'}
+                  onClick={() => {
+                    if (!confirmRemove) return setConfirmRemove(true)
+                    setConfirmRemove(false)
+                    p.onRemoveKey?.().catch((e: Error) => setKeyMsg({ text: e.message, tone: 'error' }))
+                  }}
+                />
+              )}
+              <div style={{ flexGrow: 1 }} />
+              <Btn testId="api-key-verify" label="Test this key" disabled={!draftOk || keyBusy} onClick={() => runKey(false)} />
+              <Btn testId="api-key-save" primary label={keyBusy ? 'Saving…' : 'Save key'} disabled={!draftOk || keyBusy || !p.onSaveKey} onClick={() => runKey(true)} />
+            </>
+          }
+        >
           {source === 'env' && <Notice text="DEVIN_API_KEY is set in this shell and overrides a saved key. Unset it to use the saved one." />}
-          <T size={12.5} color={C.tertiary}>Organization ID</T>
-          <Field testId="api-org-input" value={orgDraft} onChange={setOrgDraft} placeholder="org-…" mono />
-          <T size={12.5} color={C.tertiary}>Personal access token</T>
-          <div style={row({ gap: 8 })}>
-            <div style={{ flexGrow: 1 }}>
-              <SecretField testId="api-key-input" value={keyDraft} onChange={setKeyDraft} placeholder="Paste your token" reveal={reveal} />
-            </div>
-            <Btn small testId="api-key-reveal" label={reveal ? 'Hide' : 'Show'} onClick={() => setReveal((r) => !r)} />
+          <div style={col({ gap: 6 })}>
+            <Label>Organization ID</Label>
+            <Field testId="api-org-input" value={orgDraft} onChange={setOrgDraft} placeholder="org-…" mono />
           </div>
-          <div style={row({ gap: 8 })}>
-            <Btn testId="api-key-save" primary label={keyBusy ? 'Saving…' : 'Save key'} disabled={!draftOk || keyBusy || !p.onSaveKey} onClick={() => runKey(true)} />
-            <Btn testId="api-key-verify" label="Test this key" disabled={!draftOk || keyBusy} onClick={() => runKey(false)} />
-            {p.onRemoveKey && (source === 'keychain' || source === 'file') && (
-              <Btn
-                testId="api-key-remove"
-                danger
-                label={confirmRemove ? 'Click again to remove' : 'Remove saved key'}
-                onClick={() => {
-                  if (!confirmRemove) return setConfirmRemove(true)
-                  setConfirmRemove(false)
-                  p.onRemoveKey?.().catch((e: Error) => setKeyMsg({ text: e.message, tone: 'error' }))
-                }}
-              />
-            )}
+          <div style={col({ gap: 6 })}>
+            <Label>Personal access token</Label>
+            <div style={row({ gap: 6 })}>
+              <div style={{ flexGrow: 1 }}>
+                <SecretField testId="api-key-input" value={keyDraft} onChange={setKeyDraft} placeholder="Paste your token" reveal={reveal} />
+              </div>
+              <IconButton testId="api-key-reveal" icon={reveal ? 'eyeOff' : 'eye'} size={15} box={32} tip={reveal ? 'Hide token' : 'Show token'} onClick={() => setReveal((r) => !r)} />
+            </div>
           </div>
           {keyMsg && <Notice text={keyMsg.text} tone={keyMsg.tone} />}
           <T size={12} color={C.ghost}>The key is checked against the API before it's saved. On macOS it goes to the Keychain (service “devin-tui”); elsewhere to ~/.config/devin-tui/config.json with 0600 permissions. Environment variables still take priority.</T>
-        </div>
+        </FormCard>
       </Page>
     )
   } else {
     body = (
-      <Page testId="settings-web" narrow={p.narrow} title={current.label} subtitle="This page isn't in the public Devin API, so it opened on app.devin.ai in your browser.">
-        <div style={row({ gap: 8 })}>
-          <Btn primary icon="share" label="Open again" onClick={() => openUrl(`${WEB}${current.web ?? ''}`)} />
-        </div>
+      <Page testId="settings-web" narrow={p.narrow} title={current.label}>
+        <EmptyState icon="external" title="Opened in your browser" body="This page isn't in the public Devin API, so it opened on app.devin.ai." action={<Btn primary icon="external" label="Open again" onClick={() => openUrl(`${WEB}${current.web ?? ''}`)} />} />
       </Page>
     )
   }
@@ -951,10 +936,11 @@ export function SettingsView(p: SettingsProps) {
       {(!p.narrow || page === 'menu') && nav}
       {p.narrow ? (
         <div style={{ ...col(), flexGrow: 1, minHeight: 0 }}>
-          <div style={{ ...row({ gap: 8 }), paddingLeft: 12, paddingTop: 8 }}>
+          <div style={{ ...row({ gap: 4 }), paddingLeft: 14, paddingTop: 10 }}>
             {SETTINGS_NAV[0]!.items.concat(SETTINGS_NAV[1]!.items.slice(0, 1)).filter((i) => i.page).map((i) => (
-              <div key={i.id} testId={`settings-nav-${i.id}`} onClick={() => setPage(i.id)} style={{ ...row(), height: 26, paddingLeft: 9, paddingRight: 9, borderRadius: 13, cursor: 'pointer', backgroundColor: page === i.id ? C.selected : CLEAR }}>
-                <T size={12.5} color={page === i.id ? C.text : C.tertiary}>{i.label}</T>
+              <div key={i.id} testId={`settings-nav-${i.id}`} onClick={() => setPage(i.id)} style={{ ...row({ gap: 6 }), height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 8, cursor: 'pointer', backgroundColor: page === i.id ? C.selected : CLEAR, hover: { backgroundColor: page === i.id ? C.selected : C.hover } }}>
+                <Icon name={i.icon} size={13} color={page === i.id ? C.text : C.tertiary} />
+                <T size={12.5} weight={500} color={page === i.id ? C.text : C.tertiary}>{i.label}</T>
               </div>
             ))}
           </div>

@@ -23,6 +23,12 @@ export type Palette = {
   orange: string
   add: string
   del: string
+  purple: string
+  blueSoft: string
+  orangeSoft: string
+  greenSoft: string
+  redSoft: string
+  purpleSoft: string
   userBubble: string
   sendBg: string
   sendFg: string
@@ -30,6 +36,11 @@ export type Palette = {
   chipText: string
   codeText: string
   codeWash: string
+  input: string
+  focus: string
+  elevated: string
+  shadow: string
+  shadowSoft: string
 }
 
 // Neutral grays from app.devin.ai; the canvas matches Ghostty's GitHub High Contrast themes so the app blends in.
@@ -37,62 +48,84 @@ export const DARK: Palette = {
   name: 'dark',
   canvas: '#0a0c10',
   sidebar: '#0a0c10',
-  raised: '#14161a',
-  card: '#111317',
-  cardHead: '#171a1f',
-  menu: '#1a1d22',
-  hover: '#1b1e23',
-  selected: '#22252b',
-  border: '#24272d',
-  borderStrong: '#33373e',
-  text: '#ececec',
-  secondary: '#c9cbcf',
-  tertiary: '#9a9da3',
-  ghost: '#73767c',
+  raised: '#121419',
+  card: '#0f1115',
+  cardHead: '#14161b',
+  menu: '#16181d',
+  hover: '#17191e',
+  selected: '#1f2227',
+  border: '#1f2227',
+  borderStrong: '#2d3037',
+  text: '#ededef',
+  secondary: '#c3c6cc',
+  tertiary: '#9599a0',
+  ghost: '#6f737a',
   accent: '#4c9dff',
   accentSoft: '#4c9dff22',
   blue: '#4c9dff',
   orange: '#f0883e',
   add: '#3fb950',
   del: '#f85149',
-  userBubble: '#1b1e23',
-  sendBg: '#ececec',
+  purple: '#a371f7',
+  blueSoft: '#4c9dff1c',
+  orangeSoft: '#f0883e1c',
+  greenSoft: '#3fb9501c',
+  redSoft: '#f851491c',
+  purpleSoft: '#a371f71c',
+  userBubble: '#16181d',
+  sendBg: '#ededef',
   sendFg: '#0a0c10',
-  chip: '#22252b',
-  chipText: '#c9cbcf',
+  chip: '#1c1f24',
+  chipText: '#c3c6cc',
   codeText: '#e6e6e6',
-  codeWash: '#ffffff12',
+  codeWash: '#ffffff10',
+  input: '#0e1014',
+  focus: '#4a4f58',
+  elevated: '#25282e',
+  shadow: '#000000a6',
+  shadowSoft: '#00000059',
 }
 
 export const LIGHT: Palette = {
   name: 'light',
   canvas: '#ffffff',
-  sidebar: '#ffffff',
+  sidebar: '#fafafa',
   raised: '#ffffff',
   card: '#ffffff',
-  cardHead: '#f7f7f8',
+  cardHead: '#f8f8f9',
   menu: '#ffffff',
-  hover: '#f5f5f7',
-  selected: '#ededf0',
-  border: '#e8e8eb',
-  borderStrong: '#d9d9de',
-  text: '#1a1a1a',
-  secondary: '#3a3a3c',
-  tertiary: '#5c5c61',
-  ghost: '#6c6c71',
+  hover: '#f1f1f3',
+  selected: '#e9e9ec',
+  border: '#e6e6e9',
+  borderStrong: '#d4d4d9',
+  text: '#18181b',
+  secondary: '#3c3c43',
+  tertiary: '#5f5f67',
+  ghost: '#7c7c85',
   accent: '#2f6fde',
-  accentSoft: '#2f6fde18',
+  accentSoft: '#2f6fde16',
   blue: '#2f6fde',
-  orange: '#e8833a',
+  orange: '#c96512',
   add: '#1a7f37',
   del: '#cf222e',
-  userBubble: '#f5f5f7',
-  sendBg: '#1a1a1a',
+  purple: '#8250df',
+  blueSoft: '#2f6fde14',
+  orangeSoft: '#c9651214',
+  greenSoft: '#1a7f3714',
+  redSoft: '#cf222e12',
+  purpleSoft: '#8250df14',
+  userBubble: '#f3f3f5',
+  sendBg: '#18181b',
   sendFg: '#ffffff',
-  chip: '#efeff0',
-  chipText: '#3a3a3c',
+  chip: '#efeff1',
+  chipText: '#3c3c43',
   codeText: '#1a1a1a',
   codeWash: '#0000000a',
+  input: '#ffffff',
+  focus: '#b4b4bc',
+  elevated: '#ffffff',
+  shadow: '#0000001f',
+  shadowSoft: '#0000000f',
 }
 
 /** Live palette. Components read it during render; `setTheme` swaps it and the app re-renders from the root. */

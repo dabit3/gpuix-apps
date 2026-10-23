@@ -34,11 +34,11 @@ devin-tui [options] [prompt]
   -h, --help          show this help
 ```
 
-Credentials come from `DEVIN_API_KEY` + `DEVIN_ORG_ID`, or from `~/.config/devin-tui/config.json` (`{"apiKey": "...", "orgId": "org-..."}`, keep it `chmod 600`). Without them the app falls back to scripted demo data and says "Demo data" in the sidebar footer; live mode says "Live · api.devin.ai".
+Credentials come from `DEVIN_API_KEY` + `DEVIN_ORG_ID`, or from `~/.config/devin-tui/config.json` (`{"apiKey": "...", "orgId": "org-..."}`, keep it `chmod 600`). Without them the app falls back to scripted demo data. The dot next to the session count in the sidebar footer shows which: grey for "Demo data", green for "Live · api.devin.ai", red when the API can't be reached (hover it, or open the workspace or help menu, for the label).
 
 Don't pipe anything into `devin-tui`: GPUIX 0.11.0 treats a stdin pipe as the automation protocol, and terminal mode needs the TTY. Ctrl-C quits and restores the prompt.
 
-Zoom (75–200%, remembered between launches): ⌘+ / ⌘− / ⌘0 or ⌃+ / ⌃− / ⌃0. Ghostty keeps ⌘+ / ⌘− for its own font size, so in terminal mode `devin-tui` watches the terminal's cell size and steps its zoom with Ghostty's font. The zoom runtime is wired with a `/** @jsxImportSource #zoom */` pragma plus the `#zoom/*` import in `package.json`, so it works from any working directory (Bun only applies `tsconfig.json` when launched from this folder).
+Zoom (75–200%, remembered between launches): ⌘+ / ⌘− / ⌘0 or ⌃+ / ⌃− / ⌃0. Ghostty keeps ⌘+ / ⌘− for its own font size, so in terminal mode `devin-tui` watches the terminal's cell size and steps its zoom with Ghostty's font. The zoom runtime is wired with a `/** @jsxImportSource #zoom */` pragma plus the `#zoom/*` import in `package.json`, so it works from any working directory (Bun only applies `tsconfig.json` when launched from this folder). GPUIX's own components (`Button`, `Select*`, `Tooltip*`, `motion.div`) build their elements through React's runtime, not `#zoom`, so the runtime also scales the `style` the app passes to them (`src/zoom/components.ts`). Before that, buttons and menu triggers kept their 100% size while their icons and text grew.
 
 ## Live mode (Devin API v3)
 
@@ -103,9 +103,16 @@ The mic and voice buttons were removed: GPUIX has no audio capture in a terminal
 
 ## Design
 
-Laid out after the current web app: org header with search/notifications, New session (⇧⌘O), Automations, Security, Review, Customize, More, then Sessions with search (⌘K), nested sessions and "Load more…". The home view is the Devin mark with the Agent/Ask toggle over the big composer (+, slash commands, settings, repository, mode, mic, voice, split send button). Sessions get a branch/title/PR-count header with a status chip, the transcript, the status line and the composer. Inter is bundled (`assets/fonts`) and registered with `registerFont()`.
+Laid out after the current web app, with one shared set of tokens and components:
 
-Two palettes live in `src/theme.ts`. Dark uses Ghostty's GitHub Dark High Contrast background (`#0a0c10`) so the GUI blends into the terminal. Light is the web app's white. `auto` (the default) reads `~/.config/ghostty/config` and picks light for a light Ghostty theme. The sun/moon button (or ⇧⌘L) flips it at runtime.
+- **Tokens** (`src/theme.ts`): two palettes with surface steps (canvas, raised, card, menu, elevated), four text steps, tinted status colors (`blueSoft`, `orangeSoft`, `greenSoft`, `redSoft`, `purpleSoft`; purple marks merged PRs), and input, focus and shadow colors. Dark uses Ghostty's GitHub Dark High Contrast background (`#0a0c10`) so the GUI blends into the terminal. Light is white with a `#fafafa` sidebar.
+- **Components** (`src/ui.tsx`): `Btn` (primary, secondary, ghost, danger), `IconButton` with a hover tooltip and shortcut keycap, `Badge` and `StatusPill`, `Kbd`, `Segmented`, `Pills`, underline `Tabs`, `Field` with a focus border, `Toggle` with an animated knob, `EmptyState`, `IconTile`, and menus with section headers and separators. Every page uses them, so spacing, corner radii and type sizes match across the app.
+- **Sidebar**: workspace menu (settings, Devin API, shortcuts, theme), keycap hints, sessions grouped by Today / Yesterday / Previous 7 days / Older, and a status dot on every row (pulsing blue: working, orange: waiting for you, red: failed, grey: finished or asleep). A parent session shows its child count and a chevron; open children hang off a guide line.
+- **Session**: the header shows the title, a tinted status pill, the PR count and the mode. Shell, edit, browser, plan and PR cards share one card style. The status line above the composer turns orange when Devin needs a reply.
+- **Home**: the Devin mark and the Agent/Ask switch over the composer, starter prompts that fill in the composer, and the main keyboard shortcuts.
+- **Pages**: one page header, grouped settings rows, tables with column headers, and empty states that say what goes there.
+
+Lucide icons render at a 1.75 stroke. Inter is bundled (`assets/fonts`) and registered with `registerFont()`. Theme `auto` (the default) reads `~/.config/ghostty/config` and picks light for a light Ghostty theme. The sun/moon button (or ⇧⌘L) flips it at runtime.
 
 ## Ghostty setup used for the demo
 
@@ -123,9 +130,9 @@ keybind = super+n=unbind
 
 The app follows the terminal's size through `useWindowSize()`:
 
-- **≥ 1080 px**: full layout (288 px sidebar, transcript, 400 px right panel).
+- **≥ 1080 px**: full layout (280 px sidebar, transcript, 400 px right panel).
 - **600–1080 px** (a half split): 232 px sidebar, no right panel, trimmed header.
-- **< 600 px** (a narrow split): transcript and composer only.
+- **< 600 px** (a narrow split): transcript and composer, with Sessions and New session buttons in the header instead of the sidebar.
 
 Splitting with Cmd-D, dragging the divider, or zooming a split (Cmd-Shift-Enter) reflows it live, and each pane is its own independent app.
 
@@ -146,7 +153,7 @@ Env flags: `GPUIX_WINDOW=1` (same as `--window`), `GPUIX_BACKGROUND=1` (don't st
   3. Live mode against a fake `DevinApi`: sessions load and nest, opening one polls its messages, a message added server-side appears on the next poll, the composer calls `sendMessage`, New session calls `createSession`, and the theme toggle switches to light and back.
 
 ```
-bun test   →  9 pass  0 fail  (4 files)
+bun test   →  25 pass  0 fail  (7 files)
 bun run typecheck
 ```
 
@@ -175,3 +182,8 @@ Paravirtual Metal is slower than an M-series GPU, so expect better numbers on re
 7. **Ghostty splits work, tmux doesn't.** Each Ghostty split gets its own kitty-graphics surface, so two GPUIX apps side by side, divider drags and split zoom all reflow cleanly. tmux is unsupported, as the README says.
 8. **SSH works** (`ssh -t localhost devin-tui`): the remote app paints and takes clicks; `-t` is required for the TTY.
 9. **`<markdown>` text is invisible to automation.** `getAllText()` and `textContent()` don't include `<markdown>` content in 0.11.0 (the README says `getAllText()` only sees `<text>` nodes), so the live-mode test asserts that each message element appears instead of reading its text.
+10. **GPUIX components skip a custom JSX runtime.** `Button`, `Select*`, `Tooltip*` and `motion.div` create their elements with React's own runtime, so a `jsxImportSource` never sees their `style`. The zoom runtime scales the props the app passes to those components (`src/zoom/components.ts`).
+11. **A filled child blocks clicks on its parent.** An element that paints a background takes the click unless it sets `pointerEvents: 'none'`, as the GPUIX types say. Badges inside clickable rows set it.
+12. **`Tooltip` also opens on focus**, so a clicked icon button showed its tooltip at once. `Tip` in `src/ui.tsx` ignores opens after a press until the pointer leaves.
+13. **`diffFileHeaderHeight: 0` doesn't hide the diff header.** The row shrinks but its text still paints over the first hunk, so the edit card uses the diff's own header instead of adding a second one.
+14. **Test roots stay mounted across test files** in one `bun test` process. A key handler kept in a module variable and set during render could point at an app from an earlier file, which made the ⌘K / Esc check fail when the whole suite ran. Each app instance now keeps its own handler.

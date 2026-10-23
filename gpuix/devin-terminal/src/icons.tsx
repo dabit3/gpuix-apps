@@ -42,6 +42,25 @@ import icon_merge from '../assets/icons/git-merge.svg' with { type: 'text' }
 import icon_link from '../assets/icons/link.svg' with { type: 'text' }
 import icon_monitor from '../assets/icons/monitor.svg' with { type: 'text' }
 import icon_devin from '../assets/icons/devin-mark.svg' with { type: 'text' }
+import icon_trash from '../assets/icons/trash-2.svg' with { type: 'text' }
+import icon_x from '../assets/icons/x.svg' with { type: 'text' }
+import icon_enter from '../assets/icons/corner-down-left.svg' with { type: 'text' }
+import icon_external from '../assets/icons/arrow-up-right.svg' with { type: 'text' }
+import icon_circleCheck from '../assets/icons/circle-check.svg' with { type: 'text' }
+import icon_circleAlert from '../assets/icons/circle-alert.svg' with { type: 'text' }
+import icon_terminal from '../assets/icons/terminal.svg' with { type: 'text' }
+import icon_flask from '../assets/icons/flask-conical.svg' with { type: 'text' }
+import icon_book from '../assets/icons/book-open.svg' with { type: 'text' }
+import icon_archive from '../assets/icons/archive.svg' with { type: 'text' }
+import icon_stop from '../assets/icons/circle-stop.svg' with { type: 'text' }
+import icon_key from '../assets/icons/key-round.svg' with { type: 'text' }
+import icon_message from '../assets/icons/message-square.svg' with { type: 'text' }
+import icon_inbox from '../assets/icons/inbox.svg' with { type: 'text' }
+import icon_bug from '../assets/icons/bug.svg' with { type: 'text' }
+import icon_eye from '../assets/icons/eye.svg' with { type: 'text' }
+import icon_eyeOff from '../assets/icons/eye-off.svg' with { type: 'text' }
+import icon_updown from '../assets/icons/chevrons-up-down.svg' with { type: 'text' }
+import icon_lock from '../assets/icons/lock.svg' with { type: 'text' }
 
 const ICONS = {
   compose: iconCompose,
@@ -87,9 +106,30 @@ const ICONS = {
   link: icon_link,
   monitor: icon_monitor,
   devin: icon_devin,
+  trash: icon_trash,
+  x: icon_x,
+  enter: icon_enter,
+  external: icon_external,
+  circleCheck: icon_circleCheck,
+  circleAlert: icon_circleAlert,
+  terminal: icon_terminal,
+  flask: icon_flask,
+  book: icon_book,
+  archive: icon_archive,
+  stop: icon_stop,
+  key: icon_key,
+  message: icon_message,
+  inbox: icon_inbox,
+  bug: icon_bug,
+  eye: icon_eye,
+  eyeOff: icon_eyeOff,
+  updown: icon_updown,
+  lock: icon_lock,
 }
 
 export type IconName = keyof typeof ICONS
+
+const CRISP = Object.fromEntries(Object.entries(ICONS).map(([k, v]) => [k, v.replace(/stroke-width="2"/g, 'stroke-width="1.75"')])) as Record<IconName, string>
 
 // The Devin mark is the official artwork (raster, from the brand lockups); pick the variant that contrasts with its background.
 const MARK_WHITE = new URL('../assets/icons/devin-mark-white.png', import.meta.url).pathname
@@ -103,5 +143,5 @@ function isLight(hex: string) {
 
 export function Icon({ name, size = 14, color }: { name: IconName; size?: number; color: string }) {
   if (name === 'devin') return <img src={isLight(color) ? MARK_WHITE : MARK_BLACK} objectFit="contain" style={{ width: size, height: size, flexShrink: 0, pointerEvents: 'none' }} />
-  return <svg source={ICONS[name]} style={{ width: size, height: size, flexShrink: 0, color, pointerEvents: 'none' }} />
+  return <svg source={CRISP[name]} style={{ width: size, height: size, flexShrink: 0, color, pointerEvents: 'none' }} />
 }
